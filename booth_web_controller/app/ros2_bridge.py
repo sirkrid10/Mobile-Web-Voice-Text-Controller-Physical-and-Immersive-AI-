@@ -173,6 +173,14 @@ class MockROS2Bridge(BaseROS2Bridge):
 # Real ROS 2 Jazzy Bridge Implementation (rclpy In-Process Node)
 # ---------------------------------------------------------------------------
 
+try:
+    from ai_interfaces.msg import UserRequest
+    from builtin_interfaces.msg import Time as RosTime
+    HAS_AI_INTERFACES = True
+except ImportError:
+    HAS_AI_INTERFACES = False
+
+
 class RealROS2Bridge(BaseROS2Bridge):
     def __init__(self, session_manager: Any, loop: asyncio.AbstractEventLoop):
         import rclpy
@@ -194,7 +202,10 @@ class RealROS2Bridge(BaseROS2Bridge):
 
                 # Publishers to LLM & Robot
                 # Primary: /guide/user_request (UserRequest)
-                self.pub_user_request = self.create_publisher(String, '/guide/user_request', 10)
+                if HAS_AI_INTERFACES:
+                    self.pub_user_request = self.create_publisher(UserRequest, '/guide/user_request', 10)
+                else:
+                    self.pub_user_request = self.create_publisher(String, '/guide/user_request', 10)
                 # Fallback alias: /visitor/user_transcript
                 self.pub_transcript = self.create_publisher(String, '/visitor/user_transcript', 10)
                 # Primary Action/Topic: /guide/navigate
@@ -327,16 +338,25 @@ class RealROS2Bridge(BaseROS2Bridge):
         now_sec = int(time.time())
 
         # Exact schema required by LLM intent_node (/guide/user_request)
-        user_request_data = {
-            "request_id": req_id,
-            "session_id": session_id,
-            "text": text,
-            "valid_until": {"sec": now_sec + 60, "nanosec": 0}
-        }
-        msg_req = String()
-        msg_req.data = json.dumps(user_request_data, ensure_ascii=False)
-        self.node.pub_user_request.publish(msg_req)
-        print(f"[ROS2Bridge] Published /guide/user_request: {msg_req.data}")
+        if HAS_AI_INTERFACES:
+            msg_req = UserRequest()
+            msg_req.request_id = req_id
+            msg_req.session_id = session_id
+            msg_req.text = text
+            msg_req.valid_until = RosTime(sec=now_sec + 60, nanosec=0)
+            self.node.pub_user_request.publish(msg_req)
+            print(f"[ROS2Bridge] Published native UserRequest to /guide/user_request: req_id={req_id}, text={text}")
+        else:
+            user_request_data = {
+                "request_id": req_id,
+                "session_id": session_id,
+                "text": text,
+                "valid_until": {"sec": now_sec + 60, "nanosec": 0}
+            }
+            msg_req = String()
+            msg_req.data = json.dumps(user_request_data, ensure_ascii=False)
+            self.node.pub_user_request.publish(msg_req)
+            print(f"[ROS2Bridge] Published JSON String to /guide/user_request: {msg_req.data}")
 
         # Fallback alias /visitor/user_transcript
         msg_trans = String()
