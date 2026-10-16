@@ -1,12 +1,22 @@
 """ROS 2 Jazzy Bridge & Mock Fallback.
-Provides in-process ROS 2 rclpy Node in a background daemon thread,
-publishing to /visitor/user_transcript, /llm/high_level_action, /robot/emergency_stop,
-and subscribing to /robot/system_state, /llm/mind_status.
-Falls back seamlessly to MockROS2Bridge if ROS 2 is not sourced or USE_MOCK_ROS2 is enabled.
+Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
+
+Publishes to:
+- /guide/user_request (UserRequest: request_id, session_id, text, valid_until)
+- /guide/navigate (GuideToDestination: request_id, destination_id, valid_until)
+- /visitor/user_transcript (std_msgs/String - fallback alias)
+- /robot/emergency_stop & /cmd_vel
+
+Subscribes to:
+- /robot/navigation_state (NavigationState: stamp, request_id, destination_id, phase, ready_for_goal, distance_remaining_m, error_code, error_msg)
+- /vr/subtitle (Subtitle: stamp, request_id, observation_id, text, ttl)
+- /robot/system_state (fallback alias)
+- /llm/mind_status (fallback alias)
 """
 
 import json
 import time
+import secrets
 import asyncio
 import threading
 from typing import Optional, Dict, Any, Callable
@@ -41,39 +51,44 @@ class BaseROS2Bridge:
 # ---------------------------------------------------------------------------
 
 class MockROS2Bridge(BaseROS2Bridge):
-    """Simulates ROS 2 Nav2 and LLM Node behavior in standalone environment."""
+    """Simulates ROS 2 Nav2, LLM intent_node, and subtitle_node in standalone environment."""
     def __init__(self, session_manager: Any, loop: asyncio.AbstractEventLoop):
         self.session_manager = session_manager
         self.loop = loop
         self._sim_task: Optional[asyncio.Task] = None
-        print("[ROS2Bridge] Mock ROS 2 Bridge initialized.")
+        print("[ROS2Bridge] Mock ROS 2 Bridge initialized (Aligned with /guide/user_request & /vr/subtitle).")
 
     def publish_user_transcript(self, session_id: str, input_mode: str, text: str):
-        payload = {
-            "timestamp": time.time(),
-            "session_id": session_id,
-            "input_mode": input_mode,
-            "text": text
-        }
-        print(f"[ROS2Bridge Mock] Published to /visitor/user_transcript: {json.dumps(payload, ensure_ascii=False)}")
+        req_id = f"req-{secrets.token_hex(3)}"
+        now_sec = int(time.time())
 
-        # Infer target location from text or default
-        target = "AI_EXHIBITION"
+        # Exact UserRequest payload requested by LLM intent_node
+        user_request_payload = {
+            "request_id": req_id,
+            "session_id": session_id,
+            "text": text,
+            "valid_until": {"sec": now_sec + 60, "nanosec": 0}
+        }
+        print(f"[ROS2Bridge Mock] Published to /guide/user_request: {json.dumps(user_request_payload, ensure_ascii=False)}")
+
+        # Infer target destination_id: booth_09, booth_10, start
+        target = "booth_09"
         text_lower = text.lower()
-        if "presentation" in text_lower or "เวที" in text_lower:
-            target = "PRESENTATION_AREA"
-        elif "robotics" in text_lower or "lab" in text_lower:
-            target = "ROBOTICS_LAB"
-        elif "start" in text_lower or "เริ่มต้น" in text_lower:
-            target = "START_BOOTH"
+        if "คณิต" in text_lower or "10" in text_lower or "math" in text_lower or "stat" in text_lower:
+            target = "booth_10"
+        elif "คอม" in text_lower or "09" in text_lower or "computer" in text_lower or "วิทคอม" in text_lower:
+            target = "booth_09"
+        elif "start" in text_lower or "เริ่มต้น" in text_lower or "กลับ" in text_lower or "จุดรอ" in text_lower:
+            target = "start"
         elif "stop" in text_lower or "หยุด" in text_lower or "wait" in text_lower:
             target = None
 
         if target:
+            target_name = "บูธ 09 วิทยาการคอมพิวเตอร์" if target == "booth_09" else ("บูธ 10 คณิตศาสตร์และสถิติ" if target == "booth_10" else "จุดรอเริ่มต้น (Start)")
             self.session_manager.update_from_llm_mind(
                 heard_text=text,
                 target=target,
-                explanation=f"หุ่นยนต์กำลังวางแผนเส้นทางและเดินทางไปยัง {target}"
+                explanation=f"intent_node เลือกปลายทาง: {target} ({target_name})"
             )
             self._start_navigation_simulation(target)
         else:
@@ -85,13 +100,16 @@ class MockROS2Bridge(BaseROS2Bridge):
             self.session_manager.update_from_ros_state(state="IDLE")
 
     def publish_high_level_action(self, action: str, target: str, explanation: str, source: str = "web_controller"):
-        payload = {
-            "action": action,
-            "target": target,
-            "explanation": explanation,
-            "source": source
+        req_id = f"req-{secrets.token_hex(3)}"
+        now_sec = int(time.time())
+        guide_navigate_payload = {
+            "request_id": req_id,
+            "destination_id": target,
+            "valid_until": {"sec": now_sec + 60, "nanosec": 0},
+            "source": source,
+            "explanation": explanation
         }
-        print(f"[ROS2Bridge Mock] Published to /llm/high_level_action: {json.dumps(payload, ensure_ascii=False)}")
+        print(f"[ROS2Bridge Mock] Published to /guide/navigate: {json.dumps(guide_navigate_payload, ensure_ascii=False)}")
 
         if action == "GO_TO":
             self.session_manager.update_from_llm_mind(
@@ -125,19 +143,26 @@ class MockROS2Bridge(BaseROS2Bridge):
 
         async def _run_sim():
             try:
-                # 1. Start navigating
+                target_name = "บูธ 09 วิทยาการคอมพิวเตอร์" if target == "booth_09" else ("บูธ 10 คณิตศาสตร์และสถิติ" if target == "booth_10" else "จุดรอเริ่มต้น")
+                # 1. Start navigating (phase: NAVIGATING)
                 self.session_manager.update_from_ros_state(state="NAVIGATING", goal=target)
-                print(f"[ROS2Bridge Mock] Navigating towards {target}...")
-                await asyncio.sleep(4.0)
-
-                # 2. Reached destination
-                print(f"[ROS2Bridge Mock] Reached destination {target}!")
-                self.session_manager.update_from_ros_state(state="REACHED", goal=target)
                 self.session_manager.update_from_llm_mind(
                     heard_text=self.session_manager.heard_text,
                     target=target,
-                    explanation=f"หุ่นยนต์เดินทางถึง {target} เรียบร้อยแล้ว พร้อมรับคำสั่งถัดไป"
+                    explanation=f"กำลังนำทางไป{target_name}"
                 )
+                print(f"[ROS2Bridge Mock] Navigating towards {target}...")
+                await asyncio.sleep(4.0)
+
+                # 2. Reached destination (phase: ARRIVED or HOME)
+                final_state = "IDLE" if target == "start" else "REACHED"
+                self.session_manager.update_from_ros_state(state=final_state, goal=target)
+                self.session_manager.update_from_llm_mind(
+                    heard_text=self.session_manager.heard_text,
+                    target=target,
+                    explanation=f"หุ่นยนต์เดินทางถึง {target_name} เรียบร้อยแล้ว พร้อมรับคำสั่งถัดไป"
+                )
+                print(f"[ROS2Bridge Mock] Reached destination {target} ({final_state})!")
             except asyncio.CancelledError:
                 print("[ROS2Bridge Mock] Navigation simulation cancelled.")
 
@@ -167,26 +192,97 @@ class RealROS2Bridge(BaseROS2Bridge):
                 super().__init__('booth_web_bridge_node')
                 self.outer = outer
 
-                # Publishers
+                # Publishers to LLM & Robot
+                # Primary: /guide/user_request (UserRequest)
+                self.pub_user_request = self.create_publisher(String, '/guide/user_request', 10)
+                # Fallback alias: /visitor/user_transcript
                 self.pub_transcript = self.create_publisher(String, '/visitor/user_transcript', 10)
+                # Primary Action/Topic: /guide/navigate
+                self.pub_guide_nav = self.create_publisher(String, '/guide/navigate', 10)
                 self.pub_action = self.create_publisher(String, '/llm/high_level_action', 10)
                 self.pub_estop = self.create_publisher(Bool, '/robot/emergency_stop', 10)
                 self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)
 
-                # Subscribers
+                # Subscribers from Robot bridge & subtitle_node
+                # Primary: /robot/navigation_state (NavigationState)
+                self.sub_nav_state = self.create_subscription(
+                    String,
+                    '/robot/navigation_state',
+                    self._on_navigation_state,
+                    10
+                )
+                # Fallback: /robot/system_state
                 self.sub_state = self.create_subscription(
                     String,
                     '/robot/system_state',
                     self._on_system_state,
                     10
                 )
+                # Primary: /vr/subtitle (Subtitle from subtitle_node)
+                self.sub_vr_subtitle = self.create_subscription(
+                    String,
+                    '/vr/subtitle',
+                    self._on_vr_subtitle,
+                    10
+                )
+                # Fallback: /llm/mind_status
                 self.sub_mind = self.create_subscription(
                     String,
                     '/llm/mind_status',
                     self._on_mind_status,
                     10
                 )
-                self.get_logger().info("BoothWebBridgeNode ROS 2 Jazzy node created.")
+                self.get_logger().info("BoothWebBridgeNode ROS 2 Jazzy node created (Subscribed: /robot/navigation_state, /vr/subtitle; Publishing: /guide/user_request).")
+
+            def _on_navigation_state(self, msg: String):
+                """Parse /robot/navigation_state from Robot bridge."""
+                try:
+                    data = json.loads(msg.data)
+                    phase = data.get("phase", "UNKNOWN").upper()
+                    dest_id = data.get("destination_id")
+                    ready_for_goal = data.get("ready_for_goal", False)
+                    dist = data.get("distance_remaining_m", -1.0)
+                    error_code = data.get("error_code", 0)
+                    error_msg = data.get("error_msg", "")
+
+                    # Map phase to internal robot_state
+                    if phase in ("NAVIGATING", "RETURNING_HOME"):
+                        mapped_state = "NAVIGATING"
+                    elif phase == "ARRIVED":
+                        mapped_state = "REACHED"
+                    elif phase in ("HOME", "READY"):
+                        mapped_state = "IDLE"
+                    elif phase in ("CANCELED", "NOT_READY"):
+                        mapped_state = "STOPPED"
+                    elif phase == "FAILED":
+                        mapped_state = "FAILED"
+                    else:
+                        mapped_state = "IDLE"
+
+                    def _sync():
+                        self.outer.session_manager.update_from_ros_state(
+                            state=mapped_state,
+                            goal=dest_id,
+                            obstacle_detected=False
+                        )
+                    self.outer.loop.call_soon_threadsafe(_sync)
+                except Exception as e:
+                    self.get_logger().error(f"Error parsing /robot/navigation_state: {e}")
+
+            def _on_vr_subtitle(self, msg: String):
+                """Parse /vr/subtitle from subtitle_node to display synchronized subtitle on mobile screen."""
+                try:
+                    data = json.loads(msg.data)
+                    text = data.get("text", "")
+                    def _sync():
+                        if text:
+                            self.outer.session_manager.update_from_llm_mind(
+                                heard_text=self.outer.session_manager.heard_text,
+                                explanation=text
+                            )
+                    self.outer.loop.call_soon_threadsafe(_sync)
+                except Exception as e:
+                    self.get_logger().error(f"Error parsing /vr/subtitle: {e}")
 
             def _on_system_state(self, msg: String):
                 try:
@@ -226,29 +322,59 @@ class RealROS2Bridge(BaseROS2Bridge):
 
     def publish_user_transcript(self, session_id: str, input_mode: str, text: str):
         from std_msgs.msg import String
-        payload = {
+
+        req_id = f"req-{secrets.token_hex(4)}"
+        now_sec = int(time.time())
+
+        # Exact schema required by LLM intent_node (/guide/user_request)
+        user_request_data = {
+            "request_id": req_id,
+            "session_id": session_id,
+            "text": text,
+            "valid_until": {"sec": now_sec + 60, "nanosec": 0}
+        }
+        msg_req = String()
+        msg_req.data = json.dumps(user_request_data, ensure_ascii=False)
+        self.node.pub_user_request.publish(msg_req)
+        print(f"[ROS2Bridge] Published /guide/user_request: {msg_req.data}")
+
+        # Fallback alias /visitor/user_transcript
+        msg_trans = String()
+        msg_trans.data = json.dumps({
             "timestamp": time.time(),
             "session_id": session_id,
             "input_mode": input_mode,
             "text": text
-        }
-        msg = String()
-        msg.data = json.dumps(payload, ensure_ascii=False)
-        self.node.pub_transcript.publish(msg)
-        print(f"[ROS2Bridge] Published /visitor/user_transcript: {msg.data}")
+        }, ensure_ascii=False)
+        self.node.pub_transcript.publish(msg_trans)
 
     def publish_high_level_action(self, action: str, target: str, explanation: str, source: str = "web_controller"):
         from std_msgs.msg import String
-        payload = {
+
+        req_id = f"req-{secrets.token_hex(4)}"
+        now_sec = int(time.time())
+
+        # Primary: /guide/navigate
+        guide_data = {
+            "request_id": req_id,
+            "destination_id": target,
+            "valid_until": {"sec": now_sec + 60, "nanosec": 0},
+            "source": source
+        }
+        msg_guide = String()
+        msg_guide.data = json.dumps(guide_data, ensure_ascii=False)
+        self.node.pub_guide_nav.publish(msg_guide)
+        print(f"[ROS2Bridge] Published /guide/navigate: {msg_guide.data}")
+
+        # Fallback alias: /llm/high_level_action
+        msg_act = String()
+        msg_act.data = json.dumps({
             "action": action,
             "target": target,
             "explanation": explanation,
             "source": source
-        }
-        msg = String()
-        msg.data = json.dumps(payload, ensure_ascii=False)
-        self.node.pub_action.publish(msg)
-        print(f"[ROS2Bridge] Published /llm/high_level_action: {msg.data}")
+        }, ensure_ascii=False)
+        self.node.pub_action.publish(msg_act)
 
     def publish_emergency_stop(self):
         from std_msgs.msg import Bool
@@ -257,7 +383,6 @@ class RealROS2Bridge(BaseROS2Bridge):
         msg_bool.data = True
         self.node.pub_estop.publish(msg_bool)
 
-        # Zero velocity to halt TurtleBot3 instantly
         msg_twist = Twist()
         msg_twist.linear.x = 0.0
         msg_twist.angular.z = 0.0

@@ -1,6 +1,7 @@
 import os
 """Configuration module for Mobile Web Voice & Text Controller.
 Uses pydantic-settings to load settings from environment variables and .env file.
+Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 """
 
 from typing import List, Dict, Any
@@ -27,56 +28,49 @@ class Settings(BaseSettings):
     WARNING_THRESHOLD_SEC: int = 15
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5
-    START_BOOTH_ID: str = "START_BOOTH"
+    START_BOOTH_ID: str = "start"
 
     # Speech-to-Text (STT) Settings: "groq" | "openai" | "faster_whisper"
     STT_PROVIDER: str = "groq"
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
-    # STT Domain Prompt / Lexicon Hints
+    # STT Domain Prompt / Lexicon Hints (Aligned with LLM intent_node)
     STT_INITIAL_PROMPT: str = (
-        "คำสั่งควบคุมหุ่นยนต์ TurtleBot3: พาไปที่ AI Exhibition, Presentation Area, "
-        "Robotics Lab, Start Booth, หยุดรอตรงนี้. Take me to the AI exhibition, "
-        "go to the presentation area, stop, wait."
+        "คำสั่งควบคุมหุ่นยนต์ TurtleBot3: พาไปบูธคอมพิวเตอร์, บูธวิทยาการคอมพิวเตอร์, "
+        "บูธคณิตศาสตร์และสถิติ, booth_09, booth_10, กลับจุดรอ, start, หยุดรอตรงนี้. "
+        "Take me to Computer Science booth, Mathematics and Statistics booth, start, stop, wait."
     )
 
     # ROS 2 Integration Override
     USE_MOCK_ROS2: bool = False
 
-    # Predefined Booth Locations for Quick Chips
+    # Predefined Booth Locations for Quick Chips (Matching LLM destination_id)
     LOCATIONS: List[Dict[str, Any]] = Field(
         default_factory=lambda: [
             {
-                "id": "AI_EXHIBITION",
-                "label": "📍 ไปโซน AI Exhibition",
-                "prompt": "พาไปที่โซน AI Exhibition",
-                "description": "บูธแสดงผลงาน AI & Robotics",
-                "icon": "sparkles"
+                "id": "booth_09",
+                "label": "📍 บูธ 09: วิทยาการคอมพิวเตอร์",
+                "prompt": "พาไปบูธคอมพิวเตอร์",
+                "description": "บูธ 09 ภาควิชาวิทยาการคอมพิวเตอร์",
+                "icon": "code"
             },
             {
-                "id": "PRESENTATION_AREA",
-                "label": "🎤 ไปจุด Presentation Area",
-                "prompt": "พาไปที่จุด Presentation Area",
-                "description": "เวทีบรรยายและสาธิตหลัก",
-                "icon": "mic"
+                "id": "booth_10",
+                "label": "📍 บูธ 10: คณิตศาสตร์และสถิติ",
+                "prompt": "พาไปบูธคณิตศาสตร์และสถิติ",
+                "description": "บูธ 10 ภาควิชาคณิตศาสตร์และสถิติ",
+                "icon": "calculator"
             },
             {
-                "id": "ROBOTICS_LAB",
-                "label": "🤖 ไปโซน Robotics Lab",
-                "prompt": "พาไปที่โซน Robotics Lab",
-                "description": "พื้นที่แล็บหุ่นยนต์",
-                "icon": "cpu"
-            },
-            {
-                "id": "START_BOOTH",
-                "label": "🏠 กลับจุดเริ่มต้น (Start Point)",
+                "id": "start",
+                "label": "🏠 กลับจุดรอเริ่มต้น (Start Point)",
                 "prompt": "กลับจุดเริ่มต้น",
-                "description": "ป้ายสแกน QR Code หน้าบูธ",
+                "description": "จุดรอสแกน QR Code หน้าบูธ",
                 "icon": "home"
             },
             {
-                "id": "WAIT_HERE",
+                "id": "wait",
                 "label": "⏸️ หยุดรอตรงนี้ก่อน (Wait)",
                 "prompt": "หยุดรอตรงนี้ก่อน",
                 "description": "หยุดรอคำสั่งถัดไปชั่วคราว",

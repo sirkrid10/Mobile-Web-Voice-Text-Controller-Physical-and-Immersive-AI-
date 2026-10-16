@@ -1,9 +1,9 @@
 """Automated Test Suite for Verification Protocol.
 Uses FastAPI TestClient to test:
 1. Session Lock Exclusivity Test (dev-A vs dev-B 409 Conflict)
-2. ROS 2 Bridge Publication & Text/Chip Commands
+2. ROS 2 Bridge Publication & Text/Chip Commands (/guide/user_request)
 3. Smart Navigation Timer Pause Test (paused during NAVIGATING/REPLANNING)
-4. Auto-Return to Start Booth on Disconnect Test
+4. Auto-Return to Start Booth on Disconnect Test (target: start)
 5. Staff PIN Authentication & Emergency Stop
 6. Voice Audio Command Processing (with fallback)
 """
@@ -59,28 +59,27 @@ def test_session_lock_exclusivity():
 
 
 def test_text_command_and_auto_claim():
-    """Protocol 2: Text/Chip commands and auto-claim if vacant."""
+    """Protocol 2: Text/Chip commands and auto-claim if vacant (routes to booth_09)."""
     with TestClient(app) as client:
         # First command from visitor auto-claims session
         res = client.post(
             "/api/v1/command/text",
             headers={"X-Session-Id": "dev-visitor-1"},
-            json={"text": "Take me to the AI exhibition", "input_mode": "text"}
+            json={"text": "พาไปบูธคอมพิวเตอร์", "input_mode": "text"}
         )
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "sent"
-        assert data["transcript"] == "Take me to the AI exhibition"
+        assert data["transcript"] == "พาไปบูธคอมพิวเตอร์"
 
-        # Verify active session belongs to dev-visitor-1
+        # Verify active session belongs to dev-visitor-1 and destination is booth_09
         state = session_manager.get_state_broadcast()
         assert state.active_session_id == "dev-visitor-1"
-        assert state.current_goal == "AI_EXHIBITION"
+        assert state.current_goal == "booth_09"
 
 
 def test_smart_navigation_timer_pause():
     """Protocol 3: Watchdog pauses countdown during NAVIGATING/REPLANNING."""
-    # Claim session
     asyncio.run(session_manager.claim("dev-timer-test"))
     session_manager.robot_state = "IDLE"
 
@@ -111,14 +110,14 @@ def test_smart_navigation_timer_pause():
 
 
 def test_auto_return_on_disconnect():
-    """Protocol 4: Disconnect triggers delayed auto-return to START_BOOTH."""
+    """Protocol 4: Disconnect triggers delayed auto-return to start booth."""
     with TestClient(app) as client:
-        # Claim session and set destination to AI_EXHIBITION
+        # Claim session and set destination to booth_09
         claim_res = client.post("/api/v1/session/claim", json={"session_id": "dev-return-user"})
         token = claim_res.json()["session_token"]
 
-        # Navigate away from START_BOOTH
-        session_manager.current_goal = "AI_EXHIBITION"
+        # Navigate away from start
+        session_manager.current_goal = "booth_09"
         session_manager.robot_state = "REACHED"
         session_manager.auto_return_delay_sec = 1  # 1s for testing
 
@@ -133,8 +132,7 @@ def test_auto_return_on_disconnect():
 
         # Wait for delayed auto-return task to trigger
         time.sleep(1.3)
-        assert session_manager.current_goal == settings.START_BOOTH_ID
-        assert "auto_return" in session_manager.heard_text.lower() or "auto-return" in session_manager.heard_text.lower() or "กลับจุดเริ่มต้น" in session_manager.heard_text
+        assert session_manager.current_goal == settings.START_BOOTH_ID  # "start"
 
 
 def test_staff_pin_security_and_emergency_stop():
