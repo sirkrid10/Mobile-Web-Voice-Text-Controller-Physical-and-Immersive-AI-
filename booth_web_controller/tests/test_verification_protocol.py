@@ -21,6 +21,7 @@ from app.session_manager import session_manager
 
 @pytest.fixture(autouse=True)
 def reset_session_state():
+    settings.USE_MOCK_ROS2 = True
     """Reset session manager state before each test."""
     asyncio.run(session_manager.release_session(reason="test_reset"))
     session_manager.robot_state = "IDLE"
