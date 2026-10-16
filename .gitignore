@@ -1,0 +1,33 @@
+# Environments & Virtual Envs
+.env
+*.env
+.env.*
+venv/
+booth_web_venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary & Audio Uploads
+*.webm
+*.mp4
+*.wav
+*.ogg
+*.m4a
+tmp/
+temp/
+/tmp/*
+
+# Logs & IDE
+*.log
+.vscode/
+.idea/
+.DS_Store
