@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Control & Recovery Panel | TurtleBot3</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="staff-container">
+    
+    <!-- Staff Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-icon" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">???</div>
+        <div class="brand-titles">
+          <h1>Staff Override Panel</h1>
+          <p>TurtleBot3 Safety & Demo Recovery</p>
+        </div>
+      </div>
+      <a href="/" class="staff-link-btn" title="Back to Visitor View">
+        ??
+      </a>
+    </header>
+
+    <!-- PIN Authentication Card (Hidden once authenticated) -->
+    <section class="staff-section-card" id="pin-section">
+      <h2 style="font-size: 1.1rem; color: #fff;">?? ????????????? PIN ??????????????</h2>
+      <div style="display: flex; gap: 8px;">
+        <input type="password" id="staff-pin-input" class="text-input-field" placeholder="Default: 1234" maxlength="8">
+        <button type="button" class="start-session-btn" id="btn-submit-pin" style="padding: 10px 20px;">
+          ??????????
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Staff Dashboard -->
+    <div id="staff-dashboard" style="display: none; flex-direction: column; gap: 18px;">
+      
+      <!-- 1. Emergency Stop (Giant Red Button) -->
+      <section class="staff-section-card danger-card">
+        <button type="button" class="btn-danger-giant" id="btn-emergency-stop">
+          ?? EMERGENCY STOP
+        </button>
+        <p style="font-size: 0.8rem; color: #fca5a5; text-align: center;">
+          ??????????????????????????????? TurtleBot3 ????? (Cancel Goal & Cmd_vel Zero)
+        </p>
+      </section>
+
+      <!-- 2. Recovery & Reset Actions -->
+      <section class="staff-section-card">
+        <h3 class="section-title">? ????????????????? (Quick Demo Recovery)</h3>
+        <div class="staff-action-grid">
+          <button type="button" class="btn-staff-action" id="btn-return-start">
+            <span style="font-size: 24px;">??</span>
+            <span>RETURN TO START</span>
+            <small style="color: var(--text-dim);">????????????????????????????</small>
+          </button>
+          
+          <button type="button" class="btn-staff-action" id="btn-force-unlock">
+            <span style="font-size: 24px;">??</span>
+            <span>FORCE UNLOCK</span>
+            <small style="color: var(--text-dim);">????????????????????????</small>
+          </button>
+        </div>
+      </section>
+
+      <!-- 3. Auto-Return & Timing Configuration -->
+      <section class="staff-section-card">
+        <h3 class="section-title">?? ?????????????????????????? & ??????? (Settings)</h3>
+        
+        <div class="form-group-row">
+          <div>
+            <label style="font-weight: 600;">???????????????????????????? (Auto-Return)</label>
+            <p style="font-size: 0.75rem; color: var(--text-dim);">??????? Session ????????????????????????????????</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfg-auto-return" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="form-group-row">
+          <label for="cfg-timeout">???? Inactivity ?????? (??????):</label>
+          <input type="number" id="cfg-timeout" class="number-input" value="60" min="10" max="300">
+        </div>
+
+        <div class="form-group-row">
+          <label for="cfg-delay">????????????????????????? (??????):</label>
+          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="60">
+        </div>
+
+        <button type="button" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
+          ?? ???????????????? (Save Settings)
+        </button>
+      </section>
+
+      <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
+      <section class="staff-section-card">
+        <h3 class="section-title">?? ?????????????????????? (Mock Perception Triggers)</h3>
+        <p style="font-size: 0.78rem; color: var(--text-dim);">
+          ?????????????????????????????????? VR ???????????????????????????????
+        </p>
+
+        <div class="staff-action-grid" style="grid-template-columns: 1fr 1fr;">
+          <button type="button" class="btn-staff-action" id="btn-mock-nav">
+            <span>?? Navigating</span>
+            <small>????????????</small>
+          </button>
+
+          <button type="button" class="btn-staff-action" id="btn-mock-obstacle" style="border-color: rgba(245, 158, 11, 0.4);">
+            <span>?? Obstacle</span>
+            <small>?????????????? (Replan)</small>
+          </button>
+
+          <button type="button" class="btn-staff-action" id="btn-mock-reached" style="border-color: rgba(139, 92, 246, 0.4);">
+            <span>?? Reached</span>
+            <small>??????????????</small>
+          </button>
+
+          <button type="button" class="btn-staff-action" id="btn-mock-idle">
+            <span>?? Idle</span>
+            <small>??????????????</small>
+          </button>
+        </div>
+      </section>
+
+      <!-- 5. Real-Time Raw State Inspection -->
+      <section class="staff-section-card">
+        <h3 class="section-title">?? ?????????????? (Live State Inspection)</h3>
+        <pre id="raw-state-dump" style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #38bdf8; overflow-x: auto;">
+??????????????...
+        </pre>
+      </section>
+
+    </div>
+
+  </div>
+
+  <script>
+    (function() {
+      const pinSection = document.getElementById('pin-section');
+      const staffDashboard = document.getElementById('staff-dashboard');
+      const pinInput = document.getElementById('staff-pin-input');
+      const btnSubmitPin = document.getElementById('btn-submit-pin');
+
+      const btnEstop = document.getElementById('btn-emergency-stop');
+      const btnReturnStart = document.getElementById('btn-return-start');
+      const btnForceUnlock = document.getElementById('btn-force-unlock');
+
+      const cfgAutoReturn = document.getElementById('cfg-auto-return');
+      const cfgTimeout = document.getElementById('cfg-timeout');
+      const cfgDelay = document.getElementById('cfg-delay');
+      const btnSaveConfig = document.getElementById('btn-save-config');
+
+      const btnMockNav = document.getElementById('btn-mock-nav');
+      const btnMockObstacle = document.getElementById('btn-mock-obstacle');
+      const btnMockReached = document.getElementById('btn-mock-reached');
+      const btnMockIdle = document.getElementById('btn-mock-idle');
+      const rawStateDump = document.getElementById('raw-state-dump');
+
+      let currentPin = sessionStorage.getItem('staff_pin') || '';
+
+      function checkAuth() {
+        if (currentPin) {
+          pinSection.style.display = 'none';
+          staffDashboard.style.display = 'flex';
+          loadLiveState();
+        } else {
+          pinSection.style.display = 'flex';
+          staffDashboard.style.display = 'none';
+        }
+      }
+
+      btnSubmitPin.addEventListener('click', () => {
+        const val = pinInput.value.trim();
+        if (val) {
+          currentPin = val;
+          sessionStorage.setItem('staff_pin', val);
+          checkAuth();
+        }
+      });
+
+      async function staffApi(endpoint, body = {}) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Staff-Pin': currentPin
+            },
+            body: JSON.stringify(body)
+          });
+          if (res.status === 401) {
+            alert('???? PIN ??????????!');
+            sessionStorage.removeItem('staff_pin');
+            currentPin = '';
+            checkAuth();
+            return null;
+          }
+          return await res.json();
+        } catch (e) {
+          console.error('Staff API Error:', e);
+          alert('???????????????????????????????????????');
+          return null;
+        }
+      }
+
+      // Actions
+      btnEstop.addEventListener('click', async () => {
+        const res = await staffApi('/api/v1/staff/emergency-stop');
+        if (res) alert('?? ???? EMERGENCY STOP ?????????????!');
+        loadLiveState();
+      });
+
+      btnReturnStart.addEventListener('click', async () => {
+        const res = await staffApi('/api/v1/staff/return-to-start');
+        if (res) alert('?? ??????????????????????????????????????????');
+        loadLiveState();
+      });
+
+      btnForceUnlock.addEventListener('click', async () => {
+        const res = await staffApi('/api/v1/staff/force-release');
+        if (res) alert('?? ???????????????? ????????????????????????????????????????');
+        loadLiveState();
+      });
+
+      btnSaveConfig.addEventListener('click', async () => {
+        const res = await staffApi('/api/v1/staff/config', {
+          auto_return_enabled: cfgAutoReturn.checked,
+          inactivity_timeout_sec: parseInt(cfgTimeout.value, 10),
+          auto_return_delay_sec: parseInt(cfgDelay.value, 10)
+        });
+        if (res) alert('?? ?????????????????????????????');
+        loadLiveState();
+      });
+
+      // Mock perception
+      btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'AI_EXHIBITION' }).then(loadLiveState));
+      btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'AI_EXHIBITION', obstacle_detected: true }).then(loadLiveState));
+      btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'AI_EXHIBITION' }).then(loadLiveState));
+      btnMockIdle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'IDLE' }).then(loadLiveState));
+
+      async function loadLiveState() {
+        try {
+          const res = await fetch('/api/v1/state');
+          if (res.ok) {
+            const data = await res.json();
+            rawStateDump.textContent = JSON.stringify(data, null, 2);
+            cfgAutoReturn.checked = data.auto_return_enabled;
+            cfgDelay.value = data.auto_return_delay_sec;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      setInterval(() => {
+        if (currentPin) loadLiveState();
+      }, 2000);
+
+      checkAuth();
+    })();
+  </script>
+</body>
+</html>

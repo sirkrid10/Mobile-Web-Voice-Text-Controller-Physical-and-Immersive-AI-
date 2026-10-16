@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TurtleBot3 Voice & Text Controller | Physical & Immersive AI</title>
+  <meta name="description" content="Mobile Web Voice and Text Controller for TurtleBot3 Navigation and VR Mind View at Exhibition Booth">
+  
+  <!-- Modern Typography from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Application Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-icon">??</div>
+        <div class="brand-titles">
+          <h1>TurtleBot3 Controller</h1>
+          <p>Physical & Immersive AI Booth</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="/staff" class="staff-link-btn" title="Staff Control Panel" id="btn-staff-link">
+          ??
+        </a>
+      </div>
+    </header>
+
+    <!-- ====================================================================
+         VIEW 1: AVAILABLE (Start Screen)
+         ==================================================================== -->
+    <section id="view-available" class="view-state-card" style="display: none;">
+      <div class="view-state-icon icon-available">?</div>
+      <h2 class="view-state-title">???????????? ??????????????!</h2>
+      <p class="view-state-desc">
+        ???????????????????????? TurtleBot3 ?????????????????????????? ??????????????????????????????????
+      </p>
+      <button type="button" class="start-session-btn" id="btn-claim-session">
+        ?? ????????????????????????????
+      </button>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 2: QUEUE / OBSERVER MODE
+         ==================================================================== -->
+    <section id="view-queue" class="view-state-card" style="display: none;">
+      <div class="view-state-icon icon-queue">?</div>
+      <h2 class="view-state-title">???????????????????????????</h2>
+      <p class="view-state-desc">
+        ??????????????????????????????????????????????????????????? ????????????????????????????????????????????? ???????????
+      </p>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 3: ACTIVE CONTROLLER
+         ==================================================================== -->
+    <div id="view-active" style="display: flex; flex-direction: column; gap: 16px;">
+      
+      <!-- Session Bar & Countdown -->
+      <div class="session-bar">
+        <div class="session-info">
+          <span class="session-badge active" id="session-status-badge">
+            <span id="session-countdown">???????????????: 60s</span>
+          </span>
+        </div>
+        <button type="button" class="disconnect-btn" id="btn-disconnect">
+          ?? ???????????
+        </button>
+      </div>
+
+      <!-- Warning Timeout Banner (<= 15s) -->
+      <div id="warning-banner" class="timeout-warning-card" style="display: none;">
+        <div class="warning-text">
+          ?? ?????????????????????? ???????????????????????????????
+        </div>
+        <button type="button" class="extend-time-btn" id="btn-extend-time">
+          ? ????????????? (+60s)
+        </button>
+      </div>
+
+      <!-- Live Robot-Mind Status Card -->
+      <section class="robot-card">
+        <div class="robot-card-header">
+          <div class="status-indicator-wrap">
+            <div class="status-dot-pulse state-idle" id="robot-dot"></div>
+            <div class="status-label-group">
+              <h3 id="robot-state-text">?????????????? (Idle)</h3>
+              <p>Robot-Mind Status</p>
+            </div>
+          </div>
+          <div class="goal-tag" id="robot-goal-tag">?? START_BOOTH</div>
+        </div>
+
+        <div class="mind-section">
+          <div class="mind-row heard">
+            <span class="title">?? ????????????????? (Voice Transcript):</span>
+            <span class="content" id="robot-heard-text">"(?????????????????????????)"</span>
+          </div>
+          <div class="mind-row">
+            <span class="title">?? ????????????????????? (LLM Reasoning):</span>
+            <span class="content" id="robot-reason-text">?????????????????????????????</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Push-to-Talk Microphone Component -->
+      <section class="mic-control-section">
+        <div class="mic-button-wrapper">
+          <button type="button" class="mic-button" id="mic-button" aria-label="Microphone Voice Command">
+            <span class="mic-icon">???</span>
+            <span class="mic-label" id="mic-label">???????????</span>
+          </button>
+          <div class="mic-pulse-ring"></div>
+        </div>
+
+        <!-- Waveform Animation -->
+        <div class="waveform-container" id="waveform">
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+        </div>
+
+        <!-- Transcript Preview -->
+        <div class="mic-hint" id="transcript-preview">
+          ?????????????????????????? ???????????????????
+        </div>
+      </section>
+
+      <!-- Quick Scenario Chips -->
+      <section class="chips-section">
+        <div class="section-title">?? ????????????? (Quick Scenario Chips)</div>
+        <div class="chips-grid" id="chips-container">
+          <!-- Chips will be rendered dynamically by app.js -->
+        </div>
+      </section>
+
+      <!-- Fallback Text Input Bar -->
+      <section class="text-input-section">
+        <div class="section-title">?? ???????????????????? (Fallback Text Input)</div>
+        <form class="input-bar-form" id="text-input-form">
+          <input 
+            type="text" 
+            class="text-input-field" 
+            id="text-input-field" 
+            placeholder="???? '???????????', '?? AI Exhibition'..."
+            autocomplete="off"
+          >
+          <button type="submit" class="send-btn" id="btn-send-text" aria-label="Send Text Command">
+            ?
+          </button>
+        </form>
+      </section>
+
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
