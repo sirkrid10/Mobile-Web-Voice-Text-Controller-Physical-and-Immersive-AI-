@@ -2,8 +2,8 @@
 Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 
 Publishes to:
-- /guide/user_request (UserRequest: request_id, session_id, text, valid_until)
-- /guide/navigate (GuideToDestination: request_id, destination_id, valid_until)
+- /guide/user_request (UserRequest: request_id, session_id, text)
+- /guide/navigate (GuideToDestination: request_id, destination_id)
 - /visitor/user_transcript (std_msgs/String - fallback alias)
 - /robot/emergency_stop & /cmd_vel
 
@@ -66,8 +66,7 @@ class MockROS2Bridge(BaseROS2Bridge):
         user_request_payload = {
             "request_id": req_id,
             "session_id": session_id,
-            "text": text,
-            "valid_until": {"sec": now_sec + 60, "nanosec": 0}
+            "text": text
         }
         print(f"[ROS2Bridge Mock] Published to /guide/user_request: {json.dumps(user_request_payload, ensure_ascii=False)}")
 
@@ -105,7 +104,6 @@ class MockROS2Bridge(BaseROS2Bridge):
         guide_navigate_payload = {
             "request_id": req_id,
             "destination_id": target,
-            "valid_until": {"sec": now_sec + 60, "nanosec": 0},
             "source": source,
             "explanation": explanation
         }
@@ -343,15 +341,13 @@ class RealROS2Bridge(BaseROS2Bridge):
             msg_req.request_id = req_id
             msg_req.session_id = session_id
             msg_req.text = text
-            msg_req.valid_until = RosTime(sec=now_sec + 60, nanosec=0)
             self.node.pub_user_request.publish(msg_req)
             print(f"[ROS2Bridge] Published native UserRequest to /guide/user_request: req_id={req_id}, text={text}")
         else:
             user_request_data = {
                 "request_id": req_id,
                 "session_id": session_id,
-                "text": text,
-                "valid_until": {"sec": now_sec + 60, "nanosec": 0}
+                "text": text
             }
             msg_req = String()
             msg_req.data = json.dumps(user_request_data, ensure_ascii=False)
@@ -378,7 +374,6 @@ class RealROS2Bridge(BaseROS2Bridge):
         guide_data = {
             "request_id": req_id,
             "destination_id": target,
-            "valid_until": {"sec": now_sec + 60, "nanosec": 0},
             "source": source
         }
         msg_guide = String()

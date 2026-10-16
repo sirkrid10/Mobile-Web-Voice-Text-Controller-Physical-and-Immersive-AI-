@@ -109,8 +109,8 @@ Synchronized with `TurtleBot3_LLM_Subtitle.docx` (`intent_node` and `subtitle_no
 
 | Topic / Action | Message Type | Direction | Description |
 |---|---|---|---|
-| `/guide/user_request` | `std_msgs/msg/String` / `ai_interfaces/msg/UserRequest` | Publish (Web ➔ LLM) | `{"request_id": "...", "session_id": "...", "text": "พาไปบูธคอมพิวเตอร์", "valid_until": {"sec": ..., "nanosec": 0}}` |
-| `/guide/navigate` | `std_msgs/msg/String` / `ai_interfaces/action/GuideToDestination` | Publish (Web ➔ Nav2) | `{"request_id": "...", "destination_id": "start\|booth_09\|booth_10", "valid_until": ...}` |
+| `/guide/user_request` | `std_msgs/msg/String` / `ai_interfaces/msg/UserRequest` | Publish (Web ➔ LLM) | `{"request_id": "...", "session_id": "...", "text": "พาไปบูธคอมพิวเตอร์"}` |
+| `/guide/navigate` | `std_msgs/msg/String` / `ai_interfaces/action/GuideToDestination` | Publish (Web ➔ Nav2) | `{"request_id": "...", "destination_id": "start\|booth_09\|booth_10"}` |
 | `/robot/navigation_state` | `std_msgs/msg/String` / `ai_interfaces/msg/NavigationState` | Subscribe (Nav2 ➔ Web & LLM) | `{"stamp": ..., "request_id": "...", "destination_id": "booth_09", "phase": "NAVIGATING\|ARRIVED\|HOME", "ready_for_goal": bool, "distance_remaining_m": float, "error_code": 0, "error_msg": ""}` |
 | `/vr/subtitle` | `std_msgs/msg/String` / `ai_interfaces/msg/Subtitle` | Subscribe (LLM ➔ VR & Web) | `{"stamp": ..., "request_id": "...", "observation_id": "...", "text": "เห็นคนด้านหน้า กำลังนำทางไปบูธคอมพิวเตอร์", "ttl": ...}` (ซิงค์คำบรรยายสดขึ้นจอมือถือและแว่น VR) |
 | `/robot/emergency_stop` | `std_msgs/msg/Bool` | Publish (Web ➔ Nav2) | Halts robot navigation immediately |
