@@ -75,7 +75,7 @@ class MockROS2Bridge(BaseROS2Bridge):
         text_lower = text.lower()
         if "คณิต" in text_lower or "10" in text_lower or "math" in text_lower or "stat" in text_lower:
             target = "booth_10"
-        elif "คอม" in text_lower or "09" in text_lower or "computer" in text_lower or "วิทคอม" in text_lower:
+        elif "คอม" in text_lower or "09" in text_lower or "computer" in text_lower or "วิทคอม" in text_lower or "cs" in text_lower:
             target = "booth_09"
         elif "start" in text_lower or "เริ่มต้น" in text_lower or "กลับ" in text_lower or "จุดรอ" in text_lower:
             target = "start"

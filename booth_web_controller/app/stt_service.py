@@ -83,7 +83,7 @@ class STTService:
         except Exception as e:
             print(f"[STTService] STT transcription failed with provider '{self.provider}': {e}")
             print("[STTService] Falling back to graceful simulation transcript.")
-            return "พาไปที่ AI Exhibition"
+            return "พาไปบูธ Computer Science"
         finally:
             if temp_path and os.path.exists(temp_path):
                 try:
@@ -141,7 +141,7 @@ class STTService:
         return result or "พาไปที่ AI Exhibition"
 
     async def _transcribe_fallback(self, file_path: str) -> str:
-        return "พาไปที่ AI Exhibition"
+        return "พาไปบูธ Computer Science"
 
 
 stt_service = STTService()

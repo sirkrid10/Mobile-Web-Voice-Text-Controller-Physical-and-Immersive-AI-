@@ -35,11 +35,14 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
-    # STT Domain Prompt / Lexicon Hints (Aligned with LLM intent_node)
+    # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (
-        "คำสั่งควบคุมหุ่นยนต์ TurtleBot3: พาไปบูธคอมพิวเตอร์, บูธวิทยาการคอมพิวเตอร์, "
-        "บูธคณิตศาสตร์และสถิติ, booth_09, booth_10, กลับจุดรอ, start, หยุดรอตรงนี้. "
-        "Take me to Computer Science booth, Mathematics and Statistics booth, start, stop, wait."
+        "บทสนทนาสั่งงานหุ่นยนต์ TurtleBot3 ภาษาไทยผสมอังกฤษ (Code-Switching): "
+        "พาไปบูธ Computer Science, ช่วยพาไปบูธ CS, เดินไป booth 09 วิทยาการคอมพิวเตอร์, "
+        "พาไปบูธ Mathematics and Statistics, ไปบูธ Math and Stat, booth 10 คณิตศาสตร์และสถิติ, "
+        "กลับไปที่จุด Start, return to start point, หยุดรอตรงนี้, stop, wait here. "
+        "Take me to Computer Science booth 09, Mathematics and Statistics booth 10, "
+        "navigate to CS, go to Math and Stat, return to start."
     )
 
     # ROS 2 Integration Override
