@@ -210,7 +210,7 @@ async def command_voice(
     # Transcribe speech
     transcript = await stt_service.transcribe_audio(audio)
     if not transcript:
-        transcript = "??????? AI Exhibition"
+        transcript = "พาไปที่ AI Exhibition"
 
     # Publish to ROS 2
     if ros_bridge_instance:
