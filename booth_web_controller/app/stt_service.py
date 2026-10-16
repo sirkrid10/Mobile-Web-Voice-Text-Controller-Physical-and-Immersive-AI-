@@ -47,7 +47,6 @@ class STTService:
 
     async def transcribe_audio(self, audio_file: UploadFile) -> str:
         """Save uploaded audio (WebM/MP4/WAV) to a temporary file and transcribe with domain prompt."""
-        # Determine suffix based on content_type or filename
         suffix = ".webm"
         if audio_file.content_type:
             if "mp4" in audio_file.content_type:
@@ -84,7 +83,7 @@ class STTService:
         except Exception as e:
             print(f"[STTService] STT transcription failed with provider '{self.provider}': {e}")
             print("[STTService] Falling back to graceful simulation transcript.")
-            return "??????? AI Exhibition"
+            return "พาไปที่ AI Exhibition"
         finally:
             if temp_path and os.path.exists(temp_path):
                 try:
@@ -139,11 +138,10 @@ class STTService:
 
         result = await asyncio.to_thread(_run_model)
         print(f"[STTService] faster-whisper transcription: '{result}'")
-        return result or "??????? AI Exhibition"
+        return result or "พาไปที่ AI Exhibition"
 
     async def _transcribe_fallback(self, file_path: str) -> str:
-        # Graceful fallback simulation when no API key is provided
-        return "??????? AI Exhibition"
+        return "พาไปที่ AI Exhibition"
 
 
 stt_service = STTService()

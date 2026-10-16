@@ -60,27 +60,27 @@ class MockROS2Bridge(BaseROS2Bridge):
         # Infer target location from text or default
         target = "AI_EXHIBITION"
         text_lower = text.lower()
-        if "presentation" in text_lower or "????" in text_lower:
+        if "presentation" in text_lower or "เวที" in text_lower:
             target = "PRESENTATION_AREA"
         elif "robotics" in text_lower or "lab" in text_lower:
             target = "ROBOTICS_LAB"
-        elif "start" in text_lower or "????????" in text_lower:
+        elif "start" in text_lower or "เริ่มต้น" in text_lower:
             target = "START_BOOTH"
-        elif "stop" in text_lower or "????" in text_lower or "wait" in text_lower:
+        elif "stop" in text_lower or "หยุด" in text_lower or "wait" in text_lower:
             target = None
 
         if target:
             self.session_manager.update_from_llm_mind(
                 heard_text=text,
                 target=target,
-                explanation=f"????????????????????????????????????????? {target}"
+                explanation=f"หุ่นยนต์กำลังวางแผนเส้นทางและเดินทางไปยัง {target}"
             )
             self._start_navigation_simulation(target)
         else:
             self.session_manager.update_from_llm_mind(
                 heard_text=text,
                 target=self.session_manager.current_goal,
-                explanation="?????????????/?? ???????????????????????????????"
+                explanation="รับคำสั่งหยุด/รอ หุ่นยนต์จอดประจำตำแหน่งชั่วคราว"
             )
             self.session_manager.update_from_ros_state(state="IDLE")
 
@@ -95,7 +95,7 @@ class MockROS2Bridge(BaseROS2Bridge):
 
         if action == "GO_TO":
             self.session_manager.update_from_llm_mind(
-                heard_text=f"?????? {source}: ?? {target}",
+                heard_text=f"คำสั่ง {source}: ไป {target}",
                 target=target,
                 explanation=explanation
             )
@@ -136,7 +136,7 @@ class MockROS2Bridge(BaseROS2Bridge):
                 self.session_manager.update_from_llm_mind(
                     heard_text=self.session_manager.heard_text,
                     target=target,
-                    explanation=f"?????????????????? {target} ????????????? ???????????????????"
+                    explanation=f"หุ่นยนต์เดินทางถึง {target} เรียบร้อยแล้ว พร้อมรับคำสั่งถัดไป"
                 )
             except asyncio.CancelledError:
                 print("[ROS2Bridge Mock] Navigation simulation cancelled.")

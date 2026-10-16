@@ -35,8 +35,8 @@ class Settings(BaseSettings):
 
     # STT Domain Prompt / Lexicon Hints
     STT_INITIAL_PROMPT: str = (
-        "???????????????????? TurtleBot3: ??????? AI Exhibition, Presentation Area, "
-        "Robotics Lab, Start Booth, ????????????. Take me to the AI exhibition, "
+        "คำสั่งควบคุมหุ่นยนต์ TurtleBot3: พาไปที่ AI Exhibition, Presentation Area, "
+        "Robotics Lab, Start Booth, หยุดรอตรงนี้. Take me to the AI exhibition, "
         "go to the presentation area, stop, wait."
     )
 
@@ -48,37 +48,37 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             {
                 "id": "AI_EXHIBITION",
-                "label": "?? ????? AI Exhibition",
-                "prompt": "?????????? AI Exhibition",
-                "description": "???????????? AI & Robotics",
+                "label": "📍 ไปโซน AI Exhibition",
+                "prompt": "พาไปที่โซน AI Exhibition",
+                "description": "บูธแสดงผลงาน AI & Robotics",
                 "icon": "sparkles"
             },
             {
                 "id": "PRESENTATION_AREA",
-                "label": "?? ????? Presentation Area",
-                "prompt": "?????????? Presentation Area",
-                "description": "??????????????????????",
+                "label": "🎤 ไปจุด Presentation Area",
+                "prompt": "พาไปที่จุด Presentation Area",
+                "description": "เวทีบรรยายและสาธิตหลัก",
                 "icon": "mic"
             },
             {
                 "id": "ROBOTICS_LAB",
-                "label": "?? ????? Robotics Lab",
-                "prompt": "?????????? Robotics Lab",
-                "description": "???????????????????",
+                "label": "🤖 ไปโซน Robotics Lab",
+                "prompt": "พาไปที่โซน Robotics Lab",
+                "description": "พื้นที่แล็บหุ่นยนต์",
                 "icon": "cpu"
             },
             {
                 "id": "START_BOOTH",
-                "label": "?? ??????????????? (Start Point)",
-                "prompt": "???????????????",
-                "description": "???????? QR Code ???????",
+                "label": "🏠 กลับจุดเริ่มต้น (Start Point)",
+                "prompt": "กลับจุดเริ่มต้น",
+                "description": "ป้ายสแกน QR Code หน้าบูธ",
                 "icon": "home"
             },
             {
                 "id": "WAIT_HERE",
-                "label": "?? ???????????????? (Wait)",
-                "prompt": "????????????????",
-                "description": "?????????????????????????",
+                "label": "⏸️ หยุดรอตรงนี้ก่อน (Wait)",
+                "prompt": "หยุดรอตรงนี้ก่อน",
+                "description": "หยุดรอคำสั่งถัดไปชั่วคราว",
                 "icon": "pause"
             }
         ]

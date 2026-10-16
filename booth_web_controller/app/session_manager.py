@@ -32,7 +32,7 @@ class SessionManager:
         self.robot_state: str = "IDLE"  # IDLE, NAVIGATING, REPLANNING, REACHED, STOPPED, FAILED
         self.current_goal: Optional[str] = settings.START_BOOTH_ID
         self.heard_text: str = ""
-        self.llm_explanation: str = "?????????????????????????????"
+        self.llm_explanation: str = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
         self.obstacle_detected: bool = False
         self.robot_pose: Dict[str, float] = {"x": 0.0, "y": 0.0}
 
@@ -57,7 +57,7 @@ class SessionManager:
                 print(f"[SessionManager] Broadcast trigger error: {e}")
 
     # -----------------------------------------------------------------------
-    # Rule 1 ? Claiming a Session
+    # Rule 1 — Claiming a Session
     # -----------------------------------------------------------------------
     async def claim(self, session_id: str) -> Dict[str, Any]:
         async with self._lock:
@@ -98,7 +98,7 @@ class SessionManager:
             )
 
     # -----------------------------------------------------------------------
-    # Rule 2 ? Command Validation & Auto-Claim on First Interaction
+    # Rule 2 — Command Validation & Auto-Claim on First Interaction
     # -----------------------------------------------------------------------
     async def validate_or_auto_claim(self, session_id: str, session_token: Optional[str]) -> str:
         async with self._lock:
@@ -137,7 +137,7 @@ class SessionManager:
             }
 
     # -----------------------------------------------------------------------
-    # Rule 3 ? Smart Watchdog Tick (Called every 1.0s)
+    # Rule 3 — Smart Watchdog Tick (Called every 1.0s)
     # -----------------------------------------------------------------------
     async def watchdog_tick(self) -> StateBroadcast:
         async with self._lock:
@@ -159,7 +159,6 @@ class SessionManager:
 
                     if remaining == 0:
                         print(f"[SessionManager] Inactivity timeout reached for session {self.active_session_id}")
-                        # Release session asynchronously outside this lock block
                         asyncio.create_task(self.release_session(reason="inactivity_timeout"))
             else:
                 remaining = self.inactivity_timeout_sec
@@ -177,7 +176,7 @@ class SessionManager:
         return max(0, self.inactivity_timeout_sec - elapsed)
 
     # -----------------------------------------------------------------------
-    # Rule 4 ? Releasing Session & Auto-Return Task
+    # Rule 4 — Releasing Session & Auto-Return Task
     # -----------------------------------------------------------------------
     async def release_session(self, reason: str = "user_disconnect") -> bool:
         async with self._lock:
@@ -211,15 +210,14 @@ class SessionManager:
             await asyncio.sleep(self.auto_return_delay_sec)
 
             async with self._lock:
-                # Check if anyone has claimed the session in the meantime
                 if self.active_session_id is not None:
                     print("[SessionManager] Auto-return aborted: new session was claimed.")
                     return
 
                 print("[SessionManager] Executing Auto-Return to START_BOOTH...")
                 self.current_goal = settings.START_BOOTH_ID
-                self.heard_text = "??????????????? (Auto-Return)"
-                self.llm_explanation = "?????????????? ??????????????????????????????????????????"
+                self.heard_text = "กลับจุดเริ่มต้น (Auto-Return)"
+                self.llm_explanation = "หมดเวลากิจกรรม กำลังนำหุ่นยนต์เดินกลับจุดเริ่มต้นหน้าร้าน"
 
                 if self.ros_bridge:
                     self.ros_bridge.publish_high_level_action(
@@ -242,7 +240,7 @@ class SessionManager:
     async def emergency_stop(self):
         async with self._lock:
             self.robot_state = "STOPPED"
-            self.llm_explanation = "?? ????????????????? (Emergency Stop)"
+            self.llm_explanation = "🚨 สตาฟกดหยุดฉุกเฉิน (Emergency Stop)"
             if self.ros_bridge:
                 self.ros_bridge.publish_emergency_stop()
         self._trigger_broadcast()
@@ -250,8 +248,8 @@ class SessionManager:
     async def return_to_start_now(self):
         async with self._lock:
             self.current_goal = settings.START_BOOTH_ID
-            self.heard_text = "??????????: ????????????????????"
-            self.llm_explanation = "???????????????????????????????????????????????"
+            self.heard_text = "คำสั่งสตาฟ: กลับจุดเริ่มต้นทันที"
+            self.llm_explanation = "สตาฟสั่งให้หุ่นยนต์กลับจุดเริ่มต้นหน้าร้านทันที"
             if self.ros_bridge:
                 self.ros_bridge.publish_high_level_action(
                     action="GO_TO",

@@ -19,7 +19,7 @@
     <!-- Top Application Header -->
     <header class="app-header">
       <div class="brand-wrapper">
-        <div class="brand-icon">??</div>
+        <div class="brand-icon">🤖</div>
         <div class="brand-titles">
           <h1>TurtleBot3 Controller</h1>
           <p>Physical & Immersive AI Booth</p>
@@ -27,7 +27,7 @@
       </div>
       <div class="header-actions">
         <a href="/staff" class="staff-link-btn" title="Staff Control Panel" id="btn-staff-link">
-          ??
+          🔒
         </a>
       </div>
     </header>
@@ -36,13 +36,13 @@
          VIEW 1: AVAILABLE (Start Screen)
          ==================================================================== -->
     <section id="view-available" class="view-state-card" style="display: none;">
-      <div class="view-state-icon icon-available">?</div>
-      <h2 class="view-state-title">???????????? ??????????????!</h2>
+      <div class="view-state-icon icon-available">✨</div>
+      <h2 class="view-state-title">หุ่นยนต์ว่าง พร้อมรับคำสั่ง!</h2>
       <p class="view-state-desc">
-        ???????????????????????? TurtleBot3 ?????????????????????????? ??????????????????????????????????
+        คุณสามารถสั่งงานหุ่นยนต์ TurtleBot3 ได้ด้วยเสียงพูดหรือข้อความ แตะปุ่มด้านล่างเพื่อเริ่มการควบคุม
       </p>
       <button type="button" class="start-session-btn" id="btn-claim-session">
-        ?? ????????????????????????????
+        🚀 แตะเพื่อเริ่มสั่งงานหุ่นยนต์
       </button>
     </section>
 
@@ -50,10 +50,10 @@
          VIEW 2: QUEUE / OBSERVER MODE
          ==================================================================== -->
     <section id="view-queue" class="view-state-card" style="display: none;">
-      <div class="view-state-icon icon-queue">?</div>
-      <h2 class="view-state-title">???????????????????????????</h2>
+      <div class="view-state-icon icon-queue">⏳</div>
+      <h2 class="view-state-title">มีผู้ชมกำลังสั่งการหุ่นยนต์</h2>
       <p class="view-state-desc">
-        ??????????????????????????????????????????????????????????? ????????????????????????????????????????????? ???????????
+        ระบบจะเปิดสิทธิ์ให้คุณสั่งงานทันทีเมื่อคิวปัจจุบันเสร็จสิ้น คุณสามารถดูความคิดและเส้นทางของหุ่นยนต์แบบสดๆ ได้ด้านล่าง
       </p>
     </section>
 
@@ -66,21 +66,21 @@
       <div class="session-bar">
         <div class="session-info">
           <span class="session-badge active" id="session-status-badge">
-            <span id="session-countdown">???????????????: 60s</span>
+            <span id="session-countdown">ถือสิทธิ์ควบคุม: 60s</span>
           </span>
         </div>
         <button type="button" class="disconnect-btn" id="btn-disconnect">
-          ?? ???????????
+          🚪 จบการใช้งาน
         </button>
       </div>
 
       <!-- Warning Timeout Banner (<= 15s) -->
       <div id="warning-banner" class="timeout-warning-card" style="display: none;">
         <div class="warning-text">
-          ?? ?????????????????????? ???????????????????????????????
+          ⚠️ เวลาการควบคุมใกล้หมดลง คุณยังต้องการสั่งการต่อหรือไม่?
         </div>
         <button type="button" class="extend-time-btn" id="btn-extend-time">
-          ? ????????????? (+60s)
+          ⏳ ยังใช้งานอยู่ (+60s)
         </button>
       </div>
 
@@ -90,21 +90,21 @@
           <div class="status-indicator-wrap">
             <div class="status-dot-pulse state-idle" id="robot-dot"></div>
             <div class="status-label-group">
-              <h3 id="robot-state-text">?????????????? (Idle)</h3>
+              <h3 id="robot-state-text">พร้อมรับคำสั่ง (Idle)</h3>
               <p>Robot-Mind Status</p>
             </div>
           </div>
-          <div class="goal-tag" id="robot-goal-tag">?? START_BOOTH</div>
+          <div class="goal-tag" id="robot-goal-tag">📍 START_BOOTH</div>
         </div>
 
         <div class="mind-section">
           <div class="mind-row heard">
-            <span class="title">?? ????????????????? (Voice Transcript):</span>
-            <span class="content" id="robot-heard-text">"(?????????????????????????)"</span>
+            <span class="title">👂 หุ่นยนต์ได้ยินว่า (Voice Transcript):</span>
+            <span class="content" id="robot-heard-text">"(ยังไม่มีคำสั่งเสียงล่าสุด)"</span>
           </div>
           <div class="mind-row">
-            <span class="title">?? ????????????????????? (LLM Reasoning):</span>
-            <span class="content" id="robot-reason-text">?????????????????????????????</span>
+            <span class="title">🧠 ความคิดและการตัดสินใจ (LLM Reasoning):</span>
+            <span class="content" id="robot-reason-text">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
           </div>
         </div>
       </section>
@@ -113,8 +113,8 @@
       <section class="mic-control-section">
         <div class="mic-button-wrapper">
           <button type="button" class="mic-button" id="mic-button" aria-label="Microphone Voice Command">
-            <span class="mic-icon">???</span>
-            <span class="mic-label" id="mic-label">???????????</span>
+            <span class="mic-icon">🎙️</span>
+            <span class="mic-label" id="mic-label">แตะเพื่อพูด</span>
           </button>
           <div class="mic-pulse-ring"></div>
         </div>
@@ -132,13 +132,13 @@
 
         <!-- Transcript Preview -->
         <div class="mic-hint" id="transcript-preview">
-          ?????????????????????????? ???????????????????
+          แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด
         </div>
       </section>
 
       <!-- Quick Scenario Chips -->
       <section class="chips-section">
-        <div class="section-title">?? ????????????? (Quick Scenario Chips)</div>
+        <div class="section-title">📍 ปุ่มคำสั่งลัด (Quick Scenario Chips)</div>
         <div class="chips-grid" id="chips-container">
           <!-- Chips will be rendered dynamically by app.js -->
         </div>
@@ -146,17 +146,17 @@
 
       <!-- Fallback Text Input Bar -->
       <section class="text-input-section">
-        <div class="section-title">?? ???????????????????? (Fallback Text Input)</div>
+        <div class="section-title">⌨️ ช่องพิมพ์คำสั่งสำรอง (Fallback Text Input)</div>
         <form class="input-bar-form" id="text-input-form">
           <input 
             type="text" 
             class="text-input-field" 
             id="text-input-field" 
-            placeholder="???? '???????????', '?? AI Exhibition'..."
+            placeholder="เช่น 'พาไปที่เวที', 'ไป AI Exhibition'..."
             autocomplete="off"
           >
           <button type="submit" class="send-btn" id="btn-send-text" aria-label="Send Text Command">
-            ?
+            ➤
           </button>
         </form>
       </section>

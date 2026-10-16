@@ -153,7 +153,7 @@
     }
 
     // 3. Dynamic Quick Chips
-    if (state.locations && chipsContainer && chipsContainer.children.length === 0) {
+    if (state.locations && chipsContainer) {
       renderChips(state.locations);
     }
   }
@@ -163,12 +163,12 @@
 
     // State classes and labels
     const stateLabels = {
-      'IDLE': { label: '?????????????? (Idle)', class: 'state-idle' },
-      'NAVIGATING': { label: '?????????? (Navigating)', class: 'state-navigating' },
-      'REPLANNING': { label: '????????????? ?????????????? (Replanning)', class: 'state-replanning' },
-      'REACHED': { label: '?????????????? (Reached)', class: 'state-reached' },
-      'STOPPED': { label: '??????????? (Stopped)', class: 'state-stopped' },
-      'FAILED': { label: '?????????????? (Failed)', class: 'state-stopped' }
+      'IDLE': { label: 'พร้อมรับคำสั่ง (Idle)', class: 'state-idle' },
+      'NAVIGATING': { label: 'กำลังนำทาง (Navigating)', class: 'state-navigating' },
+      'REPLANNING': { label: 'พบสิ่งกีดขวาง กำลังคำนวณใหม่ (Replanning)', class: 'state-replanning' },
+      'REACHED': { label: 'ถึงจุดหมายแล้ว (Reached)', class: 'state-reached' },
+      'STOPPED': { label: 'หยุดฉุกเฉิน (Stopped)', class: 'state-stopped' },
+      'FAILED': { label: 'เกิดข้อผิดพลาด (Failed)', class: 'state-stopped' }
     };
 
     const info = stateLabels[state.robot_state] || { label: state.robot_state, class: 'state-idle' };
@@ -179,15 +179,15 @@
     }
 
     if (robotGoalTag) {
-      robotGoalTag.textContent = state.current_goal ? `?? ${state.current_goal}` : '?';
+      robotGoalTag.textContent = state.current_goal ? `📍 ${state.current_goal}` : '—';
     }
 
     if (robotHeardText) {
-      robotHeardText.textContent = state.heard_text ? `"${state.heard_text}"` : '(?????????????????????????)';
+      robotHeardText.textContent = state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งเสียงล่าสุด)';
     }
 
     if (robotReasonText) {
-      robotReasonText.textContent = state.llm_reason || '?????????????????????????';
+      robotReasonText.textContent = state.llm_reason || 'กำลังรันการประมวลผลคำสั่ง';
     }
   }
 
@@ -196,15 +196,15 @@
     if (sessionCountdown && sessionStatusBadge) {
       if (state.timer_paused_for_navigation) {
         sessionStatusBadge.className = 'session-badge paused';
-        sessionCountdown.textContent = '???????????? (???????????????????)';
+        sessionCountdown.textContent = 'กำลังเดินทาง (หยุดนับเวลาชั่วคราว)';
       } else {
         const rem = state.inactivity_remaining_sec;
         if (state.show_timeout_warning) {
           sessionStatusBadge.className = 'session-badge warning';
-          sessionCountdown.textContent = `?????????: ${rem}s (?????????)`;
+          sessionCountdown.textContent = `เหลือเวลา: ${rem}s (กดต่อเวลา)`;
         } else {
           sessionStatusBadge.className = 'session-badge active';
-          sessionCountdown.textContent = `???????????????: ${rem}s`;
+          sessionCountdown.textContent = `ถือสิทธิ์ควบคุม: ${rem}s`;
         }
       }
     }
@@ -219,8 +219,14 @@
     }
   }
 
+  let renderedChipsIds = '';
+
   function renderChips(locations) {
     if (!chipsContainer) return;
+    const currentIds = locations.map(l => l.id).join(',');
+    if (currentIds === renderedChipsIds) return;
+    renderedChipsIds = currentIds;
+
     chipsContainer.innerHTML = '';
     locations.forEach(loc => {
       const btn = document.createElement('button');
@@ -248,7 +254,7 @@
         sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
         console.log('[Session] Claimed successfully:', data);
       } else if (res.status === 409) {
-        alert('???????????????????????????????????? ??????????????????');
+        alert('ขณะนี้มีผู้ชมท่านอื่นกำลังใช้งานอยู่ กรุณารอสักครู่ครับ');
       }
     } catch (e) {
       console.error('[Session] Claim failed:', e);
@@ -256,7 +262,7 @@
   }
 
   async function disconnectSession() {
-    if (!confirm('?????????????????????????????????????????????????????????')) return;
+    if (!confirm('ต้องการจบการใช้งานและส่งต่อคิวให้ผู้ชมท่านอื่นใช่หรือไม่?')) return;
     try {
       await fetch('/api/v1/session/disconnect', {
         method: 'POST',
@@ -310,7 +316,6 @@
         const audioBlob = new Blob(audioChunks, { type: blobType });
         console.log(`[MediaRecorder] Audio recorded: ${audioBlob.size} bytes (${blobType})`);
 
-        // Stop all audio hardware tracks immediately
         if (audioStream) {
           audioStream.getTracks().forEach(t => t.stop());
           audioStream = null;
@@ -323,12 +328,12 @@
       isRecording = true;
 
       if (micButton) micButton.classList.add('recording');
-      if (micLabel) micLabel.textContent = '?????????????';
+      if (micLabel) micLabel.textContent = 'ปล่อยเพื่อส่ง';
       if (waveform) waveform.classList.add('active');
-      if (transcriptPreview) transcriptPreview.textContent = '???????????????????...';
+      if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟังเสียงของคุณ...';
     } catch (err) {
       console.error('[Audio] getUserMedia error:', err);
-      alert('??????????????????????????? ?????????????????????????????????????? ??????????????????????????????????????');
+      alert('ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตสิทธิ์ไมโครโฟนบนเบราว์เซอร์ หรือใช้ช่องพิมพ์ข้อความด้านล่างแทนครับ');
     }
   }
 
@@ -342,12 +347,12 @@
     isRecording = false;
 
     if (micButton) micButton.classList.remove('recording');
-    if (micLabel) micLabel.textContent = '???????????';
+    if (micLabel) micLabel.textContent = 'แตะเพื่อพูด';
     if (waveform) waveform.classList.remove('active');
   }
 
   async function sendVoiceCommand(blob) {
-    if (transcriptPreview) transcriptPreview.textContent = '???????????????????????...';
+    if (transcriptPreview) transcriptPreview.textContent = 'กำลังถอดความและประมวลผล...';
     const formData = new FormData();
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
     formData.append('audio', blob, `voice_${Date.now()}.${ext}`);
@@ -369,14 +374,14 @@
       if (res.ok) {
         const data = await res.json();
         if (transcriptPreview) {
-          transcriptPreview.textContent = `?????????????: "${data.transcript}"`;
+          transcriptPreview.textContent = `ส่งคำสั่งแล้ว: "${data.transcript}"`;
         }
       } else if (res.status === 403) {
-        alert('?????????????????????? ?????????????????????????????????');
+        alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
       }
     } catch (e) {
       console.error('[Command] Send voice error:', e);
-      if (transcriptPreview) transcriptPreview.textContent = '???????????????????????????';
+      if (transcriptPreview) transcriptPreview.textContent = 'เกิดข้อผิดพลาดในการส่งเสียง';
     }
   }
 
@@ -387,7 +392,7 @@
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
 
-    if (transcriptPreview) transcriptPreview.textContent = `?????????: "${cleanText}"`;
+    if (transcriptPreview) transcriptPreview.textContent = `ส่งคำสั่ง: "${cleanText}"`;
 
     try {
       const headers = {
@@ -408,7 +413,7 @@
         const data = await res.json();
         if (textInputField) textInputField.value = '';
       } else if (res.status === 403) {
-        alert('?????????????????????? ?????????????????????????????????');
+        alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
       }
     } catch (e) {
       console.error('[Command] Send text error:', e);
@@ -430,12 +435,10 @@
     btnExtend.addEventListener('click', heartbeatSession);
   }
 
-  // Push-to-Talk Button: handles both Tap-to-Talk and Press-and-Hold
   if (micButton) {
     let pressTimer = null;
     let isHoldMode = false;
 
-    // Pointer events (works for touch and mouse)
     micButton.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       pressTimer = setTimeout(() => {
@@ -451,11 +454,9 @@
         pressTimer = null;
       }
       if (isHoldMode) {
-        // Hold mode released -> stop
         stopRecording();
         isHoldMode = false;
       } else {
-        // Tap mode toggle
         if (isRecording) {
           stopRecording();
         } else {
@@ -471,7 +472,6 @@
     });
   }
 
-  // Text Form Submission
   if (textInputForm) {
     textInputForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -481,7 +481,6 @@
     });
   }
 
-  // Kickoff WebSocket and initial state fetch
   initWebSocket();
   fetch('/api/v1/state')
     .then(r => r.json())

@@ -10,9 +10,9 @@ Mobile Web Application controller designed for exhibition booth visitors to inte
 
 ---
 
-## ?? Executive Summary & Architecture
+## 📌 Executive Summary & Architecture
 
-During exhibition demos (Milestone 4 ? Stable Integrated Demo), ambient hall noise and robot-mounted microphone hardware failures can hinder voice interaction. This project replaces the robot-mounted mic with an **Audio Input Gateway** on visitor smartphones:
+During exhibition demos (Milestone 4 — Stable Integrated Demo), ambient hall noise and robot-mounted microphone hardware failures can hinder voice interaction. This project replaces the robot-mounted mic with an **Audio Input Gateway** on visitor smartphones:
 
 * **High Signal-to-Noise Ratio (SNR):** Visitors speak directly into their smartphone microphones close to their mouth.
 * **Hybrid Voice & Text Pipeline:** MediaRecorder Push-to-Talk audio sent to Whisper STT (Groq API, OpenAI API, or Local Faster-Whisper), supplemented by Quick Scenario Chips and a fallback Text input box.
@@ -34,33 +34,34 @@ graph TD
 
 ---
 
-## ??? Project Directory Structure
+## 🗂️ Project Directory Structure
 
 ```text
 booth_web_controller/
-??? .env.example                 # Template for environment variables
-??? requirements.txt             # Python dependencies (FastAPI, Uvicorn, Whisper, Pydantic)
-??? run_booth.sh                 # Startup script (sources ROS 2 Jazzy + venv + launches Uvicorn)
-??? app/
-?   ??? __init__.py
-?   ??? config.py                # Pydantic BaseSettings & predefined booth locations
-?   ??? models.py                # Pydantic schemas for REST payloads & WebSocket broadcasts
-?   ??? session_manager.py       # Exclusive session lock, smart 60s watchdog, auto-return task
-?   ??? stt_service.py           # Whisper STT engine (Groq API / OpenAI API / faster-whisper)
-?   ??? ros2_bridge.py           # In-process rclpy Node + automatic Mock ROS fallback
-?   ??? main.py                  # FastAPI app, lifespan handler, REST endpoints, WebSocket manager
-??? static/
-?   ??? index.html               # Visitor Mobile Web UI (Single-Page App)
-?   ??? staff.html               # Staff Override & Recovery Panel (/staff)
-?   ??? styles.css               # Modern glassmorphism dark theme stylesheet
-?   ??? app.js                   # Visitor & Staff frontend logic, WebSocket client, MediaRecorder
-??? tests/
-    ??? test_verification_protocol.py # Automated test suite for verification protocol
+├── .env.example                 # Template for environment variables
+├── requirements.txt             # Python dependencies (FastAPI, Uvicorn, Whisper, Pydantic)
+├── run_booth.sh                 # Startup script (sources ROS 2 Jazzy + venv + launches Uvicorn)
+├── pytest.ini                  # Pytest configuration
+├── app/
+│   ├── __init__.py
+│   ├── config.py                # Pydantic BaseSettings & predefined booth locations
+│   ├── models.py                # Pydantic schemas for REST payloads & WebSocket broadcasts
+│   ├── session_manager.py       # Exclusive session lock, smart 60s watchdog, auto-return task
+│   ├── stt_service.py           # Whisper STT engine (Groq API / OpenAI API / faster-whisper)
+│   ├── ros2_bridge.py           # In-process rclpy Node + automatic Mock ROS fallback
+│   └── main.py                  # FastAPI app, lifespan handler, REST endpoints, WebSocket manager
+├── static/
+│   ├── index.html               # Visitor Mobile Web UI (Single-Page App)
+│   ├── staff.html               # Staff Override & Recovery Panel (/staff)
+│   ├── styles.css               # Modern glassmorphism dark theme stylesheet
+│   └── app.js                   # Visitor & Staff frontend logic, WebSocket client, MediaRecorder
+└── tests/
+    └── test_verification_protocol.py # Automated test suite for verification protocol
 ```
 
 ---
 
-## ?? Installation & Setup on WSL 2 Ubuntu 24.04 + ROS 2 Jazzy
+## 🚀 Installation & Setup on WSL 2 Ubuntu 24.04 + ROS 2 Jazzy
 
 ### 1. Ubuntu 24.04 PEP 668 Virtual Environment Rule (CRITICAL)
 Ubuntu 24.04 enforces `externally-managed-environment`, and `rclpy` resides in the system path (`/opt/ros/jazzy/lib/python3.12/site-packages`). You **MUST** create the virtual environment with `--system-site-packages`:
@@ -113,7 +114,7 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ---
 
-## ?? Exhibition Booth Deployment & HTTPS Setup
+## 🌐 Exhibition Booth Deployment & HTTPS Setup
 
 Browsers (both iOS Safari and Android Chrome) **block microphone access (`getUserMedia`) on unencrypted HTTP** when accessed via local IP addresses. To allow visitors to use their microphone without connecting to the booth Wi-Fi:
 
@@ -130,20 +131,20 @@ Browsers (both iOS Safari and Android Chrome) **block microphone access (`getUse
 
 ---
 
-## ?? ROS 2 Interfaces & Topics
+## 📡 ROS 2 Interfaces & Topics
 
 | Topic | Message Type | Direction | Description |
 |---|---|---|---|
-| `/visitor/user_transcript` | `std_msgs/msg/String` | Publish | JSON payload with visitor transcript: `{"timestamp": ..., "session_id": "...", "input_mode": "voice\|text\|chip", "text": "..."}` |
-| `/llm/high_level_action` | `std_msgs/msg/String` | Publish | Action for Nav2: `{"action": "GO_TO\|STOP\|WAIT", "target": "START_BOOTH", "source": "auto_return\|staff_override"}` |
+| `/visitor/user_transcript` | `std_msgs/msg/String` | Publish | JSON payload with visitor transcript |
+| `/llm/high_level_action` | `std_msgs/msg/String` | Publish | Action for Nav2: `{"action": "GO_TO\|STOP\|WAIT", "target": "START_BOOTH"}` |
 | `/robot/emergency_stop` | `std_msgs/msg/Bool` | Publish | Halts robot navigation immediately |
 | `/cmd_vel` | `geometry_msgs/msg/Twist` | Publish | Sends 0.0 velocity on Emergency Stop |
-| `/robot/system_state` | `std_msgs/msg/String` | Subscribe | State updates from Nav2: `{"state": "NAVIGATING\|REPLANNING\|REACHED\|IDLE", "goal": "..."}` |
+| `/robot/system_state` | `std_msgs/msg/String` | Subscribe | State updates from Nav2 |
 | `/llm/mind_status` | `std_msgs/msg/String` | Subscribe | Reasoning output from LLM for VR & Web UI |
 
 ---
 
-## ?? Verification & Testing Protocol
+## 🧪 Verification & Testing Protocol
 
 Run the automated test suite covering all core requirements:
 

@@ -26,7 +26,7 @@ def reset_session_state():
     session_manager.robot_state = "IDLE"
     session_manager.current_goal = settings.START_BOOTH_ID
     session_manager.heard_text = ""
-    session_manager.llm_explanation = "?????????????????????????????"
+    session_manager.llm_explanation = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
     session_manager.obstacle_detected = False
     session_manager.auto_return_enabled = True
     session_manager.auto_return_delay_sec = 1  # 1s for fast testing
@@ -134,7 +134,7 @@ def test_auto_return_on_disconnect():
         # Wait for delayed auto-return task to trigger
         time.sleep(1.3)
         assert session_manager.current_goal == settings.START_BOOTH_ID
-        assert "auto_return" in session_manager.heard_text.lower() or "auto-return" in session_manager.heard_text.lower()
+        assert "auto_return" in session_manager.heard_text.lower() or "auto-return" in session_manager.heard_text.lower() or "กลับจุดเริ่มต้น" in session_manager.heard_text
 
 
 def test_staff_pin_security_and_emergency_stop():
@@ -183,7 +183,9 @@ def test_html_pages_served():
         res_index = client.get("/")
         assert res_index.status_code == 200
         assert "TurtleBot3 Controller" in res_index.text
+        assert "หุ่นยนต์ว่าง พร้อมรับคำสั่ง!" in res_index.text
 
         res_staff = client.get("/staff")
         assert res_staff.status_code == 200
         assert "Staff Override Panel" in res_staff.text
+        assert "กรุณาระบุรหัส PIN ของเจ้าหน้าที่" in res_staff.text
