@@ -29,6 +29,9 @@ def reset_session_state():
     session_manager.heard_text = ""
     session_manager.llm_explanation = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
     session_manager.obstacle_detected = False
+    session_manager.latest_request_identity = None
+    session_manager.latest_intent = None
+    session_manager.latest_action = None
     session_manager.auto_return_enabled = True
     session_manager.auto_return_delay_sec = 1  # 1s for fast testing
     session_manager.inactivity_timeout_sec = 60
@@ -72,11 +75,97 @@ def test_text_command_and_auto_claim():
         data = res.json()
         assert data["status"] == "sent"
         assert data["transcript"] == "พาไปบูธคอมพิวเตอร์"
+        assert data["session_id"] == "dev-visitor-1"
+        assert data["request_id"].startswith("req-")
 
         # Verify active session belongs to dev-visitor-1 and destination is booth_09
         state = session_manager.get_state_broadcast()
         assert state.active_session_id == "dev-visitor-1"
         assert state.current_goal == "booth_09"
+        assert state.latest_intent.status == "NAVIGATE"
+        assert state.latest_intent.request_id == data["request_id"]
+        assert state.latest_intent.session_id == data["session_id"]
+
+
+def test_intent_result_requires_current_request_and_session():
+    from app.models import IntentOutcome, RosStamp
+
+    asyncio.run(session_manager.claim("intent-owner"))
+    request_id, session_id = asyncio.run(session_manager.begin_user_request(
+        "intent-owner", session_manager.active_session_token
+    ))
+    result = IntentOutcome(
+        request_id=request_id,
+        session_id=session_id,
+        stamp=RosStamp(sec=1, nanosec=2),
+        status="CLARIFY",
+        message="Which booth?",
+    )
+
+    assert not session_manager.record_intent_result(result.model_copy(update={"request_id": "old"}))
+    assert not session_manager.record_intent_result(result.model_copy(update={"session_id": "other"}))
+    assert session_manager.record_intent_result(result)
+    assert not session_manager.record_intent_result(result)
+
+    state = session_manager.get_state_broadcast()
+    assert state.latest_intent.message == "Which booth?"
+    session_manager.latest_request_identity = ("new-request", session_id)
+    assert not session_manager.record_intent_result(result)
+
+
+def test_action_snapshot_keeps_newest_goal_and_terminal_state():
+    from app.models import DirectActionOutcome
+
+    first = DirectActionOutcome(
+        request_id="action-1", source="staff_override", destination_id="start", outcome="sending"
+    )
+    second = DirectActionOutcome(
+        request_id="action-2", source="auto_return", destination_id="start", outcome="sending"
+    )
+    assert session_manager.record_action_outcome(first)
+    assert session_manager.record_action_outcome(first.model_copy(update={"outcome": "accepted"}))
+    assert session_manager.record_action_outcome(second)
+    assert not session_manager.record_action_outcome(first.model_copy(update={"outcome": "succeeded"}))
+    assert session_manager.record_action_outcome(second.model_copy(update={"outcome": "succeeded"}))
+    assert not session_manager.record_action_outcome(second.model_copy(update={"outcome": "accepted"}))
+    assert session_manager.latest_action.request_id == "action-2"
+    assert session_manager.latest_action.outcome == "succeeded"
+
+
+def test_quick_chip_command_keeps_original_flow_and_correlates_result():
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/command/text",
+            headers={"X-Session-Id": "chip-visitor"},
+            json={"text": "หยุดรอตรงนี้ก่อน", "input_mode": "chip"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["transcript"] == "หยุดรอตรงนี้ก่อน"
+    assert payload["session_id"] == "chip-visitor"
+    state = session_manager.get_state_broadcast()
+    assert state.heard_text == "หยุดรอตรงนี้ก่อน"
+    assert state.latest_request_identity == (payload["request_id"], "chip-visitor")
+
+
+def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatch):
+    async def transcribe_and_change_owner(_audio):
+        await session_manager.release_session(reason="staff_force_release")
+        await session_manager.claim("replacement-owner")
+        return "พาไปบูธคอมพิวเตอร์"
+
+    monkeypatch.setattr("app.main.stt_service.transcribe_audio", transcribe_and_change_owner)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/command/voice",
+            headers={"X-Session-Id": "voice-owner"},
+            files={"audio": ("sample.wav", io.BytesIO(b"audio"), "audio/wav")},
+        )
+
+    assert response.status_code == 403
+    assert session_manager.active_session_id == "replacement-owner"
+    assert session_manager.latest_request_identity is None
 
 
 def test_smart_navigation_timer_pause():

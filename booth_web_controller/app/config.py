@@ -5,7 +5,7 @@ Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 """
 
 from typing import List, Dict, Any
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5
     START_BOOTH_ID: str = "start"
+    DIRECT_ACTION_VALIDITY_SEC: float = 30.0
+
+    @field_validator("DIRECT_ACTION_VALIDITY_SEC")
+    @classmethod
+    def validate_direct_action_validity(cls, value: float) -> float:
+        import math
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("DIRECT_ACTION_VALIDITY_SEC must be finite and greater than zero")
+        return value
 
     # Speech-to-Text (STT) Settings: "groq" | "openai" | "faster_whisper"
     STT_PROVIDER: str = "groq"

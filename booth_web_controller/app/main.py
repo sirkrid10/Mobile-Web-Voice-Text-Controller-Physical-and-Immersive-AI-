@@ -205,26 +205,34 @@ async def command_voice(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
 
     # Transcribe speech
     transcript = await stt_service.transcribe_audio(audio)
     if not transcript:
         transcript = "พาไปที่ AI Exhibition"
 
+    request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
+
     # Publish to ROS 2
     if ros_bridge_instance:
-        ros_bridge_instance.publish_user_transcript(
-            session_id=x_session_id,
-            input_mode="voice",
-            text=transcript
-        )
+        try:
+            ros_bridge_instance.publish_user_transcript(
+                request_id=request_id,
+                session_id=registered_session_id,
+                input_mode="voice",
+                text=transcript
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Unable to publish command: {exc}") from exc
 
     await ws_manager.broadcast_state()
     return {
         "status": "sent",
         "transcript": transcript,
-        "inactivity_remaining_sec": session_manager.get_remaining_sec()
+        "inactivity_remaining_sec": session_manager.get_remaining_sec(),
+        "request_id": request_id,
+        "session_id": registered_session_id
     }
 
 
@@ -238,21 +246,28 @@ async def command_text(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
 
     # Publish to ROS 2
     if ros_bridge_instance:
-        ros_bridge_instance.publish_user_transcript(
-            session_id=x_session_id,
-            input_mode=req.input_mode,
-            text=req.text
-        )
+        try:
+            ros_bridge_instance.publish_user_transcript(
+                request_id=request_id,
+                session_id=registered_session_id,
+                input_mode=req.input_mode,
+                text=req.text
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Unable to publish command: {exc}") from exc
 
     await ws_manager.broadcast_state()
     return {
         "status": "sent",
         "transcript": req.text,
-        "inactivity_remaining_sec": session_manager.get_remaining_sec()
+        "inactivity_remaining_sec": session_manager.get_remaining_sec(),
+        "request_id": request_id,
+        "session_id": registered_session_id
     }
 
 

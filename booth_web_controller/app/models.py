@@ -43,6 +43,36 @@ class CommandResponse(BaseModel):
     status: Literal["sent"] = "sent"
     transcript: str
     inactivity_remaining_sec: int
+    request_id: str
+    session_id: str
+
+
+class RosStamp(BaseModel):
+    sec: int
+    nanosec: int
+
+
+class IntentOutcome(BaseModel):
+    request_id: str
+    session_id: str
+    stamp: RosStamp
+    status: Literal["NAVIGATE", "CLARIFY", "UNSUPPORTED", "FAILED"]
+    destination_id: str = ""
+    message: str = ""
+    error_code: str = ""
+
+
+class DirectActionOutcome(BaseModel):
+    request_id: str
+    source: str
+    destination_id: str
+    outcome: Literal[
+        "sending", "accepted", "unavailable", "rejected", "succeeded",
+        "aborted", "canceled", "failed", "transport_error"
+    ]
+    ros_status: Optional[int] = None
+    error_code: Optional[int] = None
+    error_msg: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -81,3 +111,5 @@ class StateBroadcast(BaseModel):
     auto_return_delay_sec: int
     obstacle_detected: bool
     locations: List[Dict[str, Any]]
+    latest_intent: Optional[IntentOutcome] = None
+    latest_action: Optional[DirectActionOutcome] = None
