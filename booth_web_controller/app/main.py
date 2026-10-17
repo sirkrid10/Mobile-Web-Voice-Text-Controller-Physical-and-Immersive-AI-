@@ -177,17 +177,26 @@ async def claim_session(req: ClaimSessionRequest):
 
 
 @app.post("/api/v1/session/heartbeat", response_model=HeartbeatResponse, summary="Extend session timeout (Still here)")
-async def heartbeat_session(x_session_token: Optional[str] = Header(None, alias="X-Session-Token")):
-    if not x_session_token:
-        raise HTTPException(status_code=400, detail="Missing X-Session-Token header")
-    return await session_manager.heartbeat(x_session_token)
+async def heartbeat_session(
+    x_session_token: Optional[str] = Header(None, alias="X-Session-Token"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+):
+    res = await session_manager.heartbeat(x_session_token, x_session_id)
+    await ws_manager.broadcast_state()
+    return res
 
 
 @app.post("/api/v1/session/disconnect", response_model=DisconnectResponse, summary="Release session & trigger auto-return")
-async def disconnect_session(x_session_token: Optional[str] = Header(None, alias="X-Session-Token")):
-    if not x_session_token or x_session_token != session_manager.active_session_token:
-        raise HTTPException(status_code=403, detail="Invalid session token for active controller")
+async def disconnect_session(
+    x_session_token: Optional[str] = Header(None, alias="X-Session-Token"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
+):
+    is_valid_token = bool(x_session_token and session_manager.active_session_token and x_session_token == session_manager.active_session_token)
+    is_valid_id = bool(x_session_id and session_manager.active_session_id and x_session_id == session_manager.active_session_id)
+    if not (is_valid_token or is_valid_id):
+        raise HTTPException(status_code=403, detail="Invalid session token or ID for active controller")
     auto_return_scheduled = await session_manager.release_session(reason="user_disconnect")
+    await ws_manager.broadcast_state()
     return {"status": "disconnected", "auto_return_scheduled": auto_return_scheduled}
 
 
@@ -205,7 +214,7 @@ async def command_voice(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    active_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
 
     # Transcribe speech
     transcript = await stt_service.transcribe_audio(audio)
@@ -224,7 +233,8 @@ async def command_voice(
     return {
         "status": "sent",
         "transcript": transcript,
-        "inactivity_remaining_sec": session_manager.get_remaining_sec()
+        "inactivity_remaining_sec": session_manager.get_remaining_sec(),
+        "session_token": active_token
     }
 
 
@@ -238,7 +248,7 @@ async def command_text(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    active_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
 
     # Publish to ROS 2
     if ros_bridge_instance:
@@ -252,7 +262,8 @@ async def command_text(
     return {
         "status": "sent",
         "transcript": req.text,
-        "inactivity_remaining_sec": session_manager.get_remaining_sec()
+        "inactivity_remaining_sec": session_manager.get_remaining_sec(),
+        "session_token": active_token
     }
 
 

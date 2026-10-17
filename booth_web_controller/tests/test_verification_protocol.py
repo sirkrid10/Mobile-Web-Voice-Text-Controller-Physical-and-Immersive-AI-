@@ -188,3 +188,26 @@ def test_html_pages_served():
         assert res_staff.status_code == 200
         assert "Staff Override Panel" in res_staff.text
         assert "กรุณาระบุรหัส PIN ของเจ้าหน้าที่" in res_staff.text
+
+
+def test_disconnect_with_session_id_fallback():
+    """Verify visitor can disconnect using X-Session-Id even if X-Session-Token was omitted/lost."""
+    with TestClient(app) as client:
+        # First send command (auto-claims)
+        res_cmd = client.post(
+            "/api/v1/command/text",
+            headers={"X-Session-Id": "dev-autoclaim-user"},
+            json={"text": "พาไปบูธคอมพิวเตอร์", "input_mode": "text"}
+        )
+        assert res_cmd.status_code == 200
+        assert res_cmd.json()["session_token"] is not None
+        assert session_manager.active_session_id == "dev-autoclaim-user"
+
+        # Disconnect sending only X-Session-Id (no token)
+        res_disc = client.post(
+            "/api/v1/session/disconnect",
+            headers={"X-Session-Id": "dev-autoclaim-user"}
+        )
+        assert res_disc.status_code == 200
+        assert res_disc.json()["status"] == "disconnected"
+        assert session_manager.active_session_id is None

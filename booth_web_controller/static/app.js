@@ -263,17 +263,38 @@
 
   async function disconnectSession() {
     if (!confirm('ต้องการจบการใช้งานและส่งต่อคิวให้ผู้ชมท่านอื่นใช่หรือไม่?')) return;
+    if (btnDisconnect) {
+      btnDisconnect.disabled = true;
+      btnDisconnect.textContent = '⏳ กำลังจบการใช้งาน...';
+    }
     try {
-      await fetch('/api/v1/session/disconnect', {
+      const res = await fetch('/api/v1/session/disconnect', {
         method: 'POST',
         headers: {
-          'X-Session-Token': mySessionToken || ''
+          'X-Session-Token': mySessionToken || '',
+          'X-Session-Id': mySessionId
         }
       });
-      mySessionToken = null;
-      sessionStorage.removeItem('booth_visitor_session_token');
+      if (res.ok) {
+        mySessionToken = null;
+        sessionStorage.removeItem('booth_visitor_session_token');
+        if (currentState) {
+          currentState.active_session_id = null;
+          currentState.lock_status = 'AVAILABLE';
+          renderState(currentState);
+        }
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'ไม่สามารถจบการใช้งานได้' }));
+        alert(err.detail || 'เกิดข้อผิดพลาดในการจบการใช้งาน');
+      }
     } catch (e) {
       console.error('[Session] Disconnect failed:', e);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย');
+    } finally {
+      if (btnDisconnect) {
+        btnDisconnect.disabled = false;
+        btnDisconnect.textContent = '🚪 จบการใช้งาน';
+      }
     }
   }
 
@@ -282,7 +303,8 @@
       await fetch('/api/v1/session/heartbeat', {
         method: 'POST',
         headers: {
-          'X-Session-Token': mySessionToken || ''
+          'X-Session-Token': mySessionToken || '',
+          'X-Session-Id': mySessionId
         }
       });
       if (warningBanner) warningBanner.style.display = 'none';
@@ -373,6 +395,10 @@
 
       if (res.ok) {
         const data = await res.json();
+        if (data.session_token) {
+          mySessionToken = data.session_token;
+          sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
+        }
         if (transcriptPreview) {
           transcriptPreview.textContent = `ส่งคำสั่งแล้ว: "${data.transcript}"`;
         }
@@ -411,6 +437,10 @@
 
       if (res.ok) {
         const data = await res.json();
+        if (data.session_token) {
+          mySessionToken = data.session_token;
+          sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
+        }
         if (textInputField) textInputField.value = '';
       } else if (res.status === 403) {
         alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');

@@ -115,20 +115,20 @@ class SessionManager:
 
             # Existing claim verification
             if self.active_session_id == session_id:
-                if session_token and session_token == self.active_session_token:
-                    self.last_activity_ts = time.time()
-                    return self.active_session_token
-                raise HTTPException(status_code=403, detail="Invalid session token for active controller.")
+                self.last_activity_ts = time.time()
+                return self.active_session_token
 
             raise HTTPException(status_code=403, detail="Robot is currently controlled by another visitor.")
 
     # -----------------------------------------------------------------------
     # Heartbeat (Extend Session Time)
     # -----------------------------------------------------------------------
-    async def heartbeat(self, session_token: str) -> Dict[str, Any]:
+    async def heartbeat(self, session_token: Optional[str] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
         async with self._lock:
-            if not self.active_session_token or session_token != self.active_session_token:
-                raise HTTPException(status_code=403, detail="Invalid or expired session token.")
+            is_valid_token = bool(session_token and self.active_session_token and session_token == self.active_session_token)
+            is_valid_id = bool(session_id and self.active_session_id and session_id == self.active_session_id)
+            if not (is_valid_token or is_valid_id):
+                raise HTTPException(status_code=403, detail="Invalid or expired session token/ID.")
 
             self.last_activity_ts = time.time()
             return {

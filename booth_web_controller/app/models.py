@@ -43,6 +43,7 @@ class CommandResponse(BaseModel):
     status: Literal["sent"] = "sent"
     transcript: str
     inactivity_remaining_sec: int
+    session_token: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
