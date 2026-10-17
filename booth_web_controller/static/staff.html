@@ -130,7 +130,21 @@
         </div>
       </section>
 
-      <!-- 5. Real-Time Raw State Inspection -->
+      <!-- 5. Direct Action Outcomes -->
+      <section class="staff-section-card">
+        <h3 class="section-title">🚦 ผลคำสั่ง Action จาก Staff / Auto-return</h3>
+        <div class="staff-action-result" aria-live="polite" aria-atomic="true">
+          <p class="staff-action-status" id="staff-action-status">ยังไม่มีผล Action</p>
+          <p id="staff-action-source">ผู้ส่ง: —</p>
+          <p id="staff-action-destination">ปลายทาง: —</p>
+          <p id="staff-action-error-code">รหัสข้อผิดพลาด: —</p>
+          <p id="staff-action-ros-status">สถานะ ROS: —</p>
+          <p id="staff-action-error-message">รายละเอียด: —</p>
+        </div>
+        <p class="staff-action-note">แสดงคำสั่งตรงจากหน้า Staff และ Auto-return เท่านั้น ไม่ใช่สถานะคำสั่งนำทางจาก intent.</p>
+      </section>
+
+      <!-- 6. Real-Time Raw State Inspection -->
       <section class="staff-section-card">
         <h3 class="section-title">📡 สถานะดิบล่าสุด (Live State Inspection)</h3>
         <pre id="raw-state-dump" style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #38bdf8; overflow-x: auto;">
@@ -163,6 +177,12 @@
       const btnMockReached = document.getElementById('btn-mock-reached');
       const btnMockIdle = document.getElementById('btn-mock-idle');
       const rawStateDump = document.getElementById('raw-state-dump');
+      const actionStatus = document.getElementById('staff-action-status');
+      const actionSource = document.getElementById('staff-action-source');
+      const actionDestination = document.getElementById('staff-action-destination');
+      const actionErrorCode = document.getElementById('staff-action-error-code');
+      const actionRosStatus = document.getElementById('staff-action-ros-status');
+      const actionErrorMessage = document.getElementById('staff-action-error-message');
 
       let currentPin = sessionStorage.getItem('staff_pin') || '';
 
@@ -203,6 +223,10 @@
             checkAuth();
             return null;
           }
+          if (!res.ok) {
+            console.error(`Staff API request failed: HTTP ${res.status}`);
+            return null;
+          }
           return await res.json();
         } catch (e) {
           console.error('Staff API Error:', e);
@@ -220,7 +244,7 @@
 
       btnReturnStart.addEventListener('click', async () => {
         const res = await staffApi('/api/v1/staff/return-to-start');
-        if (res) alert('🏠 สั่งให้หุ่นยนต์กลับจุดเริ่มต้นหน้าร้านแล้ว');
+        if (res) alert('🏠 ส่งคำขอกลับจุดเริ่มต้นแล้ว ดูผลการทำงานได้ที่แผงผลคำสั่ง Action');
         loadLiveState();
       });
 
@@ -254,10 +278,65 @@
             rawStateDump.textContent = JSON.stringify(data, null, 2);
             cfgAutoReturn.checked = data.auto_return_enabled;
             cfgDelay.value = data.auto_return_delay_sec;
+            renderActionOutcome(data);
           }
         } catch (e) {
           console.error(e);
         }
+      }
+
+      function setTextIfChanged(element, value) {
+        if (element && element.textContent !== value) element.textContent = value;
+      }
+
+      function renderActionOutcome(state) {
+        const action = state.latest_action;
+        if (!action) {
+          setTextIfChanged(actionStatus, 'ยังไม่มีผล Action');
+          setTextIfChanged(actionSource, 'ผู้ส่ง: —');
+          setTextIfChanged(actionDestination, 'ปลายทาง: —');
+          setTextIfChanged(actionErrorCode, 'รหัสข้อผิดพลาด: —');
+          setTextIfChanged(actionRosStatus, 'สถานะ ROS: —');
+          setTextIfChanged(actionErrorMessage, 'รายละเอียด: —');
+          return;
+        }
+
+        const outcomeLabels = {
+          sending: 'กำลังส่งคำสั่ง',
+          accepted: 'Robot รับงานแล้ว',
+          unavailable: 'ไม่พบ Action server',
+          rejected: 'Robot ปฏิเสธงาน',
+          succeeded: 'Action เสร็จสำเร็จ',
+          aborted: 'Action ถูกยุติ',
+          canceled: 'Action ถูกยกเลิก',
+          failed: 'Action ไม่สำเร็จ',
+          transport_error: 'ส่งหรือรับผล Action ไม่สำเร็จ'
+        };
+        const outcome = typeof action.outcome === 'string' ? action.outcome : '';
+        const status = outcomeLabels[outcome] || (outcome
+          ? `ไม่รู้จักสถานะ Action (${outcome})`
+          : 'ไม่รู้จักสถานะ Action');
+        const location = Array.isArray(state.locations)
+          ? state.locations.find(item => item && item.id === action.destination_id)
+          : null;
+        const destination = location && typeof location.label === 'string'
+          ? location.label
+          : (typeof action.destination_id === 'string' && action.destination_id
+            ? action.destination_id
+            : '—');
+        const errorCode = action.error_code !== null && action.error_code !== undefined
+          ? String(action.error_code)
+          : '—';
+        const rosStatus = action.ros_status !== null && action.ros_status !== undefined
+          ? String(action.ros_status)
+          : '—';
+
+        setTextIfChanged(actionStatus, status);
+        setTextIfChanged(actionSource, `ผู้ส่ง: ${action.source || '—'}`);
+        setTextIfChanged(actionDestination, `ปลายทาง: ${destination}`);
+        setTextIfChanged(actionErrorCode, `รหัสข้อผิดพลาด: ${errorCode}`);
+        setTextIfChanged(actionRosStatus, `สถานะ ROS: ${rosStatus}`);
+        setTextIfChanged(actionErrorMessage, `รายละเอียด: ${action.error_msg || '—'}`);
       }
 
       setInterval(() => {
