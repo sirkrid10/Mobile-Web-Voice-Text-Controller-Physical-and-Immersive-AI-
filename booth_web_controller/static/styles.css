@@ -382,6 +382,48 @@ header.app-header {
   font-style: italic;
 }
 
+.intent-result-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.intent-result-card h3 {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.intent-result-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.intent-result-status {
+  color: var(--text-main);
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.intent-result-message,
+.intent-result-detail {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.intent-result-detail {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
 /* --------------------------------------------------------------------------
    Push-to-Talk Microphone Component
    -------------------------------------------------------------------------- */

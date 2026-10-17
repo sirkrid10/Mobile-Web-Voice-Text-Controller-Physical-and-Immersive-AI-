@@ -103,9 +103,18 @@
             <span class="content" id="robot-heard-text">"(ยังไม่มีคำสั่งเสียงล่าสุด)"</span>
           </div>
           <div class="mind-row">
-            <span class="title">🧠 ความคิดและการตัดสินใจ (LLM Reasoning):</span>
-            <span class="content" id="robot-reason-text">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
+            <span class="title">💬 ข้อความคำบรรยายล่าสุด:</span>
+            <span class="content" id="robot-reason-text"></span>
           </div>
+        </div>
+      </section>
+
+      <section class="intent-result-card" aria-labelledby="intent-result-title">
+        <h3 id="intent-result-title">ผลแปลงคำสั่ง</h3>
+        <div class="intent-result-content" aria-live="polite" aria-atomic="true">
+          <p class="intent-result-status" id="intent-result-status">ยังไม่มีผลแปลงคำสั่ง</p>
+          <p class="intent-result-message" id="intent-result-message"></p>
+          <p class="intent-result-detail" id="intent-result-detail"></p>
         </div>
       </section>
 

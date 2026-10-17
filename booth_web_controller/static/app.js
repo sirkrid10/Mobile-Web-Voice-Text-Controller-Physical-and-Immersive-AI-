@@ -25,6 +25,11 @@
   const mySessionId = getOrCreateSessionId();
   let mySessionToken = sessionStorage.getItem('booth_visitor_session_token') || null;
   let currentState = null;
+  let previousSessionOwnership = null;
+  let submissionGeneration = 0;
+  let pendingSubmission = null;
+  let currentSubmission = null;
+  let submissionFeedback = '';
 
   // Audio Recording State
   let mediaRecorder = null;
@@ -50,6 +55,9 @@
   const robotGoalTag = document.getElementById('robot-goal-tag');
   const robotHeardText = document.getElementById('robot-heard-text');
   const robotReasonText = document.getElementById('robot-reason-text');
+  const intentResultStatus = document.getElementById('intent-result-status');
+  const intentResultMessage = document.getElementById('intent-result-message');
+  const intentResultDetail = document.getElementById('intent-result-detail');
 
   const micButton = document.getElementById('mic-button');
   const micLabel = document.getElementById('mic-label');
@@ -84,6 +92,7 @@
   // --------------------------------------------------------------------------
   let ws = null;
   let wsReconnectTimer = null;
+  let receivedWebSocketState = false;
 
   function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -102,6 +111,7 @@
     ws.onmessage = function (event) {
       try {
         const state = JSON.parse(event.data);
+        receivedWebSocketState = true;
         renderState(state);
       } catch (e) {
         console.error('[WebSocket] Error parsing state JSON:', e);
@@ -124,9 +134,15 @@
   // --------------------------------------------------------------------------
   function renderState(state) {
     currentState = state;
+    const ownsSession = state.active_session_id === mySessionId;
+    if (previousSessionOwnership !== null && previousSessionOwnership !== ownsSession) {
+      resetSubmissionState();
+    }
+    previousSessionOwnership = ownsSession;
 
     // 1. Robot Mind Card Info
     renderRobotMind(state);
+    renderIntentResult(state);
 
     // 2. View Switcher Logic
     const isMine = state.active_session_id === mySessionId;
@@ -187,8 +203,136 @@
     }
 
     if (robotReasonText) {
-      robotReasonText.textContent = state.llm_reason || 'กำลังรันการประมวลผลคำสั่ง';
+      robotReasonText.textContent = state.llm_reason || '';
     }
+  }
+
+  function setIntentResult(status, message = '', detail = '') {
+    if (!intentResultStatus) return;
+    if (intentResultStatus.textContent !== status) intentResultStatus.textContent = status;
+    if (intentResultMessage && intentResultMessage.textContent !== message) {
+      intentResultMessage.textContent = message;
+    }
+    if (intentResultDetail && intentResultDetail.textContent !== detail) {
+      intentResultDetail.textContent = detail;
+    }
+  }
+
+  function renderIntentResult(state) {
+    const neutral = 'ยังไม่มีผลแปลงคำสั่ง';
+    if (!state || state.active_session_id !== mySessionId) {
+      setIntentResult(neutral);
+      return;
+    }
+
+    if (submissionFeedback) {
+      setIntentResult(submissionFeedback);
+      return;
+    }
+    if (pendingSubmission) {
+      setIntentResult('กำลังส่งคำสั่ง');
+      return;
+    }
+
+    const result = state.latest_intent;
+    if (!result || result.session_id !== mySessionId) {
+      if (currentSubmission) {
+        setIntentResult('ส่งแล้ว รอผลแปลงคำสั่ง');
+      } else {
+        setIntentResult(neutral);
+      }
+      return;
+    }
+
+    if (currentSubmission && (
+      result.request_id !== currentSubmission.requestId ||
+      result.session_id !== currentSubmission.sessionId
+    )) {
+      setIntentResult('ส่งแล้ว รอผลแปลงคำสั่ง');
+      return;
+    }
+
+    const messages = {
+      NAVIGATE: 'แปลงคำสั่งเป็นการนำทาง',
+      CLARIFY: 'ขอข้อมูลเพิ่มเติม',
+      UNSUPPORTED: 'คำสั่งนี้ยังไม่รองรับ',
+      FAILED: 'แปลงคำสั่งไม่สำเร็จ'
+    };
+    const status = messages[result.status] || 'ไม่รู้จักสถานะผลแปลงคำสั่ง';
+    let message = typeof result.message === 'string' ? result.message : '';
+    let detail = '';
+
+    if (result.status === 'NAVIGATE') {
+      const location = Array.isArray(state.locations)
+        ? state.locations.find(item => item.id === result.destination_id)
+        : null;
+      const destination = location && typeof location.label === 'string'
+        ? location.label
+        : (typeof result.destination_id === 'string' ? result.destination_id : '');
+      message = destination ? `ปลายทาง: ${destination}` : '';
+      detail = 'ผลนี้บอกว่าระบบแปลงคำสั่งแล้ว ยังไม่ยืนยันว่า Robot รับงานหรือเริ่มเคลื่อนที่';
+    } else if (result.status === 'FAILED' && !message) {
+      message = 'ลองส่งคำสั่งใหม่อีกครั้ง';
+    }
+
+    if (typeof result.error_code === 'string' && result.error_code) {
+      detail = detail ? `${detail} · รหัสข้อผิดพลาด: ${result.error_code}` : `รหัสข้อผิดพลาด: ${result.error_code}`;
+    }
+    setIntentResult(status, message, detail);
+  }
+
+  function resetSubmissionState() {
+    submissionGeneration += 1;
+    pendingSubmission = null;
+    currentSubmission = null;
+    submissionFeedback = '';
+  }
+
+  function failSubmission(generation, message) {
+    if (generation !== submissionGeneration) return;
+    pendingSubmission = null;
+    currentSubmission = null;
+    submissionFeedback = message;
+    renderIntentResult(currentState);
+  }
+
+  function beginSubmission() {
+    submissionGeneration += 1;
+    pendingSubmission = { generation: submissionGeneration };
+    currentSubmission = null;
+    submissionFeedback = '';
+    renderIntentResult(currentState);
+    return submissionGeneration;
+  }
+
+  async function finishSubmission(generation, response) {
+    let data = null;
+    if (response.ok) {
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = null;
+      }
+    }
+    if (generation !== submissionGeneration) return data;
+
+    pendingSubmission = null;
+    if (!response.ok) {
+      submissionFeedback = `ส่งคำสั่งไม่สำเร็จ (HTTP ${response.status})`;
+      if (response.status === 403) {
+        alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
+      }
+    } else if (
+      data && typeof data.request_id === 'string' && data.request_id &&
+      typeof data.session_id === 'string' && data.session_id === mySessionId
+    ) {
+      currentSubmission = { requestId: data.request_id, sessionId: data.session_id };
+    } else {
+      submissionFeedback = 'ส่งคำสั่งแล้ว แต่ยังไม่ได้รับรหัสสำหรับติดตามผล';
+    }
+
+    renderIntentResult(currentState);
+    return data;
   }
 
   function renderActiveController(state) {
@@ -252,6 +396,8 @@
         const data = await res.json();
         mySessionToken = data.session_token;
         sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
+        resetSubmissionState();
+        renderIntentResult(currentState);
         console.log('[Session] Claimed successfully:', data);
       } else if (res.status === 409) {
         alert('ขณะนี้มีผู้ชมท่านอื่นกำลังใช้งานอยู่ กรุณารอสักครู่ครับ');
@@ -272,6 +418,8 @@
       });
       mySessionToken = null;
       sessionStorage.removeItem('booth_visitor_session_token');
+      resetSubmissionState();
+      renderIntentResult(currentState);
     } catch (e) {
       console.error('[Session] Disconnect failed:', e);
     }
@@ -353,6 +501,7 @@
 
   async function sendVoiceCommand(blob) {
     if (transcriptPreview) transcriptPreview.textContent = 'กำลังถอดความและประมวลผล...';
+    const generation = beginSubmission();
     const formData = new FormData();
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
     formData.append('audio', blob, `voice_${Date.now()}.${ext}`);
@@ -371,17 +520,18 @@
         body: formData
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      const data = await finishSubmission(generation, res);
+      if (res.ok && generation === submissionGeneration) {
         if (transcriptPreview) {
-          transcriptPreview.textContent = `ส่งคำสั่งแล้ว: "${data.transcript}"`;
+          transcriptPreview.textContent = data && data.transcript
+            ? `ส่งคำสั่งแล้ว: "${data.transcript}"`
+            : 'ส่งคำสั่งแล้ว';
         }
-      } else if (res.status === 403) {
-        alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
       }
     } catch (e) {
       console.error('[Command] Send voice error:', e);
-      if (transcriptPreview) transcriptPreview.textContent = 'เกิดข้อผิดพลาดในการส่งเสียง';
+      failSubmission(generation, 'ส่งเสียงไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ');
+      if (transcriptPreview && generation === submissionGeneration) transcriptPreview.textContent = 'เกิดข้อผิดพลาดในการส่งเสียง';
     }
   }
 
@@ -391,8 +541,9 @@
   async function sendTextCommand(text, mode = 'text') {
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
+    const generation = beginSubmission();
 
-    if (transcriptPreview) transcriptPreview.textContent = `ส่งคำสั่ง: "${cleanText}"`;
+    if (transcriptPreview) transcriptPreview.textContent = `กำลังส่งคำสั่ง: "${cleanText}"`;
 
     try {
       const headers = {
@@ -409,14 +560,13 @@
         body: JSON.stringify({ text: cleanText, input_mode: mode })
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      const data = await finishSubmission(generation, res);
+      if (res.ok && generation === submissionGeneration) {
         if (textInputField) textInputField.value = '';
-      } else if (res.status === 403) {
-        alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
       }
     } catch (e) {
       console.error('[Command] Send text error:', e);
+      failSubmission(generation, 'ส่งคำสั่งไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ');
     }
   }
 
@@ -484,7 +634,9 @@
   initWebSocket();
   fetch('/api/v1/state')
     .then(r => r.json())
-    .then(renderState)
+    .then(state => {
+      if (!receivedWebSocketState) renderState(state);
+    })
     .catch(err => console.error('Initial state fetch error:', err));
 
 })();
