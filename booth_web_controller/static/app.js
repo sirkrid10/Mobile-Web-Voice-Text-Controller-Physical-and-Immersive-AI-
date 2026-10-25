@@ -32,11 +32,11 @@
   let submissionFeedback = '';
 
   // Audio Recording State
-  let mediaRecorder = null;
-  let audioChunks = [];
-  let audioStream = null;
   let isRecording = false;
   let isAcquiringMicrophone = false;
+  let isUploadingMicrophone = false;
+  let recordingGeneration = 0;
+  let activeRecording = null;
 
   // DOM Elements - Visitor UI
   const viewAvailable = document.getElementById('view-available');
@@ -182,8 +182,9 @@
     if (chipsContainer) {
       chipsContainer.children.forEach(button => { button.disabled = unavailable; });
     }
-    if (micButton && !isRecording && !isAcquiringMicrophone) {
-      micButton.disabled = unavailable;
+    if (micButton) {
+      micButton.disabled = isUploadingMicrophone ||
+        (unavailable && !isRecording && !isAcquiringMicrophone);
     }
   }
 
@@ -377,6 +378,7 @@
   }
 
   function resetSubmissionState() {
+    cancelRecording();
     clearAudioDebug();
     submissionGeneration += 1;
     pendingSubmission = null;
@@ -581,62 +583,173 @@
   // Push-to-Talk Voice Recording
   // --------------------------------------------------------------------------
   async function startRecording() {
-    if (isRecording) return;
+    if (activeRecording) return;
+    if (!canSubmitVisitorCommand()) {
+      setSessionFeedback('ยังบันทึกเสียงไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
+      return;
+    }
     if (audioDebugEnabled) audioDebugPlayer.pause?.();
+    const attempt = {
+      generation: ++recordingGeneration,
+      chunks: [],
+      stream: null,
+      recorder: null,
+      cancelled: false,
+      mimeType: ''
+    };
+    activeRecording = attempt;
+    isAcquiringMicrophone = true;
+    updateMicControls('acquiring');
+    if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน...';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStream = stream;
-      audioChunks = [];
+      if (attempt.cancelled || activeRecording !== attempt ||
+          attempt.generation !== recordingGeneration || !canSubmitVisitorCommand()) {
+        stopTracks(stream);
+        if (activeRecording === attempt) {
+          activeRecording = null;
+          isAcquiringMicrophone = false;
+          updateMicControls('idle');
+        }
+        return;
+      }
+      attempt.stream = stream;
 
       const mimeType = getSupportedMimeType();
+      attempt.mimeType = mimeType || 'audio/webm';
       const options = mimeType ? { mimeType } : {};
-      mediaRecorder = new MediaRecorder(stream, options);
+      const recorder = new MediaRecorder(stream, options);
+      attempt.recorder = recorder;
 
-      mediaRecorder.ondataavailable = function (e) {
-        if (e.data && e.data.size > 0) {
-          audioChunks.push(e.data);
+      recorder.ondataavailable = function (e) {
+        if (!attempt.cancelled && e.data && e.data.size > 0) {
+          attempt.chunks.push(e.data);
         }
       };
 
-      mediaRecorder.onstop = async function () {
-        const blobType = mimeType || 'audio/webm';
-        const audioBlob = new Blob(audioChunks, { type: blobType });
+      recorder.onstop = async function () {
+        stopAttemptTracks(attempt);
+        if (attempt.cancelled || activeRecording !== attempt) return;
+        if (!canSubmitVisitorCommand()) {
+          activeRecording = null;
+          isUploadingMicrophone = false;
+          updateMicControls('idle');
+          const message = 'ข้อมูลหรือสิทธิ์ควบคุมยังไม่ยืนยัน จึงไม่ได้ส่งเสียง';
+          if (transcriptPreview) transcriptPreview.textContent = message;
+          setSessionFeedback(message);
+          return;
+        }
+        const audioBlob = new Blob(attempt.chunks, { type: attempt.mimeType });
         showRecordedAudio(audioBlob);
-        console.log(`[MediaRecorder] Audio recorded: ${audioBlob.size} bytes (${blobType})`);
-
-        if (audioStream) {
-          audioStream.getTracks().forEach(t => t.stop());
-          audioStream = null;
+        console.log(`[MediaRecorder] Audio recorded: ${audioBlob.size} bytes (${attempt.mimeType})`);
+        activeRecording = null;
+        isRecording = false;
+        isAcquiringMicrophone = false;
+        isUploadingMicrophone = true;
+        updateMicControls('uploading');
+        try {
+          await sendVoiceCommand(audioBlob);
+        } finally {
+          isUploadingMicrophone = false;
+          updateMicControls('idle');
         }
-
-        await sendVoiceCommand(audioBlob);
       };
 
-      mediaRecorder.start();
+      recorder.start();
+      isAcquiringMicrophone = false;
       isRecording = true;
-
-      if (micButton) micButton.classList.add('recording');
-      if (micLabel) micLabel.textContent = 'ปล่อยเพื่อส่ง';
-      if (waveform) waveform.classList.add('active');
+      updateMicControls('recording');
       if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟังเสียงของคุณ...';
     } catch (err) {
-      console.error('[Audio] getUserMedia error:', err);
-      alert('ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตสิทธิ์ไมโครโฟนบนเบราว์เซอร์ หรือใช้ช่องพิมพ์ข้อความด้านล่างแทนครับ');
+      console.error('[Audio] Recording start failed:', err);
+      attempt.cancelled = true;
+      if (attempt.recorder && attempt.recorder.state !== 'inactive') {
+        try { attempt.recorder.stop(); } catch (stopError) { console.error('[Audio] Cleanup stop failed:', stopError); }
+      }
+      stopAttemptTracks(attempt);
+      if (activeRecording === attempt) {
+        activeRecording = null;
+        isAcquiringMicrophone = false;
+        isRecording = false;
+        updateMicControls('idle');
+        const message = 'เปิดไมโครโฟนไม่สำเร็จ กรุณาอนุญาตสิทธิ์หรือใช้ช่องพิมพ์ข้อความ';
+        if (transcriptPreview) transcriptPreview.textContent = message;
+        setSessionFeedback(message);
+      }
     }
   }
 
   function stopRecording() {
-    if (!isRecording || !mediaRecorder) return;
+    const attempt = activeRecording;
+    if (!attempt) return;
+    if (isAcquiringMicrophone) {
+      cancelRecording('ยกเลิกการบันทึกก่อนเปิดไมโครโฟน');
+      return;
+    }
+    if (!isRecording || !attempt.recorder) return;
+    isRecording = false;
+    isUploadingMicrophone = true;
+    updateMicControls('uploading');
     try {
-      mediaRecorder.stop();
+      attempt.recorder.stop();
     } catch (e) {
       console.error('[Audio] Stop error:', e);
+      cancelRecording('หยุดการบันทึกไม่สำเร็จ');
     }
-    isRecording = false;
+  }
 
-    if (micButton) micButton.classList.remove('recording');
-    if (micLabel) micLabel.textContent = 'แตะเพื่อพูด';
-    if (waveform) waveform.classList.remove('active');
+  function cancelRecording(message = '') {
+    const attempt = activeRecording;
+    if (!attempt) return;
+    attempt.cancelled = true;
+    recordingGeneration += 1;
+    activeRecording = null;
+    isRecording = false;
+    isAcquiringMicrophone = false;
+    isUploadingMicrophone = false;
+    if (attempt.recorder && attempt.recorder.state !== 'inactive') {
+      try { attempt.recorder.stop(); } catch (e) { console.error('[Audio] Cancel error:', e); }
+    }
+    stopAttemptTracks(attempt);
+    updateMicControls('idle');
+    if (message && transcriptPreview) transcriptPreview.textContent = message;
+    if (message) setSessionFeedback(message);
+  }
+
+  function stopTracks(stream) {
+    if (!stream) return;
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  function stopAttemptTracks(attempt) {
+    if (attempt.streamReleased) return;
+    attempt.streamReleased = true;
+    stopTracks(attempt.stream);
+  }
+
+  function updateMicControls(mode) {
+    if (micButton) {
+      micButton.classList.remove('recording');
+      if (mode === 'recording') micButton.classList.add('recording');
+      micButton.setAttribute('aria-pressed', mode === 'recording' ? 'true' : 'false');
+      micButton.setAttribute('aria-label', ({
+        idle: 'เริ่มบันทึกเสียง',
+        acquiring: 'กำลังรอสิทธิ์ไมโครโฟน กดเพื่อยกเลิก',
+        recording: 'กำลังบันทึกเสียง กดเพื่อหยุดและส่ง',
+        uploading: 'กำลังส่งเสียง'
+      })[mode]);
+    }
+    if (micLabel) micLabel.textContent = ({
+      idle: 'แตะเพื่อพูด',
+      acquiring: 'กำลังขอสิทธิ์ไมค์ · แตะเพื่อยกเลิก',
+      recording: 'แตะเพื่อหยุดส่ง',
+      uploading: 'กำลังส่งเสียง...'
+    })[mode];
+    if (waveform) {
+      if (mode === 'recording') waveform.classList.add('active');
+      else waveform.classList.remove('active');
+    }
+    renderCommandAvailability();
   }
 
   async function sendVoiceCommand(blob) {
@@ -743,8 +856,17 @@
     let pressTimer = null;
     let isHoldMode = false;
 
+    function toggleRecording() {
+      if (activeRecording) stopRecording();
+      else startRecording();
+    }
+
     micButton.addEventListener('pointerdown', (e) => {
+      if (micButton.disabled) return;
       e.preventDefault();
+      if (micButton.setPointerCapture && Number.isInteger(e.pointerId)) {
+        try { micButton.setPointerCapture(e.pointerId); } catch (err) { /* Pointer may already be released. */ }
+      }
       pressTimer = setTimeout(() => {
         isHoldMode = true;
         startRecording();
@@ -761,18 +883,20 @@
         stopRecording();
         isHoldMode = false;
       } else {
-        if (isRecording) {
-          stopRecording();
-        } else {
-          startRecording();
-        }
+        toggleRecording();
       }
     });
 
     micButton.addEventListener('pointercancel', () => {
       if (pressTimer) clearTimeout(pressTimer);
-      if (isRecording) stopRecording();
+      pressTimer = null;
+      cancelRecording('การบันทึกเสียงถูกยกเลิก');
       isHoldMode = false;
+    });
+
+    micButton.addEventListener('click', (e) => {
+      if (e.detail > 0) return;
+      toggleRecording();
     });
   }
 

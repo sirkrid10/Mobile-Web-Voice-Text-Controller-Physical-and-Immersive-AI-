@@ -13,6 +13,8 @@ class Element {
     this.children = [];
     this.style = {};
     this.listeners = new Map();
+    this.attributes = new Map();
+    this.pointerCaptures = [];
     this.classList = {
       add: name => { this.className += ` ${name}`; },
       remove: name => { this.className = this.className.replace(name, '').trim(); }
@@ -22,6 +24,9 @@ class Element {
   addEventListener(type, listener) {
     this.listeners.set(type, listener);
   }
+
+  setAttribute(name, value) { this.attributes.set(name, value); }
+  setPointerCapture(pointerId) { this.pointerCaptures.push(pointerId); }
 
   appendChild(child) {
     this.children.push(child);
