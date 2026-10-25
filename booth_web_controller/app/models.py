@@ -97,7 +97,7 @@ class StaffMockEvent(BaseModel):
 # ---------------------------------------------------------------------------
 
 class StateBroadcast(BaseModel):
-    robot_state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED"]
+    robot_state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED", "NOT_READY", "UNKNOWN"]
     heard_text: str
     current_goal: Optional[str]
     llm_reason: str

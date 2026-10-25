@@ -183,7 +183,9 @@
       'NAVIGATING': { label: 'กำลังนำทาง (Navigating)', class: 'state-navigating' },
       'REPLANNING': { label: 'พบสิ่งกีดขวาง กำลังคำนวณใหม่ (Replanning)', class: 'state-replanning' },
       'REACHED': { label: 'ถึงจุดหมายแล้ว (Reached)', class: 'state-reached' },
-      'STOPPED': { label: 'หยุดฉุกเฉิน (Stopped)', class: 'state-stopped' },
+      'STOPPED': { label: 'หยุด/ยกเลิกการนำทาง (Stopped)', class: 'state-stopped' },
+      'NOT_READY': { label: 'ยังไม่พร้อม (Not ready)', class: 'state-stopped' },
+      'UNKNOWN': { label: 'ยังไม่ทราบสถานะ (Unknown)', class: 'state-stopped' },
       'FAILED': { label: 'เกิดข้อผิดพลาด (Failed)', class: 'state-stopped' }
     };
 

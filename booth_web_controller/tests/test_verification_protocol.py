@@ -278,6 +278,31 @@ def test_mock_subtitle_clear_stale_messages_and_old_timers_cannot_clear_new_text
     asyncio.run(run())
 
 
+@pytest.mark.parametrize(("phase", "ready", "error", "expected"), [
+    ("NAVIGATING", False, 0, "NAVIGATING"),
+    ("RETURNING_HOME", False, 0, "NAVIGATING"),
+    ("ARRIVED", False, 0, "REACHED"),
+    ("READY", True, 0, "IDLE"),
+    ("HOME", True, 0, "IDLE"),
+    ("READY", False, 0, "NOT_READY"),
+    ("HOME", False, 0, "NOT_READY"),
+    ("NOT_READY", True, 0, "NOT_READY"),
+    ("CANCELED", False, 0, "STOPPED"),
+    ("FAILED", True, 0, "FAILED"),
+    ("NAVIGATING", True, 7, "FAILED"),
+    ("new_phase", False, 0, "UNKNOWN"),
+])
+def test_navigation_phase_maps_only_to_confirmed_web_state(phase, ready, error, expected):
+    from app.ros2_bridge import map_navigation_state
+    assert map_navigation_state(phase, ready, error) == expected
+
+
+def test_web_state_schema_accepts_unknown_and_not_ready():
+    for state in ("UNKNOWN", "NOT_READY"):
+        session_manager.robot_state = state
+        assert session_manager.get_state_broadcast().robot_state == state
+
+
 def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatch):
     async def transcribe_and_change_owner(_audio):
         await session_manager.release_session(reason="staff_force_release")

@@ -25,6 +25,23 @@ from app.models import DirectActionOutcome, IntentOutcome, RosStamp
 from app.config import settings
 
 
+def map_navigation_state(phase: str, ready_for_goal: bool, error_code: int) -> str:
+    phase = (phase or "").upper()
+    if error_code != 0 or phase == "FAILED":
+        return "FAILED"
+    if phase in ("NAVIGATING", "RETURNING_HOME"):
+        return "NAVIGATING"
+    if phase == "ARRIVED":
+        return "REACHED"
+    if phase in ("READY", "HOME"):
+        return "IDLE" if ready_for_goal else "NOT_READY"
+    if phase == "NOT_READY":
+        return "NOT_READY"
+    if phase == "CANCELED":
+        return "STOPPED"
+    return "UNKNOWN"
+
+
 # ---------------------------------------------------------------------------
 # Base Bridge Contract
 # ---------------------------------------------------------------------------
@@ -399,36 +416,12 @@ class RealROS2Bridge(BaseROS2Bridge):
                     ready_for_goal = msg.ready_for_goal
                     dist = msg.distance_remaining_m
                     error_code = msg.error_code
-                    error_msg = msg.error_msg
 
                     self.get_logger().info(
                         f"[/robot/navigation_state] phase={phase}, dest={dest_id}, ready={ready_for_goal}, dist={dist:.2f}m"
                     )
 
-                    # State mapping aligned with contract:
-                    # - NAVIGATING / RETURNING_HOME: In motion (watchdog timer paused)
-                    # - ARRIVED: Arrived at booth (session remains active, countdown runs)
-                    # - HOME + ready_for_goal: Back at start point and ready for new task -> IDLE
-                    # - READY: Ready for goal -> IDLE
-                    # - CANCELED / NOT_READY: Stopped
-                    # - FAILED: Failed
-                    if phase in ("NAVIGATING", "RETURNING_HOME"):
-                        mapped_state = "NAVIGATING"
-                    elif phase == "ARRIVED":
-                        mapped_state = "REACHED"
-                    elif phase == "HOME":
-                        if ready_for_goal:
-                            mapped_state = "IDLE"
-                        else:
-                            mapped_state = "NAVIGATING"
-                    elif phase == "READY":
-                        mapped_state = "IDLE"
-                    elif phase in ("CANCELED", "NOT_READY"):
-                        mapped_state = "STOPPED"
-                    elif phase == "FAILED":
-                        mapped_state = "FAILED"
-                    else:
-                        mapped_state = "IDLE"
+                    mapped_state = map_navigation_state(phase, ready_for_goal, error_code)
 
                     def _sync():
                         outer.session_manager.update_from_ros_state(
