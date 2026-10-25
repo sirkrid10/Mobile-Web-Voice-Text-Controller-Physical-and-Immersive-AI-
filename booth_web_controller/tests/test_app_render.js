@@ -3,14 +3,32 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
+class HTMLCollectionFixture {
+  constructor() { this.length = 0; }
+
+  append(element) {
+    this[this.length] = element;
+    this.length += 1;
+  }
+
+  clear() {
+    for (let index = 0; index < this.length; index += 1) delete this[index];
+    this.length = 0;
+  }
+
+  *[Symbol.iterator]() {
+    for (let index = 0; index < this.length; index += 1) yield this[index];
+  }
+}
+
 class Element {
   constructor(tag = 'div') {
     this.tagName = tag;
     this.textContent = '';
+    this.children = new HTMLCollectionFixture();
     this.innerHTML = '';
     this.className = '';
     this.value = '';
-    this.children = [];
     this.style = {};
     this.listeners = new Map();
     this.attributes = new Map();
@@ -29,12 +47,12 @@ class Element {
   setPointerCapture(pointerId) { this.pointerCaptures.push(pointerId); }
 
   appendChild(child) {
-    this.children.push(child);
+    this.children.append(child);
   }
 
   set innerHTML(value) {
     this._innerHTML = value;
-    if (value === '') this.children = [];
+    if (value === '') this.children.clear();
   }
 
   get innerHTML() {
@@ -129,7 +147,9 @@ async function main() {
   const socket = ui.sockets[0];
   const locations = ui.initialState.locations;
   assert.equal(get('view-loading').style.display, undefined);
+  assert.equal(typeof get('chips-container').children.forEach, 'undefined');
   await ui.flush();
+  assert.equal(get('connection-status').textContent, 'เชื่อมต่อแล้ว · ได้รับสถานะล่าสุด');
   ui.sendState({});
   assert.equal(get('view-loading').style.display, 'none');
   assert.equal(get('robot-status-card').style.display, 'flex');
@@ -173,7 +193,7 @@ async function main() {
   } });
   assert.equal(get('intent-result-message').textContent, 'ปลายทาง: จุด A');
 
-  assert.deepEqual(get('chips-container').children.map(button => button.textContent), locations.map(item => item.label));
+  assert.deepEqual(Array.from(get('chips-container').children, button => button.textContent), locations.map(item => item.label));
   assert.ok(get('chips-container').children[3].className.includes('full-width'));
   assert.ok(get('chips-container').children[4].className.includes('full-width'));
 
@@ -288,6 +308,7 @@ async function main() {
   assert.match(get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
   assert.equal(get('session-countdown').textContent, 'ข้อมูลเวลาล่าสุดยังไม่ยืนยัน');
   assert.equal(get('btn-send-text').disabled, true);
+  assert.equal(typeof ui.scheduled.at(-1), 'function');
   const reconnect = ui.scheduled.at(-1);
   reconnect();
   assert.equal(ui.sockets.length, 2);

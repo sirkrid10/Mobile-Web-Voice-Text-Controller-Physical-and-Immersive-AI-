@@ -180,7 +180,9 @@
     if (textInputField) textInputField.disabled = unavailable;
     if (sendBtn) sendBtn.disabled = unavailable;
     if (chipsContainer) {
-      chipsContainer.children.forEach(button => { button.disabled = unavailable; });
+      for (const button of chipsContainer.children) {
+        button.disabled = unavailable;
+      }
     }
     if (micButton) {
       micButton.disabled = isUploadingMicrophone ||
