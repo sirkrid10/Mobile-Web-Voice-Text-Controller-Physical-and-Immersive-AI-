@@ -100,6 +100,7 @@ test('voice 422 and 503 responses finish transcription with controlled guidance'
     emptyVoice.elements.get('transcript-preview').textContent,
     'ไม่พบเสียงพูดที่แปลงเป็นข้อความได้ กรุณาพูดใกล้ไมค์แล้วลองใหม่'
   );
+  assert.equal(emptyVoice.elements.get('robot-heard-text').textContent, '(ยังไม่มีคำสั่งล่าสุด)');
 
   const unavailableVoice = voiceUI(false);
   await unavailableVoice.flush();
@@ -111,6 +112,7 @@ test('voice 422 and 503 responses finish transcription with controlled guidance'
     unavailableVoice.elements.get('transcript-preview').textContent,
     'บริการรับหรือแปลงคำสั่งยังไม่พร้อม กรุณาลองใหม่ภายหลัง'
   );
+  assert.equal(unavailableVoice.elements.get('robot-heard-text').textContent, '(ยังไม่มีคำสั่งล่าสุด)');
   assert.notEqual(unavailableVoice.elements.get('transcript-preview').textContent, 'secret provider exception');
 
   const offlineVoice = voiceUI(false);

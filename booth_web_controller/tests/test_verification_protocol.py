@@ -184,6 +184,114 @@ def test_mock_does_not_invent_destination_for_ambiguous_or_unsupported_text(text
     assert actual_status == status
 
 
+@pytest.mark.parametrize("input_mode", ["voice", "text", "chip"])
+def test_real_bridge_published_command_updates_heard_text_on_owner_loop(input_mode):
+    from app.ros2_bridge import RealROS2Bridge
+
+    class UserRequest:
+        pass
+
+    class Publisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, message):
+            self.messages.append(message)
+
+    class State:
+        def __init__(self, owner_loop):
+            self.owner_loop = owner_loop
+            self.heard_text = "ข้อความก่อนหน้า"
+            self.current_goal = "B"
+            self.llm_explanation = "คำอธิบายเดิม"
+            self.latest_intent = object()
+            self.latest_action = object()
+            self.broadcasts = 0
+
+        def update_from_llm_mind(self, heard_text, target=None, explanation=None):
+            assert asyncio.get_running_loop() is self.owner_loop
+            if heard_text:
+                self.heard_text = heard_text
+            if target:
+                self.current_goal = target
+            if explanation:
+                self.llm_explanation = explanation
+            self._trigger_broadcast()
+
+        def _trigger_broadcast(self):
+            self.broadcasts += 1
+
+    loop = asyncio.new_event_loop()
+    try:
+        state = State(loop)
+        publisher = Publisher()
+        bridge = object.__new__(RealROS2Bridge)
+        bridge.session_manager = state
+        bridge.loop = loop
+        bridge.UserRequest = UserRequest
+        bridge.node = type("Node", (), {"pub_user_request": publisher})()
+        intent_before = state.latest_intent
+        action_before = state.latest_action
+
+        async def publish():
+            bridge.publish_user_transcript("req-1", "visitor-1", input_mode, "พาไปจุด A")
+
+        loop.run_until_complete(publish())
+
+        assert len(publisher.messages) == 1
+        assert publisher.messages[0].text == "พาไปจุด A"
+        assert state.heard_text == "พาไปจุด A"
+        assert state.current_goal == "B"
+        assert state.llm_explanation == "คำอธิบายเดิม"
+        assert state.latest_intent is intent_before
+        assert state.latest_action is action_before
+        assert state.broadcasts == 1
+    finally:
+        loop.close()
+
+
+def test_real_bridge_publish_failure_does_not_update_heard_text():
+    from app.ros2_bridge import RealROS2Bridge
+
+    class UserRequest:
+        pass
+
+    class Publisher:
+        def publish(self, _message):
+            raise RuntimeError("publisher failed")
+
+    class State:
+        heard_text = "ข้อความก่อนหน้า"
+        current_goal = "B"
+        llm_explanation = "คำอธิบายเดิม"
+        latest_intent = object()
+        latest_action = object()
+        broadcasts = 0
+
+        def update_from_llm_mind(self, **_kwargs):
+            self.broadcasts += 1
+
+    loop = asyncio.new_event_loop()
+    try:
+        state = State()
+        bridge = object.__new__(RealROS2Bridge)
+        bridge.session_manager = state
+        bridge.loop = loop
+        bridge.UserRequest = UserRequest
+        bridge.node = type("Node", (), {"pub_user_request": Publisher()})()
+
+        async def publish():
+            bridge.publish_user_transcript("req-2", "visitor-1", "voice", "ข้อความใหม่")
+
+        with pytest.raises(RuntimeError, match="publisher failed"):
+            loop.run_until_complete(publish())
+
+        assert state.heard_text == "ข้อความก่อนหน้า"
+        assert state.broadcasts == 0
+    finally:
+        loop.close()
+
+
 def test_mock_busy_result_preserves_simulation_and_emits_subtitle(monkeypatch):
     from app.ros2_bridge import MockROS2Bridge
 
@@ -600,6 +708,7 @@ def test_html_pages_served():
         assert "เริ่มสั่งงานหุ่นยนต์" in res_index.text
         assert "แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้" in res_index.text
         assert "กำลังเชื่อมต่อและรอสถานะล่าสุด" in res_index.text
+        assert "หุ่นยนต์ได้ยินว่า:" in res_index.text
 
         res_staff = client.get("/staff")
         assert res_staff.status_code == 200

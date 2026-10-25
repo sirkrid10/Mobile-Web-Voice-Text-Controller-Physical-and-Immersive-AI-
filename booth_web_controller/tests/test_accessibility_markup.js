@@ -26,6 +26,7 @@ function run() {
   assert.match(availableView, /แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้/);
   assert.match(availableView, /<button[^>]+id="btn-claim-session"[^>]*>\s*ขอสิทธิ์ควบคุม\s*<\/button>/);
   assert.doesNotMatch(availableView, /robot-card|mic-button|chips-container|text-input-form/);
+  assert.match(visitor, /<span class="title">หุ่นยนต์ได้ยินว่า:<\/span>/);
   const observerView = visitor.slice(visitor.indexOf('<section id="view-queue"'), visitor.indexOf('<!-- Live Robot-Mind status'));
   assert.match(observerView, /มีผู้ใช้งานอยู่ กรุณารอสักครู่/);
   assert.doesNotMatch(observerView, /view-state-icon|view-state-title|robot-card|mic-button|chips-container|text-input-form/);

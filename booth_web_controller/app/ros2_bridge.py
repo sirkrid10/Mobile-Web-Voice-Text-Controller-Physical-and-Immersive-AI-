@@ -505,6 +505,7 @@ class RealROS2Bridge(BaseROS2Bridge):
         msg_req.session_id = session_id
         msg_req.text = text
         self.node.pub_user_request.publish(msg_req)
+        self.session_manager.update_from_llm_mind(heard_text=text)
         print(f"[ROS2Bridge] Published native UserRequest to /guide/user_request: req_id={req_id}, session_id={session_id}, text='{text}'")
 
     def publish_high_level_action(self, action: str, target: str, explanation: str, source: str = "web_controller"):
