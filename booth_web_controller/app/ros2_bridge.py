@@ -52,13 +52,15 @@ class BaseROS2Bridge(ABC):
         now = self._subtitle_now()
         if stamp <= 0 or stamp > now or stamp < self._latest_subtitle_stamp:
             return
+        if text.strip() and deadline <= now:
+            return
 
         self._latest_subtitle_stamp = stamp
         self._subtitle_generation += 1
         generation = self._subtitle_generation
         self._cancel_subtitle_timer()
 
-        if not text.strip() or deadline <= now:
+        if not text.strip():
             self.session_manager.llm_explanation = ""
             self.session_manager._trigger_broadcast()
             return
@@ -231,6 +233,7 @@ class MockROS2Bridge(BaseROS2Bridge):
         context = {"request_id": req_id, "source": source, "destination_id": destination_id}
         self.session_manager.record_action_outcome(DirectActionOutcome(**context, outcome="sending"))
         self.session_manager.record_action_outcome(DirectActionOutcome(**context, outcome="accepted"))
+        self.cancel_navigation_goal()
         self._start_navigation_simulation(destination_id, context)
 
     def cancel_navigation_goal(self):

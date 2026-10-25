@@ -281,6 +281,72 @@ def test_mock_subtitle_clear_stale_messages_and_old_timers_cannot_clear_new_text
     asyncio.run(run())
 
 
+def test_expired_subtitle_does_not_clear_fresh_subtitle_or_replace_its_timer():
+    from app.ros2_bridge import MockROS2Bridge
+
+    class SubtitleState:
+        heard_text = ""
+        llm_explanation = ""
+
+        def update_from_llm_mind(self, heard_text, explanation, target=None):
+            self.llm_explanation = explanation
+
+        def _trigger_broadcast(self):
+            pass
+
+    async def run():
+        now = [102.0]
+        state = SubtitleState()
+        bridge = MockROS2Bridge(state, asyncio.get_running_loop(), clock=lambda: now[0])
+        bridge.handle_mock_subtitle("ยังสด", ttl_sec=3, stamp_sec=100)
+        await asyncio.sleep(0)
+        original_timer = bridge._subtitle_timer
+
+        now[0] = 102.0
+        bridge.handle_mock_subtitle("มาช้าและหมดอายุ", ttl_sec=0.5, stamp_sec=101)
+        await asyncio.sleep(0)
+
+        assert state.llm_explanation == "ยังสด"
+        assert bridge._subtitle_timer is original_timer
+        assert not original_timer.cancelled()
+        bridge.shutdown()
+
+    asyncio.run(run())
+
+
+def test_staff_return_home_replaces_active_mock_visitor_navigation():
+    from app.ros2_bridge import MockROS2Bridge
+
+    async def run():
+        bridge = MockROS2Bridge(session_manager, asyncio.get_running_loop())
+        session_manager.set_ros_bridge(bridge)
+        session_manager.latest_action = None
+        session_manager.update_from_ros_state(state="IDLE", goal="start")
+        bridge._start_navigation_simulation("B")
+        visitor_task = bridge._sim_task
+        await asyncio.sleep(0)
+
+        await session_manager.return_to_start_now()
+        staff_action_id = session_manager.latest_action.request_id
+        staff_task = bridge._sim_task
+
+        assert staff_task is not visitor_task
+        assert session_manager.current_goal == "start"
+        assert session_manager.latest_action.destination_id == "start"
+        assert session_manager.latest_action.source == "staff_override"
+        assert session_manager.latest_action.outcome == "accepted"
+
+        await asyncio.wrap_future(staff_task)
+        assert session_manager.current_goal == "start"
+        assert session_manager.latest_action.request_id == staff_action_id
+        assert session_manager.latest_action.outcome == "succeeded"
+        assert session_manager.robot_state == "IDLE"
+        bridge.shutdown()
+        session_manager.set_ros_bridge(None)
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize(("phase", "ready", "error", "expected"), [
     ("NAVIGATING", False, 0, "NAVIGATING"),
     ("RETURNING_HOME", False, 0, "NAVIGATING"),
