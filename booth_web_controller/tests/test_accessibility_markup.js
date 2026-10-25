@@ -60,6 +60,11 @@ function run() {
   assert.match(styles, /\.visitor-page \.disconnect-btn\s*\{[^}]*min-height:\s*44px/s);
   assert.match(styles, /\.visitor-page \.start-session-btn\s*\{[^}]*min-height:\s*52px/s);
   assert.match(styles, /--visitor-teal:\s*#087e75/);
+  assert.match(styles, /--visitor-muted:\s*#3c4e47/);
+  assert.match(styles, /\.visitor-page \.status-label-group \.status-kicker[^}]*font-size:\s*0\.92rem/);
+  assert.match(styles, /\.visitor-page \.goal-label[^}]*font-size:\s*0\.86rem/);
+  assert.match(styles, /\.visitor-page \.text-input-field::placeholder[^}]*color:\s*#465650;\s*opacity:\s*1/);
+  assert.match(styles, /\.visitor-page \.chip-btn:disabled,\s*\.visitor-page \.text-input-field:disabled \{[^}]*color:\s*#384842;[^}]*opacity:\s*1/);
   assert.doesNotMatch(styles.slice(styles.indexOf('/* --------------------------------------------------------------------------\n   Visitor page')), /radial-gradient|backdrop-filter:\s*blur/);
   assert.match(styles, /\.staff-link-btn\s*\{[^}]*width:\s*44px/s);
   process.stdout.write('accessibility markup checks passed\n');
