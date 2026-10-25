@@ -265,7 +265,7 @@
     }
 
     if (robotHeardText) {
-      robotHeardText.textContent = state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งเสียงล่าสุด)';
+      robotHeardText.textContent = state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งล่าสุด)';
     }
 
     if (robotReasonText) {
@@ -395,7 +395,7 @@
     pendingSubmission = null;
     currentSubmission = null;
     submissionFeedback = '';
-    if (transcriptPreview) transcriptPreview.textContent = 'แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด';
+    if (transcriptPreview) transcriptPreview.textContent = 'แตะเพื่อพูด หรือกดค้างขณะพูด';
     if (sessionFeedbackText) sessionFeedbackText.textContent = '';
   }
 
@@ -612,7 +612,7 @@
     activeRecording = attempt;
     isAcquiringMicrophone = true;
     updateMicControls('acquiring', attempt.gesture);
-    if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน...';
+    if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน…';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (attempt.cancelled || activeRecording !== attempt ||
@@ -671,7 +671,7 @@
       isAcquiringMicrophone = false;
       isRecording = true;
       updateMicControls('recording', attempt.gesture);
-      if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟังเสียงของคุณ...';
+      if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟัง…';
     } catch (err) {
       console.error('[Audio] Recording start failed:', err);
       attempt.cancelled = true;
@@ -769,7 +769,7 @@
       setSessionFeedback('ยังส่งคำสั่งไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
       return;
     }
-    if (transcriptPreview) transcriptPreview.textContent = 'กำลังถอดความและประมวลผล...';
+    if (transcriptPreview) transcriptPreview.textContent = 'กำลังถอดเสียงและส่งคำสั่ง…';
     const generation = beginSubmission();
     const formData = new FormData();
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
@@ -792,9 +792,7 @@
       const data = await finishSubmission(generation, res);
       if (generation === submissionGeneration) {
         if (res.ok && transcriptPreview) {
-          transcriptPreview.textContent = data && data.transcript
-            ? `ส่งคำสั่งแล้ว: "${data.transcript}"`
-            : 'ส่งคำสั่งแล้ว';
+          transcriptPreview.textContent = 'ส่งคำสั่งแล้ว';
         } else if (!res.ok && transcriptPreview) {
           transcriptPreview.textContent = submissionFeedback;
         }
@@ -817,7 +815,7 @@
     const cleanText = text.trim();
     const generation = beginSubmission();
 
-    if (transcriptPreview) transcriptPreview.textContent = `กำลังส่งคำสั่ง: "${cleanText}"`;
+    if (transcriptPreview) transcriptPreview.textContent = 'กำลังส่งคำสั่ง…';
 
     try {
       const headers = {
@@ -837,7 +835,7 @@
       const data = await finishSubmission(generation, res);
       if (generation === submissionGeneration) {
         if (res.ok) {
-          if (transcriptPreview) transcriptPreview.textContent = `ส่งคำสั่งแล้ว: "${cleanText}"`;
+          if (transcriptPreview) transcriptPreview.textContent = 'ส่งคำสั่งแล้ว';
           if (textInputField) textInputField.value = '';
         } else if (transcriptPreview) {
           transcriptPreview.textContent = submissionFeedback;

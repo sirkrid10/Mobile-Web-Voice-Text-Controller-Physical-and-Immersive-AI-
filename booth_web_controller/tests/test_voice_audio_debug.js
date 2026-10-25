@@ -75,6 +75,20 @@ test('normal recording does not retain a debug audio URL', async () => {
   assert.notEqual(ui.elements.get('voice-audio-debug').hidden, false);
 });
 
+test('voice success reports status under the mic and leaves the transcript in robot status', async () => {
+  const ui = voiceUI(false);
+  await ui.flush();
+  ui.sendState({ heard_text: 'พาไปจุด A' });
+  const request = await ui.record();
+  assert.equal(ui.elements.get('transcript-preview').textContent, 'กำลังถอดเสียงและส่งคำสั่ง…');
+  request.resolve({ ok: true, status: 200, json: async () => ({
+    transcript: 'พาไปจุด A', request_id: 'voice-1', session_id: 'visitor-1'
+  }) });
+  await ui.flush();
+  assert.equal(ui.elements.get('transcript-preview').textContent, 'ส่งคำสั่งแล้ว');
+  assert.equal(ui.elements.get('robot-heard-text').textContent, '"พาไปจุด A"');
+});
+
 test('voice 422 and 503 responses finish transcription with controlled guidance', async () => {
   const emptyVoice = voiceUI(false);
   await emptyVoice.flush();

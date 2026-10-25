@@ -154,6 +154,11 @@ async function main() {
   assert.equal(get('view-loading').style.display, 'none');
   assert.equal(get('robot-status-card').style.display, 'flex');
   assert.equal(get('view-active').style.display, 'flex');
+  assert.equal(get('robot-heard-text').textContent, '(ยังไม่มีคำสั่งล่าสุด)');
+  ui.sendState({ heard_text: 'พาไปจุด A' });
+  assert.equal(get('robot-heard-text').textContent, '"พาไปจุด A"');
+  ui.sendState({ heard_text: '' });
+  assert.equal(get('robot-heard-text').textContent, '(ยังไม่มีคำสั่งล่าสุด)');
 
   for (const robot_state of ['IDLE', 'UNKNOWN', 'NOT_READY', 'NAVIGATING', 'FAILED']) {
     ui.sendState({
@@ -265,13 +270,16 @@ async function main() {
 
   // Chips keep their intended route and ID; Wait remains a text request.
   get('chips-container').children[1].fire('click');
+  assert.equal(get('transcript-preview').textContent, 'กำลังส่งคำสั่ง…');
   await ui.flush();
   const chipRequest = ui.pendingRequests.at(-1);
   assert.equal(chipRequest.url, '/api/v1/command/text');
   assert.deepEqual(JSON.parse(chipRequest.init.body), { text: 'ไปจุด B', input_mode: 'chip' });
+  assert.doesNotMatch(get('transcript-preview').textContent, /ไปจุด B/);
   chipRequest.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'chip-1', session_id: 'visitor-1' }) });
   await ui.flush();
-  assert.equal(get('transcript-preview').textContent, 'ส่งคำสั่งแล้ว: "ไปจุด B"');
+  assert.equal(get('transcript-preview').textContent, 'ส่งคำสั่งแล้ว');
+  assert.doesNotMatch(get('transcript-preview').textContent, /ไปจุด B/);
   assert.equal(get('intent-result-status').textContent, 'ส่งแล้ว รอผลแปลงคำสั่ง');
   for (const [index, expectedText] of [[3, 'กลับจุดเริ่มต้น'], [4, 'หยุดรอตรงนี้ก่อน']]) {
     get('chips-container').children[index].fire('click');
@@ -287,6 +295,8 @@ async function main() {
   // Rapid requests reconcile a result received before HTTP and ignore the older HTTP response.
   get('text-input-field').value = 'first request';
   get('text-input-form').fire('submit');
+  assert.equal(get('transcript-preview').textContent, 'กำลังส่งคำสั่ง…');
+  assert.doesNotMatch(get('transcript-preview').textContent, /first request/);
   get('text-input-field').value = 'second request';
   get('text-input-form').fire('submit');
   await ui.flush();
@@ -300,6 +310,8 @@ async function main() {
   second.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'rapid-2', session_id: 'visitor-1' }) });
   await ui.flush();
   assert.equal(get('intent-result-message').textContent, 'ผลคำขอที่สอง');
+  assert.equal(get('transcript-preview').textContent, 'ส่งคำสั่งแล้ว');
+  assert.doesNotMatch(get('transcript-preview').textContent, /second request/);
   first.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'rapid-1', session_id: 'visitor-1' }) });
   await ui.flush();
   assert.equal(get('intent-result-message').textContent, 'ผลคำขอที่สอง');
@@ -374,7 +386,7 @@ async function main() {
   ui.sendState({ active_session_id: 'visitor-2', lock_status: 'LOCKED' });
   lateResponse.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'late', session_id: 'visitor-1' }) });
   await ui.flush();
-  assert.equal(get('transcript-preview').textContent, 'แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด');
+  assert.equal(get('transcript-preview').textContent, 'แตะเพื่อพูด หรือกดค้างขณะพูด');
   assert.equal(get('session-feedback').textContent, '');
 
   process.stdout.write('app render fixture passed\n');
