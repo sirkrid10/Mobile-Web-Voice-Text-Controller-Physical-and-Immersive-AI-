@@ -20,6 +20,14 @@ function run() {
   assert.match(elementById(visitor, 'mic-button'), /aria-label="[^"]+"/);
   assert.match(elementById(visitor, 'mic-button'), /aria-pressed="false"/);
   assert.match(elementById(visitor, 'btn-staff-link'), /aria-label="[^"]+"/);
+  const availableView = visitor.slice(visitor.indexOf('<section id="view-available"'), visitor.indexOf('<section id="view-queue"'));
+  assert.match(availableView, /<button[^>]+id="btn-claim-session"[^>]*>\s*ขอสิทธิ์ควบคุม\s*<\/button>/);
+  assert.doesNotMatch(availableView, /view-state-icon|view-state-title|view-state-desc|robot-card|mic-button|chips-container|text-input-form/);
+  const observerView = visitor.slice(visitor.indexOf('<section id="view-queue"'), visitor.indexOf('<!-- Live Robot-Mind status'));
+  assert.match(observerView, /มีผู้ใช้งานอยู่ กรุณารอสักครู่/);
+  assert.doesNotMatch(observerView, /view-state-icon|view-state-title|robot-card|mic-button|chips-container|text-input-form/);
+  assert.match(elementById(visitor, 'robot-status-card'), /style="display: none;"/);
+  assert.match(elementById(visitor, 'connection-status'), /style="display: none;"/);
   assert.match(elementById(staff, 'staff-pin-input'), /autocomplete="current-password"/);
   assert.match(staff, /<label for="cfg-auto-return"/);
   assert.match(elementById(staff, 'cfg-auto-return'), /aria-label="[^"]+"/);

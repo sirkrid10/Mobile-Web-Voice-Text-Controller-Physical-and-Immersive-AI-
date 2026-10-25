@@ -168,7 +168,12 @@ async function main() {
     });
     assert.equal(get('view-available').style.display, 'flex');
     assert.equal(get('view-active').style.display, 'none');
-    assert.equal(get('robot-status-card').style.display, 'flex');
+    assert.equal(get('btn-claim-session').disabled, false);
+    assert.equal(get('robot-status-card').style.display, 'none');
+    assert.equal(get('chips-container').children[0].disabled, true);
+    assert.equal(get('mic-button').disabled, true);
+    assert.equal(get('text-input-field').disabled, true);
+    assert.equal(get('connection-status').style.display, 'none');
     assert.equal(get('robot-state-text').textContent, ({
       IDLE: 'พร้อมรับคำสั่ง (Idle)',
       UNKNOWN: 'ยังไม่ทราบสถานะ (Unknown)',
@@ -181,10 +186,15 @@ async function main() {
   ui.sendState({ active_session_id: 'visitor-2', lock_status: 'LOCKED', robot_state: 'NAVIGATING' });
   assert.equal(get('view-queue').style.display, 'flex');
   assert.equal(get('view-active').style.display, 'none');
-  assert.equal(get('robot-status-card').style.display, 'flex');
+  assert.equal(get('robot-status-card').style.display, 'none');
+  assert.equal(get('chips-container').children[0].disabled, true);
+  assert.equal(get('mic-button').disabled, true);
+  assert.equal(get('text-input-field').disabled, true);
   ui.sendState({ active_session_id: 'visitor-1', lock_status: 'LOCKED', robot_state: 'IDLE' });
   assert.equal(get('view-active').style.display, 'flex');
   assert.equal(get('view-queue').style.display, 'none');
+  assert.equal(get('robot-status-card').style.display, 'flex');
+  assert.equal(get('connection-status').style.display, 'block');
 
   for (const [current_goal, label] of [
     ['A', 'จุด A'], ['B', 'จุด B'], ['C', 'จุด C'],
@@ -318,6 +328,9 @@ async function main() {
 
   socket.onclose();
   assert.match(get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
+  assert.equal(get('view-loading').style.display, 'flex');
+  assert.equal(get('view-active').style.display, 'none');
+  assert.equal(get('robot-status-card').style.display, 'none');
   assert.equal(get('session-countdown').textContent, 'ข้อมูลเวลาล่าสุดยังไม่ยืนยัน');
   assert.equal(get('btn-send-text').disabled, true);
   assert.equal(typeof ui.scheduled.at(-1), 'function');
@@ -326,17 +339,77 @@ async function main() {
   assert.equal(ui.sockets.length, 2);
   ui.sockets[1].onopen();
   assert.match(get('connection-status').textContent, /รอสถานะล่าสุด/);
+  assert.equal(get('view-loading').style.display, 'flex');
   assert.equal(get('btn-send-text').disabled, true);
   ui.sendState({ robot_state: 'NAVIGATING', latest_intent: {
     status: 'CLARIFY', request_id: 'rapid-2', session_id: 'visitor-1', message: 'ผลหลัง reconnect'
   } });
   assert.equal(get('intent-result-message').textContent, 'ผลหลัง reconnect');
+  assert.equal(get('view-active').style.display, 'flex');
+  assert.equal(get('robot-status-card').style.display, 'flex');
   assert.equal(get('btn-send-text').disabled, false);
 
   const failedInitialFetch = createUI({ initialStateFetch: () => Promise.reject(new Error('offline')) });
   await failedInitialFetch.flush();
   assert.match(failedInitialFetch.elements.get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
+  assert.equal(failedInitialFetch.elements.get('view-loading').style.display, 'flex');
+  assert.match(failedInitialFetch.elements.get('view-loading-message').textContent, /ยังตรวจสอบสิทธิ์ควบคุมไม่ได้/);
+  assert.equal(failedInitialFetch.elements.get('btn-claim-session').disabled, true);
   assert.equal(failedInitialFetch.elements.get('btn-send-text').disabled, true);
+
+  let resolveInitialState;
+  const waitingForSnapshot = createUI({
+    initialStateFetch: () => new Promise(resolve => { resolveInitialState = resolve; })
+  });
+  waitingForSnapshot.sockets[0].onopen();
+  await waitingForSnapshot.flush();
+  assert.equal(waitingForSnapshot.elements.get('view-loading').style.display, 'flex');
+  assert.equal(waitingForSnapshot.elements.get('view-available').style.display, 'none');
+  assert.equal(waitingForSnapshot.elements.get('btn-claim-session').disabled, true);
+  assert.equal(waitingForSnapshot.elements.get('robot-status-card').style.display, 'none');
+  resolveInitialState({ ok: true, json: async () => waitingForSnapshot.initialState });
+  await waitingForSnapshot.flush();
+  assert.equal(waitingForSnapshot.elements.get('view-active').style.display, 'flex');
+  assert.equal(waitingForSnapshot.elements.get('robot-status-card').style.display, 'flex');
+
+  const claimState = { ...ui.initialState, active_session_id: null, lock_status: 'AVAILABLE' };
+  const claimUI = createUI({
+    initialStateFetch: () => Promise.resolve({
+      ok: true,
+      json: async () => claimState
+    })
+  });
+  await claimUI.flush();
+  const claimElements = claimUI.elements;
+  assert.equal(claimElements.get('view-available').style.display, 'flex');
+  claimElements.get('btn-claim-session').fire('click');
+  await claimUI.flush();
+  claimUI.pendingRequests.at(-1).resolve({
+    ok: true,
+    status: 200,
+    json: async () => ({ session_token: 'claim-token' })
+  });
+  await claimUI.flush();
+  assert.equal(claimElements.get('view-available').style.display, 'flex');
+  assert.equal(claimElements.get('view-active').style.display, 'none');
+  assert.equal(claimElements.get('robot-status-card').style.display, 'none');
+  assert.match(claimElements.get('session-feedback').textContent, /กำลังยืนยันสิทธิ์ควบคุม/);
+  claimUI.sendState({ active_session_id: 'visitor-1', lock_status: 'LOCKED' });
+  assert.equal(claimElements.get('view-active').style.display, 'flex');
+  assert.equal(claimElements.get('robot-status-card').style.display, 'flex');
+
+  const failedClaimState = { ...claimState };
+  const failedClaimUI = createUI({
+    initialStateFetch: () => Promise.resolve({ ok: true, json: async () => failedClaimState })
+  });
+  await failedClaimUI.flush();
+  failedClaimUI.elements.get('btn-claim-session').fire('click');
+  await failedClaimUI.flush();
+  failedClaimUI.pendingRequests.at(-1).resolve({ ok: false, status: 409, json: async () => ({}) });
+  await failedClaimUI.flush();
+  assert.equal(failedClaimUI.elements.get('view-available').style.display, 'flex');
+  assert.equal(failedClaimUI.elements.get('session-feedback').style.display, 'block');
+  assert.match(failedClaimUI.elements.get('session-feedback').textContent, /มีผู้ถือสิทธิ์/);
 
   get('text-input-field').value = 'bad request';
   get('text-input-form').fire('submit');

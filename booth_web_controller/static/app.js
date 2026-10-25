@@ -43,6 +43,7 @@
   const viewActive = document.getElementById('view-active');
   const viewQueue = document.getElementById('view-queue');
   const viewLoading = document.getElementById('view-loading');
+  const viewLoadingMessage = document.getElementById('view-loading-message');
   const robotStatusCard = document.getElementById('robot-status-card');
 
   const btnClaim = document.getElementById('btn-claim-session');
@@ -164,8 +165,9 @@
       connectionStatusText.textContent = copy[status];
       connectionStatusText.className = `connection-status ${status}`;
     }
+    renderSessionViews(currentState);
     renderCommandAvailability();
-    if (currentState && viewActive && viewActive.style.display !== 'none') {
+    if (currentState && currentState.active_session_id === mySessionId && viewActive) {
       renderActiveController(currentState);
     }
   }
@@ -204,38 +206,43 @@
     // 1. Robot Mind Card Info
     renderRobotMind(state);
     renderIntentResult(state);
-    if (viewLoading) viewLoading.style.display = 'none';
-    if (robotStatusCard) robotStatusCard.style.display = 'flex';
-
-    // 2. View Switcher Logic
-    const isMine = state.active_session_id === mySessionId;
-    const isFree = state.lock_status === 'AVAILABLE' || !state.active_session_id;
-
-    if (viewAvailable && viewActive && viewQueue) {
-      if (isMine) {
-        // Active Controller
-        viewAvailable.style.display = 'none';
-        viewQueue.style.display = 'none';
-        viewActive.style.display = 'flex';
-        renderActiveController(state);
-      } else if (isFree) {
-        // Available for anyone to claim
-        viewActive.style.display = 'none';
-        viewQueue.style.display = 'none';
-        viewAvailable.style.display = 'flex';
-      } else {
-        // Locked by another visitor -> Observer mode
-        viewAvailable.style.display = 'none';
-        viewActive.style.display = 'none';
-        viewQueue.style.display = 'flex';
-      }
-    }
+    renderSessionViews(state);
+    if (viewActive && viewActive.style.display !== 'none') renderActiveController(state);
 
     // 3. Dynamic Quick Chips
     if (state.locations && chipsContainer) {
       renderChips(state.locations);
     }
     renderCommandAvailability();
+  }
+
+  function renderSessionViews(state) {
+    const hasSnapshot = Boolean(state);
+    const ownsSession = hasSnapshot && state.active_session_id === mySessionId;
+    const isFree = hasSnapshot && (state.lock_status === 'AVAILABLE' || !state.active_session_id);
+    const isConnected = connectionStatus === 'connected';
+    const showController = ownsSession && isConnected;
+
+    if (viewLoading) viewLoading.style.display = !hasSnapshot || !isConnected ? 'flex' : 'none';
+    if (viewAvailable) viewAvailable.style.display = isConnected && isFree ? 'flex' : 'none';
+    if (viewActive) viewActive.style.display = showController ? 'flex' : 'none';
+    if (viewQueue) viewQueue.style.display = isConnected && hasSnapshot && !ownsSession && !isFree ? 'flex' : 'none';
+    if (robotStatusCard) robotStatusCard.style.display = showController ? 'flex' : 'none';
+    if (btnClaim) btnClaim.disabled = !(isConnected && isFree);
+
+    if (viewLoadingMessage) {
+      if (!hasSnapshot && connectionStatus === 'disconnected') {
+        viewLoadingMessage.textContent = 'เชื่อมต่อระบบไม่ได้ จึงยังตรวจสอบสิทธิ์ควบคุมไม่ได้';
+      } else if (hasSnapshot && !isConnected) {
+        viewLoadingMessage.textContent = 'ขาดการเชื่อมต่อ สถานะล่าสุดยังไม่ยืนยัน';
+      } else {
+        viewLoadingMessage.textContent = 'กำลังเชื่อมต่อและรอสถานะล่าสุด…';
+      }
+    }
+
+    if (connectionStatusText) {
+      connectionStatusText.style.display = connectionStatus !== 'connected' || showController ? 'block' : 'none';
+    }
   }
 
   function renderRobotMind(state) {
@@ -396,7 +403,7 @@
     currentSubmission = null;
     submissionFeedback = '';
     if (transcriptPreview) transcriptPreview.textContent = 'แตะเพื่อพูด หรือกดค้างขณะพูด';
-    if (sessionFeedbackText) sessionFeedbackText.textContent = '';
+    setSessionFeedback('');
   }
 
   function failSubmission(generation, message) {
@@ -528,7 +535,9 @@
         mySessionToken = data.session_token;
         sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
         resetSubmissionState();
-        setSessionFeedback('ได้รับสิทธิ์ควบคุมแล้ว');
+        setSessionFeedback(currentState && currentState.active_session_id === mySessionId && connectionStatus === 'connected'
+          ? 'ได้รับสิทธิ์ควบคุมแล้ว'
+          : 'ได้รับคำขอแล้ว กำลังยืนยันสิทธิ์ควบคุม…');
         renderIntentResult(currentState);
         console.log('[Session] Claimed successfully:', data);
       } else if (res.status === 409) {
@@ -587,7 +596,9 @@
   }
 
   function setSessionFeedback(message) {
-    if (sessionFeedbackText) sessionFeedbackText.textContent = message;
+    if (!sessionFeedbackText) return;
+    sessionFeedbackText.textContent = message;
+    sessionFeedbackText.style.display = message ? 'block' : 'none';
   }
 
   // --------------------------------------------------------------------------
