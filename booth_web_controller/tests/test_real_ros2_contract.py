@@ -136,7 +136,7 @@ def test_real_ros2_user_request_publication():
         res = client.post(
             "/api/v1/command/text",
             headers={"X-Session-Id": "ros2-test-user"},
-            json={"text": "พาไปบูธ Computer Science", "input_mode": "text"}
+            json={"text": "ไปจุด A", "input_mode": "text"}
         )
         assert res.status_code == 200
 
@@ -147,7 +147,7 @@ def test_real_ros2_user_request_publication():
         last_req = mock_node.received_user_requests[-1]
         assert isinstance(last_req, UserRequest)
         assert last_req.session_id == "ros2-test-user"
-        assert last_req.text == "พาไปบูธ Computer Science"
+        assert last_req.text == "ไปจุด A"
         assert last_req.request_id.startswith("req-")
 
     executor.shutdown()
@@ -164,7 +164,7 @@ def test_real_ros2_navigation_state_reception():
     with TestClient(app) as client:
         # 1. Publish NAVIGATING
         nav_msg = NavigationState()
-        nav_msg.destination_id = "booth_09"
+        nav_msg.destination_id = "A"
         nav_msg.phase = "NAVIGATING"
         nav_msg.ready_for_goal = False
         nav_msg.distance_remaining_m = 8.5
@@ -174,7 +174,7 @@ def test_real_ros2_navigation_state_reception():
         time.sleep(0.2)
         state = session_manager.get_state_broadcast()
         assert state.robot_state == "NAVIGATING"
-        assert state.current_goal == "booth_09"
+        assert state.current_goal == "A"
 
         # 2. Publish ARRIVED
         nav_msg.phase = "ARRIVED"
@@ -185,7 +185,7 @@ def test_real_ros2_navigation_state_reception():
         time.sleep(0.2)
         state = session_manager.get_state_broadcast()
         assert state.robot_state == "REACHED"
-        assert state.current_goal == "booth_09"
+        assert state.current_goal == "A"
 
         # 3. Publish HOME + ready_for_goal
         nav_msg.phase = "HOME"
@@ -211,10 +211,32 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
     executor.add_node(mock_node)
 
     with TestClient(app) as client:
+        from app.main import ros_bridge_instance
+
+        def set_current_source_stamp(message):
+            message.stamp = ros_bridge_instance.node.get_clock().now().to_msg()
+
+        # Reject source timestamps that are malformed or later than the ROS clock.
+        invalid_msg = Subtitle()
+        set_current_source_stamp(invalid_msg)
+        invalid_msg.stamp.nanosec = 1_000_000_000
+        invalid_msg.text = "invalid timestamp"
+        invalid_msg.ttl.sec = 10
+        mock_node.pub_subtitle.publish(invalid_msg)
+        future_msg = Subtitle()
+        set_current_source_stamp(future_msg)
+        future_msg.stamp.sec += 10
+        future_msg.text = "future timestamp"
+        future_msg.ttl.sec = 10
+        mock_node.pub_subtitle.publish(future_msg)
+        spin_executor(executor, duration_sec=0.4)
+        time.sleep(0.1)
+        assert session_manager.get_state_broadcast().llm_reason == ""
+
         # 1. Send subtitle with 1s TTL
         sub_msg = Subtitle()
-        sub_msg.stamp.sec = int(time.time())
-        sub_msg.text = "สวัสดีครับ กำลังนำทางไปบูธ 09"
+        set_current_source_stamp(sub_msg)
+        sub_msg.text = "สวัสดีครับ กำลังนำทางไปจุด A"
         sub_msg.ttl.sec = 1
         sub_msg.ttl.nanosec = 0
         mock_node.pub_subtitle.publish(sub_msg)
@@ -222,7 +244,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
         spin_executor(executor, duration_sec=0.5)
         time.sleep(0.2)
         state = session_manager.get_state_broadcast()
-        assert state.llm_reason == "สวัสดีครับ กำลังนำทางไปบูธ 09"
+        assert state.llm_reason == "สวัสดีครับ กำลังนำทางไปจุด A"
 
         # Wait for TTL to expire (1.0s + margin)
         time.sleep(1.3)
@@ -230,7 +252,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
         assert state.llm_reason == ""
 
         # 2. Send new subtitle then immediately clear with empty text (TTL=0)
-        sub_msg.stamp.sec = int(time.time()) + 2
+        set_current_source_stamp(sub_msg)
         sub_msg.text = "ข้อความชั่วคราว"
         sub_msg.ttl.sec = 10
         mock_node.pub_subtitle.publish(sub_msg)
@@ -239,7 +261,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
         assert session_manager.get_state_broadcast().llm_reason == "ข้อความชั่วคราว"
 
         # Clear immediately
-        sub_msg.stamp.sec = int(time.time()) + 3
+        set_current_source_stamp(sub_msg)
         sub_msg.text = ""
         sub_msg.ttl.sec = 0
         mock_node.pub_subtitle.publish(sub_msg)

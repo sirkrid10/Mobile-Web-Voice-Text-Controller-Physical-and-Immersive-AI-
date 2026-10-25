@@ -24,6 +24,7 @@ from app.stt_service import STTService, STTUnavailableError
 @pytest.fixture(autouse=True)
 def reset_session_state():
     settings.USE_MOCK_ROS2 = True
+    session_manager.set_broadcast_callback(None)
     """Reset session manager state before each test."""
     asyncio.run(session_manager.release_session(reason="test_reset"))
     session_manager.robot_state = "IDLE"
@@ -41,6 +42,8 @@ def reset_session_state():
         session_manager.auto_return_task.cancel()
     # The TestClient lifespan runs on a different event loop than asyncio.run above.
     session_manager._lock = asyncio.Lock()
+    yield
+    session_manager.set_broadcast_callback(None)
 
 
 def test_session_lock_exclusivity():
@@ -150,7 +153,7 @@ def test_quick_chip_command_keeps_original_flow_and_correlates_result():
     assert payload["session_id"] == "chip-visitor"
     state = session_manager.get_state_broadcast()
     assert state.heard_text == "หยุดรอตรงนี้ก่อน"
-    assert state.latest_request_identity == (payload["request_id"], "chip-visitor")
+    assert session_manager.latest_request_identity == (payload["request_id"], "chip-visitor")
 
 
 def test_locations_use_visitor_a_b_c_and_start_chip_remains_a_request():

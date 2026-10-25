@@ -387,7 +387,7 @@
     locations.forEach(loc => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'chip-btn' + (loc.id === 'START_BOOTH' || loc.id === 'WAIT_HERE' ? ' full-width' : '');
+      btn.className = 'chip-btn' + (loc.id === 'start' || loc.id === 'wait' ? ' full-width' : '');
       btn.textContent = loc.label;
       btn.addEventListener('click', () => sendTextCommand(loc.prompt, 'chip'));
       chipsContainer.appendChild(btn);

@@ -148,6 +148,11 @@ class MockROS2Bridge(BaseROS2Bridge):
     def publish_user_transcript(self, request_id: str, session_id: str, input_mode: str, text: str):
         req_id = request_id
         print(f"[ROS2Bridge Mock] Published to /guide/user_request: req_id={req_id}, session_id={session_id}, text='{text}'")
+        self.session_manager.update_from_llm_mind(
+            heard_text=text,
+            target=self.session_manager.current_goal,
+            explanation=self.session_manager.llm_explanation,
+        )
         target, status, message = self._mock_intent(text)
         if status == "NAVIGATE" and self._sim_task and not self._sim_task.done():
             self.session_manager.record_intent_result(IntentOutcome(
