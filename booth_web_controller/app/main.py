@@ -22,7 +22,7 @@ from app.models import (
     ClaimSessionRequest, ClaimSessionResponse,
     HeartbeatResponse, DisconnectResponse,
     TextCommandRequest, CommandResponse,
-    StaffConfigUpdate, StaffMockEvent,
+    StaffConfigUpdate, StaffConfigSnapshot, StaffMockEvent,
     StateBroadcast
 )
 from app.session_manager import session_manager
@@ -304,6 +304,16 @@ async def staff_update_config(req: StaffConfigUpdate, _: bool = Depends(verify_s
         "inactivity_timeout_sec": session_manager.inactivity_timeout_sec,
         "auto_return_delay_sec": session_manager.auto_return_delay_sec
     }
+
+
+@app.get("/api/v1/staff/config", response_model=StaffConfigSnapshot,
+         summary="Read staff settings after PIN verification")
+async def staff_read_config(_: bool = Depends(verify_staff_pin)):
+    return StaffConfigSnapshot(
+        auto_return_enabled=session_manager.auto_return_enabled,
+        inactivity_timeout_sec=session_manager.inactivity_timeout_sec,
+        auto_return_delay_sec=session_manager.auto_return_delay_sec,
+    )
 
 
 @app.post("/api/v1/staff/force-release", summary="Force unlock active session lock")

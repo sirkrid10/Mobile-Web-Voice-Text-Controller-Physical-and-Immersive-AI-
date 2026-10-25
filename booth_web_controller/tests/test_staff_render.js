@@ -17,12 +17,17 @@ class Element {
   fire(type, event = {}) { return this.listeners.get(type)?.({ preventDefault() {}, ...event }); }
 }
 
-function createStaffUI() {
+function createStaffUI({ storedPin = 'test-pin', authStatus = 200 } = {}) {
   const elements = new Map();
   const intervals = [];
   const alerts = [];
   const requests = [];
   let failStateFetch = false;
+  let currentPin = storedPin;
+  let currentAuthStatus = authStatus;
+  const authResponses = [];
+  const configResponses = [];
+  const config = { auto_return_enabled: true, inactivity_timeout_sec: 180, auto_return_delay_sec: 12 };
   const state = {
     auto_return_enabled: true,
     auto_return_delay_sec: 5,
@@ -39,12 +44,33 @@ function createStaffUI() {
       if (!elements.has(id)) elements.set(id, new Element());
       return elements.get(id);
     } },
-    sessionStorage: { getItem: () => 'test-pin', setItem() {}, removeItem() {} },
+    sessionStorage: {
+      getItem: () => currentPin,
+      setItem(_key, value) { currentPin = value; },
+      removeItem() { currentPin = ''; }
+    },
     fetch: async (url, options = {}) => {
       requests.push({ url, options });
-      return url === '/api/v1/state' && failStateFetch
-        ? { ok: false, status: 503 }
-        : { ok: true, json: async () => state };
+      if (url === '/api/v1/state') {
+        return failStateFetch
+          ? { ok: false, status: 503 }
+          : { ok: true, json: async () => state };
+      }
+      if (url === '/api/v1/staff/config' && options.method === 'GET') {
+        const next = authResponses.shift();
+        const status = next ? next.status : currentAuthStatus;
+        return status === 200
+          ? { ok: true, status, json: async () => ({ ...config, ...(next?.body || {}) }) }
+          : { ok: false, status };
+      }
+      if (url === '/api/v1/staff/config' && options.method === 'POST') {
+        const next = configResponses.shift();
+        const status = next && next.status !== undefined ? next.status : 200;
+        return status === 200
+          ? { ok: true, status, json: async () => ({ status: 'updated', ...config, ...(next?.body || {}) }) }
+          : { ok: false, status };
+      }
+      return { ok: true, json: async () => ({ status: 'ok' }) };
     },
     setInterval(callback) { intervals.push(callback); },
     alert(message) { alerts.push(message); },
@@ -54,7 +80,11 @@ function createStaffUI() {
   return {
     elements, intervals, alerts, requests,
     setFailStateFetch(value) { failStateFetch = value; },
-    updateState(value) { Object.assign(state, value); }
+    updateState(value) { Object.assign(state, value); },
+    setAuthStatus(value) { currentAuthStatus = value; },
+    queueAuthResponse(value) { authResponses.push(value); },
+    queueConfigResponse(value) { configResponses.push(value); },
+    getStoredPin() { return currentPin; }
   };
 }
 
@@ -94,4 +124,73 @@ test('staff direct Action distinguishes system start and mocks use a real destin
       ...(expectedState === 'REPLANNING' ? { obstacle_detected: true } : {})
     });
   }
+});
+
+test('staff PIN gates dashboard and settings drafts survive polling and failed saves', async () => {
+  const ui = createStaffUI();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ui.elements.get('staff-dashboard').style.display, 'flex');
+  assert.equal(ui.elements.get('cfg-timeout').value, 180);
+  assert.equal(ui.elements.get('cfg-delay').value, 12);
+
+  const toggle = ui.elements.get('cfg-auto-return');
+  const timeout = ui.elements.get('cfg-timeout');
+  const delay = ui.elements.get('cfg-delay');
+  toggle.checked = false;
+  timeout.value = '420';
+  delay.value = '44';
+  await ui.intervals[0]();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(toggle.checked, false);
+  assert.equal(timeout.value, '420');
+  assert.equal(delay.value, '44');
+
+  const requestsBeforeInvalid = ui.requests.length;
+  timeout.value = '';
+  await ui.elements.get('staff-config-form').fire('submit');
+  assert.equal(ui.requests.length, requestsBeforeInvalid);
+  assert.match(ui.elements.get('staff-feedback').textContent, /timeout ต้องเป็นจำนวนเต็ม/);
+
+  timeout.value = '420';
+  ui.queueConfigResponse({ status: 422 });
+  await ui.elements.get('staff-config-form').fire('submit');
+  assert.equal(timeout.value, '420');
+  assert.equal(delay.value, '44');
+  assert.match(ui.elements.get('staff-feedback').textContent, /HTTP 422/);
+
+  ui.queueConfigResponse({ body: {
+    auto_return_enabled: true, inactivity_timeout_sec: 300, auto_return_delay_sec: 30
+  } });
+  await ui.elements.get('staff-config-form').fire('submit');
+  assert.equal(toggle.checked, true);
+  assert.equal(timeout.value, 300);
+  assert.equal(delay.value, 30);
+  assert.equal(ui.elements.get('staff-feedback').textContent, 'บันทึกการตั้งค่าแล้ว');
+});
+
+test('invalid cached and typed PINs do not reveal the Staff dashboard', async () => {
+  const cached = createStaffUI({ authStatus: 401 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cached.elements.get('staff-dashboard').style.display, 'none');
+  assert.equal(cached.elements.get('pin-section').style.display, 'flex');
+  assert.equal(cached.getStoredPin(), '');
+
+  const typed = createStaffUI({ storedPin: '', authStatus: 401 });
+  const input = typed.elements.get('staff-pin-input');
+  input.value = 'wrong';
+  await typed.elements.get('staff-pin-form').fire('submit');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(typed.elements.get('staff-dashboard').style.display, 'none');
+  assert.equal(typed.getStoredPin(), '');
+  assert.match(typed.elements.get('staff-auth-feedback').textContent, /PIN ไม่ถูกต้อง/);
+  assert.equal(typed.requests[0].url, '/api/v1/staff/config');
+  assert.equal(typed.requests[0].options.method, 'GET');
+
+  const unavailable = createStaffUI({ storedPin: '', authStatus: 503 });
+  unavailable.elements.get('staff-pin-input').value = 'candidate';
+  await unavailable.elements.get('staff-pin-form').fire('submit');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(unavailable.elements.get('staff-dashboard').style.display, 'none');
+  assert.match(unavailable.elements.get('staff-auth-feedback').textContent, /HTTP 503/);
+  assert.equal(unavailable.getStoredPin(), '');
 });

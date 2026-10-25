@@ -30,13 +30,16 @@
 
     <!-- PIN Authentication Card (Hidden once authenticated) -->
     <section class="staff-section-card" id="pin-section">
-      <h2 style="font-size: 1.1rem; color: #fff;">🔐 กรุณาระบุรหัส PIN ของเจ้าหน้าที่</h2>
-      <div style="display: flex; gap: 8px;">
-        <input type="password" id="staff-pin-input" class="text-input-field" placeholder="Default: 1234" maxlength="8">
-        <button type="button" class="start-session-btn" id="btn-submit-pin" style="padding: 10px 20px;">
+      <form id="staff-pin-form">
+        <label for="staff-pin-input" style="font-size: 1.1rem; color: #fff;">🔐 กรุณาระบุรหัส PIN ของเจ้าหน้าที่</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="password" id="staff-pin-input" class="text-input-field" autocomplete="current-password" required maxlength="8">
+          <button type="submit" class="start-session-btn" id="btn-submit-pin" style="padding: 10px 20px;">
           เข้าใช้งาน
-        </button>
-      </div>
+          </button>
+        </div>
+      </form>
+      <p id="staff-auth-feedback" class="session-feedback" role="status" aria-live="polite"></p>
     </section>
 
     <!-- Main Staff Dashboard -->
@@ -44,6 +47,7 @@
       <p id="staff-data-status" class="connection-status connecting" role="status" aria-live="polite">
         กำลังเชื่อมต่อ รอสถานะล่าสุด
       </p>
+      <p id="staff-feedback" class="session-feedback" role="status" aria-live="polite"></p>
       
       <!-- 1. Emergency Stop (Giant Red Button) -->
       <section class="staff-section-card danger-card">
@@ -74,7 +78,7 @@
       </section>
 
       <!-- 3. Auto-Return & Timing Configuration -->
-      <section class="staff-section-card">
+      <form class="staff-section-card" id="staff-config-form">
         <h3 class="section-title">⚙️ ตั้งค่าระบบกลับจุดเริ่มต้น & เวลาคิว (Settings)</h3>
         
         <div class="form-group-row">
@@ -90,18 +94,18 @@
 
         <div class="form-group-row">
           <label for="cfg-timeout">เวลา Inactivity สูงสุด (วินาที):</label>
-          <input type="number" id="cfg-timeout" class="number-input" value="60" min="10" max="300">
+          <input type="number" id="cfg-timeout" class="number-input" value="60" min="10" max="600" step="1" required>
         </div>
 
         <div class="form-group-row">
           <label for="cfg-delay">ระยะเวลาหน่วงก่อนเดินกลับ (วินาที):</label>
-          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="60">
+          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="120" step="1" required>
         </div>
 
-        <button type="button" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
+        <button type="submit" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
           💾 บันทึกการตั้งค่า (Save Settings)
         </button>
-      </section>
+      </form>
 
       <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
       <section class="staff-section-card">
@@ -163,8 +167,11 @@
     (function() {
       const pinSection = document.getElementById('pin-section');
       const staffDashboard = document.getElementById('staff-dashboard');
+      const pinForm = document.getElementById('staff-pin-form');
       const pinInput = document.getElementById('staff-pin-input');
       const btnSubmitPin = document.getElementById('btn-submit-pin');
+      const authFeedback = document.getElementById('staff-auth-feedback');
+      const staffFeedback = document.getElementById('staff-feedback');
 
       const btnEstop = document.getElementById('btn-emergency-stop');
       const btnReturnStart = document.getElementById('btn-return-start');
@@ -173,7 +180,7 @@
       const cfgAutoReturn = document.getElementById('cfg-auto-return');
       const cfgTimeout = document.getElementById('cfg-timeout');
       const cfgDelay = document.getElementById('cfg-delay');
-      const btnSaveConfig = document.getElementById('btn-save-config');
+      const configForm = document.getElementById('staff-config-form');
 
       const btnMockNav = document.getElementById('btn-mock-nav');
       const btnMockObstacle = document.getElementById('btn-mock-obstacle');
@@ -188,26 +195,84 @@
       const actionRosStatus = document.getElementById('staff-action-ros-status');
       const actionErrorMessage = document.getElementById('staff-action-error-message');
 
-      let currentPin = sessionStorage.getItem('staff_pin') || '';
+      let currentPin = '';
+      let authInProgress = false;
 
-      function checkAuth() {
-        if (currentPin) {
+      function applyConfig(data) {
+        cfgAutoReturn.checked = data.auto_return_enabled;
+        cfgTimeout.value = data.inactivity_timeout_sec;
+        cfgDelay.value = data.auto_return_delay_sec;
+      }
+
+      function clearStaffAuth(message) {
+        sessionStorage.removeItem('staff_pin');
+        currentPin = '';
+        pinSection.style.display = 'flex';
+        staffDashboard.style.display = 'none';
+        authFeedback.textContent = message;
+      }
+
+      async function authenticateStaff(candidate, fromStorage = false) {
+        if (!candidate || authInProgress) return;
+        authInProgress = true;
+        authFeedback.textContent = 'กำลังตรวจสอบ PIN...';
+        btnSubmitPin.disabled = true;
+        try {
+          const res = await fetch('/api/v1/staff/config', {
+            method: 'GET',
+            headers: { 'X-Staff-Pin': candidate }
+          });
+          if (res.status === 401) {
+            if (fromStorage) sessionStorage.removeItem('staff_pin');
+            currentPin = '';
+            pinSection.style.display = 'flex';
+            staffDashboard.style.display = 'none';
+            authFeedback.textContent = 'PIN ไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่';
+            return;
+          }
+          if (!res.ok) {
+            authFeedback.textContent = `ตรวจสอบ PIN ไม่สำเร็จ (HTTP ${res.status})`;
+            return;
+          }
+          const data = await res.json();
+          if (typeof data.auto_return_enabled !== 'boolean' ||
+              !Number.isInteger(data.inactivity_timeout_sec) ||
+              !Number.isInteger(data.auto_return_delay_sec)) {
+            authFeedback.textContent = 'ตรวจสอบ PIN ไม่สำเร็จ: ได้รับค่าตั้งค่าที่ไม่ถูกต้อง';
+            return;
+          }
+          currentPin = candidate;
+          sessionStorage.setItem('staff_pin', candidate);
+          applyConfig(data);
+          authFeedback.textContent = '';
+          staffFeedback.textContent = '';
           pinSection.style.display = 'none';
           staffDashboard.style.display = 'flex';
           loadLiveState();
+        } catch (e) {
+          console.error('Staff PIN verification failed:', e);
+          authFeedback.textContent = 'ติดต่อระบบไม่ได้ จึงยังตรวจสอบ PIN ไม่สำเร็จ';
+        } finally {
+          authInProgress = false;
+          btnSubmitPin.disabled = false;
+        }
+      }
+
+      function checkAuth() {
+        const savedPin = sessionStorage.getItem('staff_pin') || '';
+        if (savedPin) {
+          pinSection.style.display = 'flex';
+          staffDashboard.style.display = 'none';
+          authenticateStaff(savedPin, true);
         } else {
           pinSection.style.display = 'flex';
           staffDashboard.style.display = 'none';
         }
       }
 
-      btnSubmitPin.addEventListener('click', () => {
-        const val = pinInput.value.trim();
-        if (val) {
-          currentPin = val;
-          sessionStorage.setItem('staff_pin', val);
-          checkAuth();
-        }
+      pinForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        authenticateStaff(pinInput.value.trim());
       });
 
       async function staffApi(endpoint, body = {}) {
@@ -221,20 +286,20 @@
             body: JSON.stringify(body)
           });
           if (res.status === 401) {
-            alert('รหัส PIN ไม่ถูกต้อง!');
-            sessionStorage.removeItem('staff_pin');
-            currentPin = '';
-            checkAuth();
+            clearStaffAuth('การยืนยัน PIN หมดอายุ กรุณาเข้าสู่ระบบเจ้าหน้าที่อีกครั้ง');
             return null;
           }
           if (!res.ok) {
             console.error(`Staff API request failed: HTTP ${res.status}`);
+            staffFeedback.textContent = `ส่งคำขอไม่สำเร็จ (HTTP ${res.status})`;
             return null;
           }
-          return await res.json();
+          const data = await res.json();
+          staffFeedback.textContent = '';
+          return data;
         } catch (e) {
           console.error('Staff API Error:', e);
-          alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+          staffFeedback.textContent = 'ติดต่อระบบไม่ได้ คำขอยังไม่สำเร็จ';
           return null;
         }
       }
@@ -242,7 +307,7 @@
       // Actions
       btnEstop.addEventListener('click', async () => {
         const res = await staffApi('/api/v1/staff/emergency-stop');
-        if (res) alert('🚨 สั่ง EMERGENCY STOP เรียบร้อยแล้ว!');
+        if (res) alert('ส่งคำขอหยุดฉุกเฉินแล้ว');
         loadLiveState();
       });
 
@@ -258,14 +323,24 @@
         loadLiveState();
       });
 
-      btnSaveConfig.addEventListener('click', async () => {
+      configForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const timeout = Number(cfgTimeout.value);
+        const delay = Number(cfgDelay.value);
+        if (!Number.isInteger(timeout) || timeout < 10 || timeout > 600 ||
+            !Number.isInteger(delay) || delay < 1 || delay > 120) {
+          staffFeedback.textContent = 'ค่า timeout ต้องเป็นจำนวนเต็ม 10–600 และ delay ต้องเป็นจำนวนเต็ม 1–120 วินาที';
+          return;
+        }
         const res = await staffApi('/api/v1/staff/config', {
           auto_return_enabled: cfgAutoReturn.checked,
-          inactivity_timeout_sec: parseInt(cfgTimeout.value, 10),
-          auto_return_delay_sec: parseInt(cfgDelay.value, 10)
+          inactivity_timeout_sec: timeout,
+          auto_return_delay_sec: delay
         });
-        if (res) alert('💾 บันทึกการตั้งค่าเรียบร้อยแล้ว');
-        loadLiveState();
+        if (res) {
+          applyConfig(res);
+          staffFeedback.textContent = 'บันทึกการตั้งค่าแล้ว';
+        }
       });
 
       // Mock perception
@@ -283,8 +358,6 @@
           }
           const data = await res.json();
           rawStateDump.textContent = JSON.stringify(data, null, 2);
-          cfgAutoReturn.checked = data.auto_return_enabled;
-          cfgDelay.value = data.auto_return_delay_sec;
           renderActionOutcome(data);
           setDataStatus('connected');
         } catch (e) {
@@ -357,7 +430,7 @@
       }
 
       setInterval(() => {
-        if (currentPin) loadLiveState();
+        if (currentPin && staffDashboard.style.display !== 'none') loadLiveState();
       }, 2000);
 
       checkAuth();

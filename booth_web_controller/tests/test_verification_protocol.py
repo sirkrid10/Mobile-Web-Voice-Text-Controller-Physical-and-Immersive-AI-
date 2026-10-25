@@ -531,6 +531,26 @@ def test_auto_return_on_disconnect():
 def test_staff_pin_security_and_emergency_stop():
     """Protocol 5: Staff PIN authentication & Emergency Stop behavior."""
     with TestClient(app) as client:
+        config_before = {
+            "auto_return_enabled": session_manager.auto_return_enabled,
+            "inactivity_timeout_sec": session_manager.inactivity_timeout_sec,
+            "auto_return_delay_sec": session_manager.auto_return_delay_sec,
+        }
+        assert client.get("/api/v1/staff/config").status_code == 401
+        config_res = client.get(
+            "/api/v1/staff/config",
+            headers={"X-Staff-Pin": settings.STAFF_PIN}
+        )
+        assert config_res.status_code == 200
+        assert config_res.json() == config_before
+        assert "staff_pin" not in config_res.json()
+        assert "session_token" not in config_res.json()
+        assert {
+            "auto_return_enabled": session_manager.auto_return_enabled,
+            "inactivity_timeout_sec": session_manager.inactivity_timeout_sec,
+            "auto_return_delay_sec": session_manager.auto_return_delay_sec,
+        } == config_before
+
         # Attempt E-Stop without PIN -> 401
         res_unauth = client.post("/api/v1/staff/emergency-stop")
         assert res_unauth.status_code == 401

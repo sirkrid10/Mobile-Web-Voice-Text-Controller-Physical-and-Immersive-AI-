@@ -85,6 +85,12 @@ class StaffConfigUpdate(BaseModel):
     auto_return_delay_sec: Optional[int] = Field(None, ge=1, le=120)
 
 
+class StaffConfigSnapshot(BaseModel):
+    auto_return_enabled: bool
+    inactivity_timeout_sec: int
+    auto_return_delay_sec: int
+
+
 class StaffMockEvent(BaseModel):
     state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED"]
     goal: Optional[str] = None
