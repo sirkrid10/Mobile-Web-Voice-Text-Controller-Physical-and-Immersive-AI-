@@ -33,8 +33,8 @@ function run() {
   assert.doesNotMatch(availableView, /robot-card|mic-button|chips-container|text-input-form/);
   const activeView = visitor.slice(visitor.indexOf('<div id="view-active"'), visitor.indexOf('</body>'));
   assert.match(activeView, /<span class="title">หุ่นยนต์ได้ยินว่า:<\/span>/);
-  assert.ok(activeView.indexOf('id="robot-status-card"') < activeView.indexOf('id="intent-result-card"'));
-  assert.ok(activeView.indexOf('id="intent-result-card"') < activeView.indexOf('id="command-panel-title"'));
+  assert.ok(activeView.indexOf('id="robot-status-card"') < activeView.indexOf('id="command-panel-title"'));
+  assert.ok(activeView.indexOf('id="command-panel-title"') < activeView.indexOf('id="intent-result-card"'));
   const micButton = activeView.match(/<button[^>]*id="mic-button"[^>]*>[\s\S]*?<\/button>/);
   assert.ok(micButton, 'missing microphone button markup');
   assert.match(micButton[0], /<svg class="mic-icon" aria-hidden="true"/);
@@ -55,9 +55,12 @@ function run() {
   assert.match(styles, /\.text-input-field\s*\{[^}]*font-size:\s*16px/s);
   assert.doesNotMatch(app, /addEventListener\(['"]contextmenu['"]/);
   assert.match(styles, /\.visitor-page \.active-layout\s*\{/);
+  assert.match(styles, /grid-template-areas:[\s\S]*\"robot commands\"[\s\S]*\"robot result\"/);
   assert.match(styles, /\.visitor-page \.robot-card\s*\{/);
-  assert.match(styles, /\.visitor-page \.disconnect-btn\s*\{[^}]*min-height:\s*48px/s);
-  assert.match(styles, /\.visitor-page \.start-session-btn\s*\{[^}]*min-height:\s*54px/s);
+  assert.match(styles, /\.visitor-page \.disconnect-btn\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(styles, /\.visitor-page \.start-session-btn\s*\{[^}]*min-height:\s*52px/s);
+  assert.match(styles, /--visitor-teal:\s*#087e75/);
+  assert.doesNotMatch(styles.slice(styles.indexOf('/* --------------------------------------------------------------------------\n   Visitor page')), /radial-gradient|backdrop-filter:\s*blur/);
   assert.match(styles, /\.staff-link-btn\s*\{[^}]*width:\s*44px/s);
   process.stdout.write('accessibility markup checks passed\n');
 }
