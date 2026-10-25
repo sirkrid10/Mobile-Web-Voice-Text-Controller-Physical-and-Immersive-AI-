@@ -120,6 +120,8 @@ test('tap and hold gestures stop once, support keyboard, and capture release out
   mic.fire('pointerup', { pointerId: 7 });
   await tap.flush();
   assert.equal(mic.attributes.get('aria-pressed'), 'true');
+  assert.equal(tap.elements.get('mic-label').textContent, 'แตะอีกครั้งเพื่อหยุดและส่ง');
+  assert.equal(mic.attributes.get('aria-label'), 'กำลังบันทึกเสียง แตะอีกครั้งเพื่อหยุดและส่ง');
   mic.fire('click', { detail: 1 });
   assert.equal(mic.attributes.get('aria-pressed'), 'true');
   mic.fire('pointerdown', { pointerId: 8 });
@@ -136,8 +138,12 @@ test('tap and hold gestures stop once, support keyboard, and capture release out
   hold.scheduled.at(-1)();
   await hold.flush();
   assert.equal(holdMic.attributes.get('aria-pressed'), 'true');
+  assert.equal(hold.elements.get('mic-label').textContent, 'ปล่อยเพื่อส่ง');
+  assert.equal(holdMic.attributes.get('aria-label'), 'กำลังบันทึกเสียง ปล่อยเพื่อหยุดและส่ง');
   holdMic.fire('pointerup', { pointerId: 3 });
   await hold.flush();
+  assert.equal(hold.elements.get('mic-label').textContent, 'กำลังส่งเสียง...');
+  assert.equal(holdMic.attributes.get('aria-label'), 'กำลังส่งเสียง');
   assert.equal(hold.pendingRequests.filter(request => request.url === '/api/v1/command/voice').length, 1);
 
   const keyboard = voiceUI(false);
@@ -212,7 +218,11 @@ test('permission races, pointer cancel, and ownership loss discard audio and sto
   holdMic.fire('pointerdown', { pointerId: 9 });
   holdCancel.scheduled.at(-1)();
   await holdCancel.flush();
+  assert.equal(holdCancel.elements.get('mic-label').textContent, 'กำลังขอสิทธิ์ไมค์ · ปล่อยเพื่อยกเลิก');
+  assert.equal(holdMic.attributes.get('aria-label'), 'กำลังรอสิทธิ์ไมโครโฟน ปล่อยเพื่อยกเลิก');
   holdMic.fire('pointerup', { pointerId: 9 });
+  assert.equal(holdCancel.elements.get('mic-label').textContent, 'แตะเพื่อพูด');
+  assert.equal(holdMic.attributes.get('aria-label'), 'เริ่มบันทึกเสียง');
   resolveHoldPermission({ getTracks: () => [holdTrack] });
   await holdCancel.flush();
   assert.equal(holdTrack.stopped, true);
@@ -240,6 +250,8 @@ test('permission denial and recorder construction failures leave no active mic o
   deniedMic.fire('click', { detail: 0 });
   await denied.flush();
   assert.equal(deniedMic.attributes.get('aria-pressed'), 'false');
+  assert.equal(denied.elements.get('mic-label').textContent, 'แตะเพื่อพูด');
+  assert.equal(deniedMic.attributes.get('aria-label'), 'เริ่มบันทึกเสียง');
   assert.match(denied.elements.get('transcript-preview').textContent, /เปิดไมโครโฟนไม่สำเร็จ/);
 
   class BrokenRecorder {

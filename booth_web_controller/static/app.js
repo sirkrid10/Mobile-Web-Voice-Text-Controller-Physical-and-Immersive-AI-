@@ -593,7 +593,7 @@
   // --------------------------------------------------------------------------
   // Push-to-Talk Voice Recording
   // --------------------------------------------------------------------------
-  async function startRecording() {
+  async function startRecording(gesture = 'tap') {
     if (activeRecording) return;
     if (!canSubmitVisitorCommand()) {
       setSessionFeedback('ยังบันทึกเสียงไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
@@ -606,11 +606,12 @@
       stream: null,
       recorder: null,
       cancelled: false,
-      mimeType: ''
+      mimeType: '',
+      gesture
     };
     activeRecording = attempt;
     isAcquiringMicrophone = true;
-    updateMicControls('acquiring');
+    updateMicControls('acquiring', attempt.gesture);
     if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน...';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -669,7 +670,7 @@
       recorder.start();
       isAcquiringMicrophone = false;
       isRecording = true;
-      updateMicControls('recording');
+      updateMicControls('recording', attempt.gesture);
       if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟังเสียงของคุณ...';
     } catch (err) {
       console.error('[Audio] Recording start failed:', err);
@@ -738,24 +739,24 @@
     stopTracks(attempt.stream);
   }
 
-  function updateMicControls(mode) {
+  function updateMicControls(mode, gesture = 'tap') {
+    const labels = {
+      idle: { visible: 'แตะเพื่อพูด', accessible: 'เริ่มบันทึกเสียง' },
+      acquiring: gesture === 'hold'
+        ? { visible: 'กำลังขอสิทธิ์ไมค์ · ปล่อยเพื่อยกเลิก', accessible: 'กำลังรอสิทธิ์ไมโครโฟน ปล่อยเพื่อยกเลิก' }
+        : { visible: 'กำลังขอสิทธิ์ไมค์ · แตะเพื่อยกเลิก', accessible: 'กำลังรอสิทธิ์ไมโครโฟน แตะเพื่อยกเลิก' },
+      recording: gesture === 'hold'
+        ? { visible: 'ปล่อยเพื่อส่ง', accessible: 'กำลังบันทึกเสียง ปล่อยเพื่อหยุดและส่ง' }
+        : { visible: 'แตะอีกครั้งเพื่อหยุดและส่ง', accessible: 'กำลังบันทึกเสียง แตะอีกครั้งเพื่อหยุดและส่ง' },
+      uploading: { visible: 'กำลังส่งเสียง...', accessible: 'กำลังส่งเสียง' }
+    }[mode];
     if (micButton) {
       micButton.classList.remove('recording');
       if (mode === 'recording') micButton.classList.add('recording');
       micButton.setAttribute('aria-pressed', mode === 'recording' ? 'true' : 'false');
-      micButton.setAttribute('aria-label', ({
-        idle: 'เริ่มบันทึกเสียง',
-        acquiring: 'กำลังรอสิทธิ์ไมโครโฟน กดเพื่อยกเลิก',
-        recording: 'กำลังบันทึกเสียง กดเพื่อหยุดและส่ง',
-        uploading: 'กำลังส่งเสียง'
-      })[mode]);
+      micButton.setAttribute('aria-label', labels.accessible);
     }
-    if (micLabel) micLabel.textContent = ({
-      idle: 'แตะเพื่อพูด',
-      acquiring: 'กำลังขอสิทธิ์ไมค์ · แตะเพื่อยกเลิก',
-      recording: 'แตะเพื่อหยุดส่ง',
-      uploading: 'กำลังส่งเสียง...'
-    })[mode];
+    if (micLabel) micLabel.textContent = labels.visible;
     if (waveform) {
       if (mode === 'recording') waveform.classList.add('active');
       else waveform.classList.remove('active');
@@ -880,7 +881,7 @@
       }
       pressTimer = setTimeout(() => {
         isHoldMode = true;
-        startRecording();
+        startRecording('hold');
       }, 250);
     });
 
