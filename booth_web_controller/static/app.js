@@ -268,7 +268,7 @@
     }
 
     if (robotGoalTag) {
-      robotGoalTag.textContent = `📍 ${formatGoalTarget(state.current_goal, state.locations)}`;
+      robotGoalTag.textContent = formatGoalTarget(state.current_goal, state.locations);
     }
 
     if (robotHeardText) {
@@ -514,7 +514,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'chip-btn' + (loc.id === 'start' || loc.id === 'wait' ? ' full-width' : '');
-      btn.textContent = loc.label;
+      btn.textContent = loc.label.replace(/^(?:📍|🏠|⏸️)\s*/u, '');
       btn.addEventListener('click', () => sendTextCommand(loc.prompt, 'chip'));
       chipsContainer.appendChild(btn);
     });
