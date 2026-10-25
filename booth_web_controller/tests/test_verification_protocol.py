@@ -206,6 +206,78 @@ def test_mock_busy_result_preserves_simulation_and_emits_subtitle(monkeypatch):
     loop.close()
 
 
+def test_mock_subtitle_uses_remaining_source_ttl_and_discards_owner_loop_expiry():
+    from app.ros2_bridge import MockROS2Bridge
+
+    class SubtitleState:
+        heard_text = ""
+        llm_explanation = ""
+
+        def update_from_llm_mind(self, heard_text, explanation, target=None):
+            self.heard_text = heard_text
+            self.llm_explanation = explanation
+
+        def _trigger_broadcast(self):
+            pass
+
+    async def run():
+        now = [102.5]
+        state = SubtitleState()
+        bridge = MockROS2Bridge(state, asyncio.get_running_loop(), clock=lambda: now[0])
+        bridge.handle_mock_subtitle("เหลือครึ่งวินาที", ttl_sec=3, stamp_sec=100)
+        await asyncio.sleep(0)
+        assert state.llm_explanation == "เหลือครึ่งวินาที"
+        now[0] = 103
+        await asyncio.sleep(0.6)
+        assert state.llm_explanation == ""
+
+        now[0] = 202.5
+        bridge.handle_mock_subtitle("หมดอายุระหว่างรอ loop", ttl_sec=0.5, stamp_sec=202)
+        now[0] = 203
+        await asyncio.sleep(0)
+        assert state.llm_explanation == ""
+        bridge.shutdown()
+
+    asyncio.run(run())
+
+
+def test_mock_subtitle_clear_stale_messages_and_old_timers_cannot_clear_new_text():
+    from app.ros2_bridge import MockROS2Bridge
+
+    class SubtitleState:
+        heard_text = ""
+        llm_explanation = "initial"
+
+        def update_from_llm_mind(self, heard_text, explanation, target=None):
+            self.llm_explanation = explanation
+
+        def _trigger_broadcast(self):
+            pass
+
+    async def run():
+        now = [100.0]
+        state = SubtitleState()
+        bridge = MockROS2Bridge(state, asyncio.get_running_loop(), clock=lambda: now[0])
+        bridge.handle_mock_subtitle("ข้อความเก่า", ttl_sec=0.1, stamp_sec=100)
+        await asyncio.sleep(0)
+        bridge.handle_mock_subtitle("ข้อความใหม่", ttl_sec=5, stamp_sec=100)
+        await asyncio.sleep(0)
+        bridge.handle_mock_subtitle("ย้อนเวลา", ttl_sec=5, stamp_sec=99)
+        await asyncio.sleep(0.15)
+        assert state.llm_explanation == "ข้อความใหม่"
+
+        now[0] = 101
+        bridge.handle_mock_subtitle("", ttl_sec=0, stamp_sec=101)
+        await asyncio.sleep(0)
+        assert state.llm_explanation == ""
+        bridge.handle_mock_subtitle("อนาคต", ttl_sec=3, stamp_sec=102)
+        await asyncio.sleep(0)
+        assert state.llm_explanation == ""
+        bridge.shutdown()
+
+    asyncio.run(run())
+
+
 def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatch):
     async def transcribe_and_change_owner(_audio):
         await session_manager.release_session(reason="staff_force_release")

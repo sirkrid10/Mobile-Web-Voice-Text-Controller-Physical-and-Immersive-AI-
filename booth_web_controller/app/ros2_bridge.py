@@ -16,6 +16,7 @@ import json
 import secrets
 import asyncio
 import threading
+import math
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 
@@ -29,6 +30,52 @@ from app.config import settings
 # ---------------------------------------------------------------------------
 
 class BaseROS2Bridge(ABC):
+    def _accept_subtitle(self, stamp: float, deadline: float, text: str):
+        """Apply the newest source subtitle on the asyncio owner loop."""
+        now = self._subtitle_now()
+        if stamp <= 0 or stamp > now or stamp < self._latest_subtitle_stamp:
+            return
+
+        self._latest_subtitle_stamp = stamp
+        self._subtitle_generation += 1
+        generation = self._subtitle_generation
+        self._cancel_subtitle_timer()
+
+        if not text.strip() or deadline <= now:
+            self.session_manager.llm_explanation = ""
+            self.session_manager._trigger_broadcast()
+            return
+
+        self.session_manager.update_from_llm_mind(
+            heard_text=self.session_manager.heard_text,
+            explanation=text,
+        )
+        self._schedule_subtitle_clear(deadline, generation)
+
+    def _subtitle_now(self) -> float:
+        return time.time()
+
+    def _schedule_subtitle_clear(self, deadline: float, generation: int):
+        async def _clear_at_deadline():
+            try:
+                while generation == self._subtitle_generation:
+                    remaining = deadline - self._subtitle_now()
+                    if remaining <= 0:
+                        if generation == self._subtitle_generation:
+                            self.session_manager.llm_explanation = ""
+                            self.session_manager._trigger_broadcast()
+                        return
+                    await asyncio.sleep(remaining)
+            except asyncio.CancelledError:
+                pass
+
+        self._subtitle_timer = asyncio.create_task(_clear_at_deadline())
+
+    def _cancel_subtitle_timer(self):
+        if self._subtitle_timer and not self._subtitle_timer.done():
+            self._subtitle_timer.cancel()
+        self._subtitle_timer = None
+
     @abstractmethod
     def publish_user_transcript(self, request_id: str, session_id: str, input_mode: str, text: str):
         """Publish visitor request to /guide/user_request for LLM intent parsing."""
@@ -71,12 +118,14 @@ class BaseROS2Bridge(ABC):
 # ---------------------------------------------------------------------------
 
 class MockROS2Bridge(BaseROS2Bridge):
-    def __init__(self, session_manager: Any, loop: asyncio.AbstractEventLoop):
+    def __init__(self, session_manager: Any, loop: asyncio.AbstractEventLoop, clock=None):
         self.session_manager = session_manager
         self.loop = loop
         self._sim_task: Optional[asyncio.Task] = None
         self._subtitle_timer: Optional[asyncio.Task] = None
         self._latest_subtitle_stamp: float = 0.0
+        self._subtitle_generation = 0
+        self._clock = clock or time.time
         print("[ROS2Bridge Mock] Running in standalone mock mode (USE_MOCK_ROS2=true).")
 
     def publish_user_transcript(self, request_id: str, session_id: str, input_mode: str, text: str):
@@ -175,38 +224,16 @@ class MockROS2Bridge(BaseROS2Bridge):
 
     def handle_mock_subtitle(self, text: str, ttl_sec: float = 5.0, stamp_sec: float = 0.0):
         """Simulate receiving Subtitle message."""
-        now = time.time()
-        stamp = stamp_sec or now
-
-        if stamp < self._latest_subtitle_stamp:
+        stamp = stamp_sec or self._subtitle_now()
+        if not math.isfinite(stamp) or not math.isfinite(ttl_sec) or stamp <= 0 or ttl_sec < 0:
             return
-        self._latest_subtitle_stamp = stamp
-
-        if not text or not text.strip() or ttl_sec <= 0:
-            if self._subtitle_timer and not self._subtitle_timer.done():
-                self._subtitle_timer.cancel()
-            self.session_manager.llm_explanation = ""
-            self.session_manager._trigger_broadcast()
+        deadline = stamp + ttl_sec
+        if not math.isfinite(deadline):
             return
+        self.loop.call_soon_threadsafe(self._accept_subtitle, stamp, deadline, text or "")
 
-        self.session_manager.update_from_llm_mind(
-            heard_text=self.session_manager.heard_text,
-            explanation=text
-        )
-
-        if self._subtitle_timer and not self._subtitle_timer.done():
-            self._subtitle_timer.cancel()
-
-        async def _clear_sub():
-            try:
-                await asyncio.sleep(ttl_sec)
-                if self._latest_subtitle_stamp <= stamp:
-                    self.session_manager.llm_explanation = ""
-                    self.session_manager._trigger_broadcast()
-            except asyncio.CancelledError:
-                pass
-
-        self._subtitle_timer = asyncio.run_coroutine_threadsafe(_clear_sub(), self.loop)
+    def _subtitle_now(self) -> float:
+        return self._clock()
 
     def inject_system_state(self, state: str, goal: Optional[str] = None,
                             obstacle_detected: bool = False, pose: Optional[Dict[str, float]] = None):
@@ -261,8 +288,7 @@ class MockROS2Bridge(BaseROS2Bridge):
     def shutdown(self):
         if self._sim_task and not self._sim_task.done():
             self._sim_task.cancel()
-        if self._subtitle_timer and not self._subtitle_timer.done():
-            self._subtitle_timer.cancel()
+        self._cancel_subtitle_timer()
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +330,7 @@ class RealROS2Bridge(BaseROS2Bridge):
         self._latest_action_request_id: Optional[str] = None
         self._subtitle_timer: Optional[asyncio.Task] = None
         self._latest_subtitle_stamp: float = 0.0
+        self._subtitle_generation = 0
 
         if not rclpy.ok():
             rclpy.init()
@@ -416,45 +443,19 @@ class RealROS2Bridge(BaseROS2Bridge):
             def _on_vr_subtitle(self, msg: Subtitle):
                 """Handle /vr/subtitle updates with strict TTL and auto-clearing rules."""
                 try:
+                    if not (0 <= msg.stamp.nanosec < 1_000_000_000):
+                        return
+                    if not (0 <= msg.ttl.nanosec < 1_000_000_000) or msg.ttl.sec < 0:
+                        return
                     stamp_sec = msg.stamp.sec + msg.stamp.nanosec * 1e-9
                     ttl_sec = msg.ttl.sec + msg.ttl.nanosec * 1e-9
                     text = (msg.text or "").strip()
-
-                    # Rule 3: Discard if stamp is older than latest seen message
-                    if stamp_sec > 0 and stamp_sec < outer._latest_subtitle_stamp:
-                        self.get_logger().debug(
-                            f"Discarding outdated subtitle (stamp={stamp_sec} < latest={outer._latest_subtitle_stamp})"
-                        )
+                    if stamp_sec <= 0 or ttl_sec < 0:
                         return
-
-                    if stamp_sec > outer._latest_subtitle_stamp:
-                        outer._latest_subtitle_stamp = stamp_sec
-
-                    # Rule 2: Empty text with TTL 0 -> clear immediately
-                    if not text or ttl_sec <= 0:
-                        self.get_logger().info("Received empty subtitle or TTL <= 0 -> Clearing subtitle immediately")
-                        def _clear():
-                            outer._cancel_subtitle_timer()
-                            outer.session_manager.llm_explanation = ""
-                            outer.session_manager._trigger_broadcast()
-                        outer.loop.call_soon_threadsafe(_clear)
+                    deadline = stamp_sec + ttl_sec
+                    if not math.isfinite(deadline):
                         return
-
-                    # Rule 1 & 4: Display text, and schedule auto-clear at stamp + ttl
-                    now_sec = time.time()
-                    if stamp_sec > 0 and (stamp_sec + ttl_sec) < now_sec:
-                        self.get_logger().debug("Discarding expired subtitle message")
-                        return
-
-                    def _display():
-                        outer._cancel_subtitle_timer()
-                        outer.session_manager.update_from_llm_mind(
-                            heard_text=outer.session_manager.heard_text,
-                            explanation=msg.text
-                        )
-                        outer._schedule_subtitle_clear(ttl_sec, stamp_sec)
-
-                    outer.loop.call_soon_threadsafe(_display)
+                    outer.loop.call_soon_threadsafe(outer._accept_subtitle, stamp_sec, deadline, text)
                 except Exception as e:
                     self.get_logger().error(f"Error handling /vr/subtitle: {e}")
 
@@ -491,25 +492,8 @@ class RealROS2Bridge(BaseROS2Bridge):
         self.thread.start()
         print("[ROS2Bridge] Real ROS 2 Jazzy Node running in daemon background thread.")
 
-    def _schedule_subtitle_clear(self, delay: float, stamp: float):
-        self._cancel_subtitle_timer()
-
-        async def _clear_after_delay():
-            try:
-                await asyncio.sleep(max(0.1, delay))
-                if self._latest_subtitle_stamp <= stamp:
-                    self.session_manager.llm_explanation = ""
-                    self.session_manager._trigger_broadcast()
-                    print(f"[ROS2Bridge] Subtitle cleared automatically after TTL ({delay:.1f}s)")
-            except asyncio.CancelledError:
-                pass
-
-        self._subtitle_timer = asyncio.create_task(_clear_after_delay())
-
-    def _cancel_subtitle_timer(self):
-        if self._subtitle_timer and not self._subtitle_timer.done():
-            self._subtitle_timer.cancel()
-            self._subtitle_timer = None
+    def _subtitle_now(self) -> float:
+        return self.node.get_clock().now().nanoseconds / 1_000_000_000
 
     def publish_user_transcript(self, request_id: str, session_id: str, input_mode: str, text: str):
         """Publish native UserRequest to /guide/user_request for LLM intent parsing."""
