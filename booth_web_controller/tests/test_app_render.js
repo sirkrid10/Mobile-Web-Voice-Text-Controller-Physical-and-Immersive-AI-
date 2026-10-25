@@ -161,6 +161,18 @@ async function main() {
   assert.equal(get('view-active').style.display, 'flex');
   assert.equal(get('view-queue').style.display, 'none');
 
+  for (const [current_goal, label] of [
+    ['A', 'จุด A'], ['B', 'จุด B'], ['C', 'จุด C'],
+    ['start', 'จุดเริ่มต้นระบบ (start)'], [null, '—']
+  ]) {
+    ui.sendState({ current_goal });
+    assert.equal(get('robot-goal-tag').textContent, `📍 ${label}`);
+  }
+  ui.sendState({ latest_intent: {
+    status: 'NAVIGATE', request_id: 'visitor-return', session_id: 'visitor-1', destination_id: 'A'
+  } });
+  assert.equal(get('intent-result-message').textContent, 'ปลายทาง: จุด A');
+
   assert.deepEqual(get('chips-container').children.map(button => button.textContent), locations.map(item => item.label));
   assert.ok(get('chips-container').children[3].className.includes('full-width'));
   assert.ok(get('chips-container').children[4].className.includes('full-width'));
@@ -205,7 +217,7 @@ async function main() {
   } });
   assert.equal(get('intent-result-status').textContent, 'แปลงคำสั่งเป็นการนำทาง');
   assert.match(get('intent-result-detail').textContent, /ยังไม่ยืนยันว่า Robot รับงาน/);
-  assert.equal(get('robot-goal-tag').textContent, '📍 start');
+  assert.equal(get('robot-goal-tag').textContent, '📍 จุดเริ่มต้นระบบ (start)');
 
   ui.sendState({ robot_state: 'NOT_READY', latest_intent: null });
   assert.equal(get('robot-state-text').textContent, 'ยังไม่พร้อม (Not ready)');

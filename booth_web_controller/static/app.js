@@ -259,7 +259,7 @@
     }
 
     if (robotGoalTag) {
-      robotGoalTag.textContent = state.current_goal ? `📍 ${state.current_goal}` : '—';
+      robotGoalTag.textContent = `📍 ${formatGoalTarget(state.current_goal, state.locations)}`;
     }
 
     if (robotHeardText) {
@@ -269,6 +269,15 @@
     if (robotReasonText) {
       robotReasonText.textContent = state.llm_reason || '';
     }
+  }
+
+  function formatGoalTarget(destinationId, locations) {
+    if (!destinationId) return '—';
+    if (destinationId === 'start') return 'จุดเริ่มต้นระบบ (start)';
+    const location = Array.isArray(locations)
+      ? locations.find(item => item && item.id === destinationId)
+      : null;
+    return location && typeof location.label === 'string' ? location.label : destinationId;
   }
 
   function setIntentResult(status, message = '', detail = '') {

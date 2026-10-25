@@ -107,7 +107,7 @@
       <section class="staff-section-card">
         <h3 class="section-title">🧪 จำลองสถานการณ์หุ่นยนต์ (Mock Perception Triggers)</h3>
         <p style="font-size: 0.78rem; color: var(--text-dim);">
-          ใช้ทดสอบการตอบสนองของระบบและหน้าจอ VR หากฮาร์ดแวร์หรือแสงในบูธมีปัญหา
+          เปลี่ยนเฉพาะสถานะจำลองที่ Backend แสดงบนหน้าเว็บ ไม่ได้รับประกันว่ามีการสั่ง Robot หรือ Unity จริง
         </p>
 
         <div class="staff-action-grid" style="grid-template-columns: 1fr 1fr;">
@@ -269,9 +269,9 @@
       });
 
       // Mock perception
-      btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'AI_EXHIBITION' }).then(loadLiveState));
-      btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'AI_EXHIBITION', obstacle_detected: true }).then(loadLiveState));
-      btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'AI_EXHIBITION' }).then(loadLiveState));
+      btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'B' }).then(loadLiveState));
+      btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'B', obstacle_detected: true }).then(loadLiveState));
+      btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'B' }).then(loadLiveState));
       btnMockIdle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'IDLE' }).then(loadLiveState));
 
       async function loadLiveState() {
@@ -331,14 +331,7 @@
         const status = outcomeLabels[outcome] || (outcome
           ? `ไม่รู้จักสถานะ Action (${outcome})`
           : 'ไม่รู้จักสถานะ Action');
-        const location = Array.isArray(state.locations)
-          ? state.locations.find(item => item && item.id === action.destination_id)
-          : null;
-        const destination = location && typeof location.label === 'string'
-          ? location.label
-          : (typeof action.destination_id === 'string' && action.destination_id
-            ? action.destination_id
-            : '—');
+        const destination = formatGoalTarget(action.destination_id, state.locations);
         const errorCode = action.error_code !== null && action.error_code !== undefined
           ? String(action.error_code)
           : '—';
@@ -352,6 +345,15 @@
         setTextIfChanged(actionErrorCode, `รหัสข้อผิดพลาด: ${errorCode}`);
         setTextIfChanged(actionRosStatus, `สถานะ ROS: ${rosStatus}`);
         setTextIfChanged(actionErrorMessage, `รายละเอียด: ${action.error_msg || '—'}`);
+      }
+
+      function formatGoalTarget(destinationId, locations) {
+        if (!destinationId) return '—';
+        if (destinationId === 'start') return 'จุดเริ่มต้นระบบ (start)';
+        const location = Array.isArray(locations)
+          ? locations.find(item => item && item.id === destinationId)
+          : null;
+        return location && typeof location.label === 'string' ? location.label : destinationId;
       }
 
       setInterval(() => {
