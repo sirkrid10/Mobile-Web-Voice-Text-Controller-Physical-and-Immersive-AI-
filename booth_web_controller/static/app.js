@@ -258,7 +258,17 @@
       UNSUPPORTED: 'คำสั่งนี้ยังไม่รองรับ',
       FAILED: 'แปลงคำสั่งไม่สำเร็จ'
     };
-    const status = messages[result.status] || 'ไม่รู้จักสถานะผลแปลงคำสั่ง';
+    const rejectionMessages = {
+      request_busy: 'กำลังประมวลผลคำสั่งก่อนหน้า',
+      robot_busy: 'หุ่นยังไม่ว่าง',
+      request_uncertain: 'ยังยืนยันผลคำสั่งก่อนหน้าไม่ได้',
+      robot_state_unknown: 'ยังยืนยันสถานะหุ่นไม่ได้',
+      robot_not_ready: 'หุ่นยังไม่พร้อมรับคำสั่ง',
+      navigation_unavailable: 'ระบบนำทางยังไม่พร้อม'
+    };
+    const status = result.status === 'FAILED' && rejectionMessages[result.error_code]
+      ? rejectionMessages[result.error_code]
+      : (messages[result.status] || 'ไม่รู้จักสถานะผลแปลงคำสั่ง');
     let message = typeof result.message === 'string' ? result.message : '';
     let detail = '';
 
