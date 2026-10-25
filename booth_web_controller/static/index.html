@@ -143,6 +143,12 @@
         <div class="mic-hint" id="transcript-preview">
           แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด
         </div>
+        <div id="voice-audio-debug" class="mic-hint" hidden>
+          <p>ฟังไฟล์เสียงเดียวกับที่ส่งถอดข้อความ</p>
+          <audio id="voice-audio-player" controls preload="metadata" style="max-width: 100%;"></audio>
+          <p><a id="voice-audio-download">ดาวน์โหลดเสียงล่าสุด</a></p>
+          <p id="voice-audio-description"></p>
+        </div>
       </section>
 
       <!-- Quick Scenario Chips -->

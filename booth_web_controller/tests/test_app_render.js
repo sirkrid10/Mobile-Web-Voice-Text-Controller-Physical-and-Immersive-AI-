@@ -41,7 +41,7 @@ class Element {
   }
 }
 
-function createUI() {
+function createUI(overrides = {}) {
   const elements = new Map();
   const sockets = [];
   const pendingRequests = [];
@@ -90,6 +90,8 @@ function createUI() {
     alert() {},
     console: { log() {}, warn() {}, error() {} }
   };
+
+  Object.assign(context, overrides);
 
   const script = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.js'), 'utf8');
   vm.runInNewContext(script, context, { filename: 'static/app.js' });
@@ -234,7 +236,11 @@ async function main() {
   process.stdout.write('app render fixture passed\n');
 }
 
-main().catch(error => {
-  process.stderr.write(`${error.stack || error}\n`);
-  process.exitCode = 1;
-});
+module.exports = { createUI };
+
+if (require.main === module) {
+  main().catch(error => {
+    process.stderr.write(`${error.stack || error}\n`);
+    process.exitCode = 1;
+  });
+}

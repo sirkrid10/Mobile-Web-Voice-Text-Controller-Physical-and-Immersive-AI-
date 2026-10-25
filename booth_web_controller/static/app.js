@@ -63,6 +63,12 @@
   const micLabel = document.getElementById('mic-label');
   const waveform = document.getElementById('waveform');
   const transcriptPreview = document.getElementById('transcript-preview');
+  const audioDebugEnabled = /(?:\?|&)debug_audio=1(?:&|$)/.test(window.location.search || '');
+  const audioDebugPanel = document.getElementById('voice-audio-debug');
+  const audioDebugPlayer = document.getElementById('voice-audio-player');
+  const audioDebugDownload = document.getElementById('voice-audio-download');
+  const audioDebugDescription = document.getElementById('voice-audio-description');
+  let audioDebugUrl = null;
 
   const chipsContainer = document.getElementById('chips-container');
   const textInputForm = document.getElementById('text-input-form');
@@ -293,7 +299,30 @@
     setIntentResult(status, message, detail);
   }
 
+  function clearAudioDebug() {
+    if (!audioDebugEnabled) return;
+    audioDebugPlayer.pause?.();
+    audioDebugPlayer.removeAttribute?.('src');
+    audioDebugDownload.removeAttribute?.('href');
+    if (audioDebugUrl) URL.revokeObjectURL(audioDebugUrl);
+    audioDebugUrl = null;
+    audioDebugPanel.hidden = true;
+  }
+
+  function showRecordedAudio(blob) {
+    if (!audioDebugEnabled) return;
+    clearAudioDebug();
+    audioDebugUrl = URL.createObjectURL(blob);
+    audioDebugPlayer.src = audioDebugUrl;
+    audioDebugDownload.href = audioDebugUrl;
+    const extension = blob.type.includes('mp4') ? 'm4a' : (blob.type.includes('ogg') ? 'ogg' : 'webm');
+    audioDebugDownload.download = `voice-debug-${Date.now()}.${extension}`;
+    audioDebugDescription.textContent = `${blob.size} bytes · ${blob.type}`;
+    audioDebugPanel.hidden = false;
+  }
+
   function resetSubmissionState() {
+    clearAudioDebug();
     submissionGeneration += 1;
     pendingSubmission = null;
     currentSubmission = null;
@@ -456,6 +485,7 @@
   // --------------------------------------------------------------------------
   async function startRecording() {
     if (isRecording) return;
+    if (audioDebugEnabled) audioDebugPlayer.pause?.();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStream = stream;
@@ -474,6 +504,7 @@
       mediaRecorder.onstop = async function () {
         const blobType = mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunks, { type: blobType });
+        showRecordedAudio(audioBlob);
         console.log(`[MediaRecorder] Audio recorded: ${audioBlob.size} bytes (${blobType})`);
 
         if (audioStream) {

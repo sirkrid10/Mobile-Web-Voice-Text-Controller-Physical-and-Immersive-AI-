@@ -71,7 +71,7 @@ class STTService:
                 temp_file.write(content)
 
             file_size = os.path.getsize(temp_path)
-            print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type})")
+            print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type}, provider={self.provider}, language={settings.STT_LANGUAGE})")
 
             # Route to configured provider
             if self.provider == "groq":
