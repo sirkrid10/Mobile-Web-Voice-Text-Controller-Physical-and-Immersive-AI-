@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Speech-to-Text (STT) Settings: "groq" | "openai" | "faster_whisper"
     STT_PROVIDER: str = "groq"
     STT_LANGUAGE: str = "th"
+    STT_GROQ_MODEL: str = "whisper-large-v3"
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 

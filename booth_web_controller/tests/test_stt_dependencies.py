@@ -45,6 +45,8 @@ def test_cloud_transcription_sends_configured_language(monkeypatch, provider, la
             body = await request.aread()
             calls.append(body)
             assert ('name="language"\r\n\r\n' + language + '\r\n').encode() in body
+            expected_model = "whisper-large-v3" if provider == "groq" else "whisper-1"
+            assert ('name="model"\r\n\r\n' + expected_model + '\r\n').encode() in body
             return httpx.Response(200, json={"text": "พาไปจุด A"})
 
         client = AsyncOpenAI(

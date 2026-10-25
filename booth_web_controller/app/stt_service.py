@@ -98,9 +98,10 @@ class STTService:
     async def _transcribe_groq(self, file_path: str) -> str:
         try:
             client = self._get_groq_client()
+            print(f"[STTService] Groq model={settings.STT_GROQ_MODEL}, language={settings.STT_LANGUAGE}")
             with open(file_path, "rb") as audio:
                 transcription = await client.audio.transcriptions.create(
-                    model="whisper-large-v3-turbo",
+                    model=settings.STT_GROQ_MODEL,
                     file=audio,
                     language=settings.STT_LANGUAGE,
                     prompt=settings.STT_INITIAL_PROMPT,
