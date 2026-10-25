@@ -102,6 +102,7 @@ class STTService:
                 transcription = await client.audio.transcriptions.create(
                     model="whisper-large-v3-turbo",
                     file=audio,
+                    language=settings.STT_LANGUAGE,
                     prompt=settings.STT_INITIAL_PROMPT,
                     temperature=0.0
                 )
@@ -118,6 +119,7 @@ class STTService:
                 transcription = await client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio,
+                    language=settings.STT_LANGUAGE,
                     prompt=settings.STT_INITIAL_PROMPT,
                     temperature=0.0
                 )
@@ -132,6 +134,7 @@ class STTService:
             model = self._get_local_model()
             segments, info = model.transcribe(
                 file_path,
+                language=settings.STT_LANGUAGE,
                 initial_prompt=settings.STT_INITIAL_PROMPT,
                 vad_filter=True
             )
