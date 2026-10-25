@@ -35,11 +35,17 @@
     <!-- ====================================================================
          VIEW 1: AVAILABLE (Start Screen)
          ==================================================================== -->
+    <section id="view-loading" class="view-state-card" aria-live="polite">
+      <div class="view-state-icon icon-available">…</div>
+      <h2 class="view-state-title">กำลังเชื่อมต่อและรอสถานะหุ่นยนต์</h2>
+      <p class="view-state-desc">กำลังตรวจสอบสิทธิ์ควบคุมและสถานะล่าสุด</p>
+    </section>
+
     <section id="view-available" class="view-state-card" style="display: none;">
       <div class="view-state-icon icon-available">✨</div>
-      <h2 class="view-state-title">หุ่นยนต์ว่าง พร้อมรับคำสั่ง!</h2>
+      <h2 class="view-state-title">ยังไม่มีผู้ถือสิทธิ์ควบคุม</h2>
       <p class="view-state-desc">
-        คุณสามารถสั่งงานหุ่นยนต์ TurtleBot3 ได้ด้วยเสียงพูดหรือข้อความ แตะปุ่มด้านล่างเพื่อเริ่มการควบคุม
+        แตะปุ่มด้านล่างเพื่อขอสิทธิ์ควบคุม สถานะความพร้อมของหุ่นยนต์แสดงแยกด้านล่าง
       </p>
       <button type="button" class="start-session-btn" id="btn-claim-session">
         🚀 แตะเพื่อเริ่มสั่งงานหุ่นยนต์
@@ -53,14 +59,39 @@
       <div class="view-state-icon icon-queue">⏳</div>
       <h2 class="view-state-title">มีผู้ชมกำลังสั่งการหุ่นยนต์</h2>
       <p class="view-state-desc">
-        ระบบจะเปิดสิทธิ์ให้คุณสั่งงานทันทีเมื่อคิวปัจจุบันเสร็จสิ้น คุณสามารถดูความคิดและเส้นทางของหุ่นยนต์แบบสดๆ ได้ด้านล่าง
+        มีผู้ถือสิทธิ์ควบคุมอยู่ คุณสามารถดูสถานะหุ่นยนต์และคำอธิบายล่าสุดด้านล่าง เมื่อไม่มีผู้ถือสิทธิ์แล้วให้แตะเริ่มด้วยตนเอง
       </p>
+    </section>
+
+    <!-- Shared live Robot-Mind status; visible in all session views. -->
+    <section class="robot-card" id="robot-status-card" style="display: none;">
+      <div class="robot-card-header">
+        <div class="status-indicator-wrap">
+          <div class="status-dot-pulse state-idle" id="robot-dot"></div>
+          <div class="status-label-group">
+            <h3 id="robot-state-text">กำลังรอสถานะ</h3>
+            <p>Robot-Mind Status</p>
+          </div>
+        </div>
+        <div class="goal-tag" id="robot-goal-tag">📍 —</div>
+      </div>
+
+      <div class="mind-section">
+        <div class="mind-row heard">
+          <span class="title">👂 คำสั่งล่าสุด:</span>
+          <span class="content" id="robot-heard-text">(ยังไม่มีคำสั่งล่าสุด)</span>
+        </div>
+        <div class="mind-row">
+          <span class="title">💬 ข้อความคำบรรยายล่าสุด:</span>
+          <span class="content" id="robot-reason-text"></span>
+        </div>
+      </div>
     </section>
 
     <!-- ====================================================================
          VIEW 3: ACTIVE CONTROLLER
          ==================================================================== -->
-    <div id="view-active" style="display: flex; flex-direction: column; gap: 16px;">
+    <div id="view-active" style="display: none; flex-direction: column; gap: 16px;">
       
       <!-- Session Bar & Countdown -->
       <div class="session-bar">
@@ -83,31 +114,6 @@
           ⏳ ยังใช้งานอยู่ (+60s)
         </button>
       </div>
-
-      <!-- Live Robot-Mind Status Card -->
-      <section class="robot-card">
-        <div class="robot-card-header">
-          <div class="status-indicator-wrap">
-            <div class="status-dot-pulse state-idle" id="robot-dot"></div>
-            <div class="status-label-group">
-              <h3 id="robot-state-text">พร้อมรับคำสั่ง (Idle)</h3>
-              <p>Robot-Mind Status</p>
-            </div>
-          </div>
-          <div class="goal-tag" id="robot-goal-tag">📍 START_BOOTH</div>
-        </div>
-
-        <div class="mind-section">
-          <div class="mind-row heard">
-            <span class="title">👂 หุ่นยนต์ได้ยินว่า (Voice Transcript):</span>
-            <span class="content" id="robot-heard-text">"(ยังไม่มีคำสั่งเสียงล่าสุด)"</span>
-          </div>
-          <div class="mind-row">
-            <span class="title">💬 ข้อความคำบรรยายล่าสุด:</span>
-            <span class="content" id="robot-reason-text"></span>
-          </div>
-        </div>
-      </section>
 
       <section class="intent-result-card" aria-labelledby="intent-result-title">
         <h3 id="intent-result-title">ผลแปลงคำสั่ง</h3>

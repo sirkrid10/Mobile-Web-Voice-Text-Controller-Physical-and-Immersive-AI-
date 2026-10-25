@@ -41,6 +41,8 @@
   const viewAvailable = document.getElementById('view-available');
   const viewActive = document.getElementById('view-active');
   const viewQueue = document.getElementById('view-queue');
+  const viewLoading = document.getElementById('view-loading');
+  const robotStatusCard = document.getElementById('robot-status-card');
 
   const btnClaim = document.getElementById('btn-claim-session');
   const btnDisconnect = document.getElementById('btn-disconnect');
@@ -149,6 +151,8 @@
     // 1. Robot Mind Card Info
     renderRobotMind(state);
     renderIntentResult(state);
+    if (viewLoading) viewLoading.style.display = 'none';
+    if (robotStatusCard) robotStatusCard.style.display = 'flex';
 
     // 2. View Switcher Logic
     const isMine = state.active_session_id === mySessionId;

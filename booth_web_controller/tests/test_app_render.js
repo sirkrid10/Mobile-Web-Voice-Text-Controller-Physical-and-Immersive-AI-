@@ -112,8 +112,38 @@ async function main() {
   const get = id => ui.elements.get(id);
   const socket = ui.sockets[0];
   const locations = ui.initialState.locations;
+  assert.equal(get('view-loading').style.display, undefined);
   await ui.flush();
   ui.sendState({});
+  assert.equal(get('view-loading').style.display, 'none');
+  assert.equal(get('robot-status-card').style.display, 'flex');
+  assert.equal(get('view-active').style.display, 'flex');
+
+  for (const robot_state of ['IDLE', 'UNKNOWN', 'NOT_READY', 'NAVIGATING', 'FAILED']) {
+    ui.sendState({
+      active_session_id: null,
+      lock_status: 'AVAILABLE',
+      robot_state
+    });
+    assert.equal(get('view-available').style.display, 'flex');
+    assert.equal(get('view-active').style.display, 'none');
+    assert.equal(get('robot-status-card').style.display, 'flex');
+    assert.equal(get('robot-state-text').textContent, ({
+      IDLE: 'พร้อมรับคำสั่ง (Idle)',
+      UNKNOWN: 'ยังไม่ทราบสถานะ (Unknown)',
+      NOT_READY: 'ยังไม่พร้อม (Not ready)',
+      NAVIGATING: 'กำลังนำทาง (Navigating)',
+      FAILED: 'เกิดข้อผิดพลาด (Failed)'
+    })[robot_state]);
+  }
+
+  ui.sendState({ active_session_id: 'visitor-2', lock_status: 'LOCKED', robot_state: 'NAVIGATING' });
+  assert.equal(get('view-queue').style.display, 'flex');
+  assert.equal(get('view-active').style.display, 'none');
+  assert.equal(get('robot-status-card').style.display, 'flex');
+  ui.sendState({ active_session_id: 'visitor-1', lock_status: 'LOCKED', robot_state: 'IDLE' });
+  assert.equal(get('view-active').style.display, 'flex');
+  assert.equal(get('view-queue').style.display, 'none');
 
   assert.deepEqual(get('chips-container').children.map(button => button.textContent), locations.map(item => item.label));
   assert.ok(get('chips-container').children[3].className.includes('full-width'));
