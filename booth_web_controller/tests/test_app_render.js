@@ -42,6 +42,7 @@ class Element {
 }
 
 function createUI(overrides = {}) {
+  const initialStateFetch = overrides.initialStateFetch;
   const elements = new Map();
   const sockets = [];
   const pendingRequests = [];
@@ -81,7 +82,8 @@ function createUI(overrides = {}) {
     FormData: class { append() {} },
     fetch(url, init = {}) {
       if (url === '/api/v1/state') {
-        return Promise.resolve({ json: async () => initialState });
+        if (initialStateFetch) return initialStateFetch();
+        return Promise.resolve({ ok: true, json: async () => initialState });
       }
       return new Promise(resolve => pendingRequests.push({ url, init, resolve }));
     },
@@ -91,7 +93,9 @@ function createUI(overrides = {}) {
     console: { log() {}, warn() {}, error() {} }
   };
 
-  Object.assign(context, overrides);
+  Object.assign(context, Object.fromEntries(
+    Object.entries(overrides).filter(([key]) => key !== 'initialStateFetch')
+  ));
 
   const script = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.js'), 'utf8');
   vm.runInNewContext(script, context, { filename: 'static/app.js' });
@@ -255,13 +259,25 @@ async function main() {
   assert.equal(get('intent-result-message').textContent, 'ผลคำขอที่สอง');
 
   socket.onclose();
+  assert.match(get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
+  assert.equal(get('session-countdown').textContent, 'ข้อมูลเวลาล่าสุดยังไม่ยืนยัน');
+  assert.equal(get('btn-send-text').disabled, true);
   const reconnect = ui.scheduled.at(-1);
   reconnect();
   assert.equal(ui.sockets.length, 2);
+  ui.sockets[1].onopen();
+  assert.match(get('connection-status').textContent, /รอสถานะล่าสุด/);
+  assert.equal(get('btn-send-text').disabled, true);
   ui.sendState({ robot_state: 'NAVIGATING', latest_intent: {
     status: 'CLARIFY', request_id: 'rapid-2', session_id: 'visitor-1', message: 'ผลหลัง reconnect'
   } });
   assert.equal(get('intent-result-message').textContent, 'ผลหลัง reconnect');
+  assert.equal(get('btn-send-text').disabled, false);
+
+  const failedInitialFetch = createUI({ initialStateFetch: () => Promise.reject(new Error('offline')) });
+  await failedInitialFetch.flush();
+  assert.match(failedInitialFetch.elements.get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
+  assert.equal(failedInitialFetch.elements.get('btn-send-text').disabled, true);
 
   process.stdout.write('app render fixture passed\n');
 }

@@ -36,6 +36,7 @@
   let audioChunks = [];
   let audioStream = null;
   let isRecording = false;
+  let isAcquiringMicrophone = false;
 
   // DOM Elements - Visitor UI
   const viewAvailable = document.getElementById('view-available');
@@ -76,6 +77,8 @@
   const textInputForm = document.getElementById('text-input-form');
   const textInputField = document.getElementById('text-input-field');
   const sendBtn = document.getElementById('btn-send-text');
+  const connectionStatusText = document.getElementById('connection-status');
+  let connectionStatus = 'connecting';
 
   // --------------------------------------------------------------------------
   // Audio MIME Support Detection (iOS Safari & Android Chrome)
@@ -103,6 +106,7 @@
   let receivedWebSocketState = false;
 
   function initWebSocket() {
+    let socketReceivedSnapshot = false;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/status`;
 
@@ -110,6 +114,7 @@
 
     ws.onopen = function () {
       console.log('[WebSocket] Connected to /ws/status');
+      if (!socketReceivedSnapshot) setConnectionStatus('connecting');
       if (wsReconnectTimer) {
         clearTimeout(wsReconnectTimer);
         wsReconnectTimer = null;
@@ -119,8 +124,11 @@
     ws.onmessage = function (event) {
       try {
         const state = JSON.parse(event.data);
+        if (!isValidStateSnapshot(state)) return;
+        socketReceivedSnapshot = true;
         receivedWebSocketState = true;
         renderState(state);
+        setConnectionStatus('connected');
       } catch (e) {
         console.error('[WebSocket] Error parsing state JSON:', e);
       }
@@ -128,6 +136,7 @@
 
     ws.onclose = function () {
       console.warn('[WebSocket] Closed. Attempting reconnect in 2s...');
+      setConnectionStatus('disconnected');
       wsReconnectTimer = setTimeout(initWebSocket, 2000);
     };
 
@@ -135,6 +144,46 @@
       console.error('[WebSocket] Error:', err);
       ws.close();
     };
+  }
+
+  function isValidStateSnapshot(state) {
+    return Boolean(state && typeof state === 'object' &&
+      typeof state.robot_state === 'string' && 'active_session_id' in state &&
+      Array.isArray(state.locations));
+  }
+
+  function setConnectionStatus(status) {
+    connectionStatus = status;
+    const copy = {
+      connecting: 'กำลังเชื่อมต่อ รอสถานะล่าสุดก่อนส่งคำสั่ง',
+      connected: 'เชื่อมต่อแล้ว · ได้รับสถานะล่าสุด',
+      disconnected: 'ขาดการเชื่อมต่อ · ข้อมูลล่าสุดยังไม่ยืนยัน'
+    };
+    if (connectionStatusText) {
+      connectionStatusText.textContent = copy[status];
+      connectionStatusText.className = `connection-status ${status}`;
+    }
+    renderCommandAvailability();
+    if (currentState && viewActive && viewActive.style.display !== 'none') {
+      renderActiveController(currentState);
+    }
+  }
+
+  function canSubmitVisitorCommand() {
+    return connectionStatus === 'connected' && currentState &&
+      currentState.active_session_id === mySessionId;
+  }
+
+  function renderCommandAvailability() {
+    const unavailable = !canSubmitVisitorCommand();
+    if (textInputField) textInputField.disabled = unavailable;
+    if (sendBtn) sendBtn.disabled = unavailable;
+    if (chipsContainer) {
+      chipsContainer.children.forEach(button => { button.disabled = unavailable; });
+    }
+    if (micButton && !isRecording && !isAcquiringMicrophone) {
+      micButton.disabled = unavailable;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -182,6 +231,7 @@
     if (state.locations && chipsContainer) {
       renderChips(state.locations);
     }
+    renderCommandAvailability();
   }
 
   function renderRobotMind(state) {
@@ -383,7 +433,10 @@
   function renderActiveController(state) {
     // Timer display
     if (sessionCountdown && sessionStatusBadge) {
-      if (state.timer_paused_for_navigation) {
+      if (connectionStatus !== 'connected') {
+        sessionStatusBadge.className = 'session-badge warning';
+        sessionCountdown.textContent = 'ข้อมูลเวลาล่าสุดยังไม่ยืนยัน';
+      } else if (state.timer_paused_for_navigation) {
         sessionStatusBadge.className = 'session-badge paused';
         sessionCountdown.textContent = 'กำลังเดินทาง (หยุดนับเวลาชั่วคราว)';
       } else {
@@ -400,7 +453,7 @@
 
     // Warning Banner (<= 15s)
     if (warningBanner) {
-      if (state.show_timeout_warning && !state.timer_paused_for_navigation) {
+      if (connectionStatus === 'connected' && state.show_timeout_warning && !state.timer_paused_for_navigation) {
         warningBanner.style.display = 'flex';
       } else {
         warningBanner.style.display = 'none';
@@ -680,10 +733,18 @@
 
   initWebSocket();
   fetch('/api/v1/state')
-    .then(r => r.json())
-    .then(state => {
-      if (!receivedWebSocketState) renderState(state);
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
     })
-    .catch(err => console.error('Initial state fetch error:', err));
+    .then(state => {
+      if (!isValidStateSnapshot(state)) throw new Error('Invalid state snapshot');
+      if (!receivedWebSocketState) renderState(state);
+      if (!receivedWebSocketState && connectionStatus === 'connecting') setConnectionStatus('connected');
+    })
+    .catch(err => {
+      console.error('Initial state fetch error:', err);
+      if (!receivedWebSocketState) setConnectionStatus('disconnected');
+    });
 
 })();

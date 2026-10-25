@@ -41,6 +41,9 @@
 
     <!-- Main Staff Dashboard -->
     <div id="staff-dashboard" style="display: none; flex-direction: column; gap: 18px;">
+      <p id="staff-data-status" class="connection-status connecting" role="status" aria-live="polite">
+        กำลังเชื่อมต่อ รอสถานะล่าสุด
+      </p>
       
       <!-- 1. Emergency Stop (Giant Red Button) -->
       <section class="staff-section-card danger-card">
@@ -177,6 +180,7 @@
       const btnMockReached = document.getElementById('btn-mock-reached');
       const btnMockIdle = document.getElementById('btn-mock-idle');
       const rawStateDump = document.getElementById('raw-state-dump');
+      const dataStatus = document.getElementById('staff-data-status');
       const actionStatus = document.getElementById('staff-action-status');
       const actionSource = document.getElementById('staff-action-source');
       const actionDestination = document.getElementById('staff-action-destination');
@@ -273,16 +277,27 @@
       async function loadLiveState() {
         try {
           const res = await fetch('/api/v1/state');
-          if (res.ok) {
-            const data = await res.json();
-            rawStateDump.textContent = JSON.stringify(data, null, 2);
-            cfgAutoReturn.checked = data.auto_return_enabled;
-            cfgDelay.value = data.auto_return_delay_sec;
-            renderActionOutcome(data);
+          if (!res.ok) {
+            setDataStatus('disconnected');
+            return;
           }
+          const data = await res.json();
+          rawStateDump.textContent = JSON.stringify(data, null, 2);
+          cfgAutoReturn.checked = data.auto_return_enabled;
+          cfgDelay.value = data.auto_return_delay_sec;
+          renderActionOutcome(data);
+          setDataStatus('connected');
         } catch (e) {
           console.error(e);
+          setDataStatus('disconnected');
         }
+      }
+
+      function setDataStatus(status) {
+        dataStatus.className = `connection-status ${status}`;
+        dataStatus.textContent = status === 'connected'
+          ? 'เชื่อมต่อแล้ว · ได้รับสถานะล่าสุด'
+          : 'ดึงสถานะไม่สำเร็จ · ข้อมูลที่แสดงอาจค้าง';
       }
 
       function setTextIfChanged(element, value) {
