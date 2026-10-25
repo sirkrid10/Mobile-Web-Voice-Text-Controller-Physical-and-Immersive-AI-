@@ -50,6 +50,10 @@ function run() {
   assert.match(styles, /:focus-visible/);
   assert.match(styles, /env\(safe-area-inset-bottom\)/);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
+  assert.match(styles, /\.mic-button\s*\{[^}]*-webkit-user-select:\s*none;[^}]*user-select:\s*none;[^}]*-webkit-touch-callout:\s*none;/s);
+  assert.match(styles, /\.mic-button \*[\s\S]*?-webkit-touch-callout:\s*none;/);
+  assert.match(styles, /\.text-input-field\s*\{[^}]*font-size:\s*16px/s);
+  assert.doesNotMatch(app, /addEventListener\(['"]contextmenu['"]/);
   assert.match(styles, /\.visitor-page \.active-layout\s*\{/);
   assert.match(styles, /\.visitor-page \.robot-card\s*\{/);
   assert.match(styles, /\.visitor-page \.disconnect-btn\s*\{[^}]*min-height:\s*48px/s);

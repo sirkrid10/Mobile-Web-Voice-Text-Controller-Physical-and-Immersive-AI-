@@ -536,7 +536,17 @@ header.app-header {
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   z-index: 2;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mic-button *,
+.mic-button::before,
+.mic-button::after {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .mic-button:hover {
