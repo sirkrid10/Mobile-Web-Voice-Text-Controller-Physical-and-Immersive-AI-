@@ -78,6 +78,7 @@
   const textInputField = document.getElementById('text-input-field');
   const sendBtn = document.getElementById('btn-send-text');
   const connectionStatusText = document.getElementById('connection-status');
+  const sessionFeedbackText = document.getElementById('session-feedback');
   let connectionStatus = 'connecting';
 
   // --------------------------------------------------------------------------
@@ -288,7 +289,7 @@
     }
 
     if (submissionFeedback) {
-      setIntentResult(submissionFeedback);
+      setIntentResult('ส่งคำสั่งไม่สำเร็จ', submissionFeedback);
       return;
     }
     if (pendingSubmission) {
@@ -381,6 +382,8 @@
     pendingSubmission = null;
     currentSubmission = null;
     submissionFeedback = '';
+    if (transcriptPreview) transcriptPreview.textContent = 'แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด';
+    if (sessionFeedbackText) sessionFeedbackText.textContent = '';
   }
 
   function failSubmission(generation, message) {
@@ -388,6 +391,7 @@
     pendingSubmission = null;
     currentSubmission = null;
     submissionFeedback = message;
+    if (transcriptPreview) transcriptPreview.textContent = message;
     renderIntentResult(currentState);
   }
 
@@ -402,18 +406,16 @@
 
   async function finishSubmission(generation, response) {
     let data = null;
-    if (response.ok) {
-      try {
-        data = await response.json();
-      } catch (e) {
-        data = null;
-      }
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = null;
     }
     if (generation !== submissionGeneration) return data;
 
     pendingSubmission = null;
     if (!response.ok) {
-      submissionFeedback = `ส่งคำสั่งไม่สำเร็จ (HTTP ${response.status})`;
+      submissionFeedback = commandErrorMessage(response.status, data);
       if (response.status === 403) {
         alert('สิทธิ์การควบคุมหมดอายุ หรือมีผู้ชมท่านอื่นกำลังถือสิทธิ์');
       }
@@ -428,6 +430,24 @@
 
     renderIntentResult(currentState);
     return data;
+  }
+
+  function commandErrorMessage(status, body) {
+    if (status === 403) return 'สิทธิ์การควบคุมหมดอายุ กรุณาเริ่มรับสิทธิ์อีกครั้ง';
+    if (status === 422) {
+      if (body && typeof body.detail === 'string' && body.detail === 'ไม่พบข้อความจากเสียง') {
+        return 'ไม่พบเสียงพูดที่แปลงเป็นข้อความได้ กรุณาพูดใกล้ไมค์แล้วลองใหม่';
+      }
+      if (body && Array.isArray(body.detail)) {
+        const fields = body.detail.flatMap(item => Array.isArray(item.loc) ? item.loc.map(String) : []);
+        if (fields.includes('audio')) return 'ไฟล์เสียงไม่ถูกต้อง กรุณาบันทึกเสียงใหม่';
+        if (fields.includes('text')) return 'กรุณาตรวจข้อความคำสั่งแล้วลองใหม่';
+        return 'ข้อมูลคำขอไม่ครบหรือไม่ถูกต้อง กรุณาลองใหม่';
+      }
+      return 'ไม่พบข้อความจากเสียง หรือข้อมูลคำขอไม่ถูกต้อง กรุณาลองใหม่';
+    }
+    if (status === 503) return 'บริการรับหรือแปลงคำสั่งยังไม่พร้อม กรุณาลองใหม่ภายหลัง';
+    return `ส่งคำสั่งไม่สำเร็จ (HTTP ${status})`;
   }
 
   function renderActiveController(state) {
@@ -495,46 +515,66 @@
         mySessionToken = data.session_token;
         sessionStorage.setItem('booth_visitor_session_token', mySessionToken);
         resetSubmissionState();
+        setSessionFeedback('ได้รับสิทธิ์ควบคุมแล้ว');
         renderIntentResult(currentState);
         console.log('[Session] Claimed successfully:', data);
       } else if (res.status === 409) {
-        alert('ขณะนี้มีผู้ชมท่านอื่นกำลังใช้งานอยู่ กรุณารอสักครู่ครับ');
+        setSessionFeedback('มีผู้ถือสิทธิ์ควบคุมอยู่ กรุณารอแล้วลองเริ่มใหม่');
+      } else {
+        setSessionFeedback(`ขอสิทธิ์ควบคุมไม่สำเร็จ (HTTP ${res.status})`);
       }
     } catch (e) {
       console.error('[Session] Claim failed:', e);
+      setSessionFeedback('ติดต่อระบบไม่ได้ จึงยังขอสิทธิ์ควบคุมไม่สำเร็จ');
     }
   }
 
   async function disconnectSession() {
     if (!confirm('ต้องการจบการใช้งานและส่งต่อคิวให้ผู้ชมท่านอื่นใช่หรือไม่?')) return;
     try {
-      await fetch('/api/v1/session/disconnect', {
+      const res = await fetch('/api/v1/session/disconnect', {
         method: 'POST',
         headers: {
           'X-Session-Token': mySessionToken || ''
         }
       });
+      if (!res.ok) {
+        setSessionFeedback(`จบการใช้งานไม่สำเร็จ (HTTP ${res.status})`);
+        return;
+      }
       mySessionToken = null;
       sessionStorage.removeItem('booth_visitor_session_token');
       resetSubmissionState();
+      setSessionFeedback('จบการใช้งานแล้ว');
       renderIntentResult(currentState);
     } catch (e) {
       console.error('[Session] Disconnect failed:', e);
+      setSessionFeedback('ติดต่อระบบไม่ได้ จึงยังจบการใช้งานไม่สำเร็จ');
     }
   }
 
   async function heartbeatSession() {
     try {
-      await fetch('/api/v1/session/heartbeat', {
+      const res = await fetch('/api/v1/session/heartbeat', {
         method: 'POST',
         headers: {
           'X-Session-Token': mySessionToken || ''
         }
       });
+      if (!res.ok) {
+        setSessionFeedback(`ต่อเวลาไม่สำเร็จ (HTTP ${res.status})`);
+        return;
+      }
+      setSessionFeedback('ต่อเวลาการใช้งานแล้ว');
       if (warningBanner) warningBanner.style.display = 'none';
     } catch (e) {
       console.error('[Session] Heartbeat failed:', e);
+      setSessionFeedback('ติดต่อระบบไม่ได้ จึงยังต่อเวลาไม่สำเร็จ');
     }
+  }
+
+  function setSessionFeedback(message) {
+    if (sessionFeedbackText) sessionFeedbackText.textContent = message;
   }
 
   // --------------------------------------------------------------------------
@@ -600,6 +640,10 @@
   }
 
   async function sendVoiceCommand(blob) {
+    if (!canSubmitVisitorCommand()) {
+      setSessionFeedback('ยังส่งคำสั่งไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
+      return;
+    }
     if (transcriptPreview) transcriptPreview.textContent = 'กำลังถอดความและประมวลผล...';
     const generation = beginSubmission();
     const formData = new FormData();
@@ -621,17 +665,18 @@
       });
 
       const data = await finishSubmission(generation, res);
-      if (res.ok && generation === submissionGeneration) {
-        if (transcriptPreview) {
+      if (generation === submissionGeneration) {
+        if (res.ok && transcriptPreview) {
           transcriptPreview.textContent = data && data.transcript
             ? `ส่งคำสั่งแล้ว: "${data.transcript}"`
             : 'ส่งคำสั่งแล้ว';
+        } else if (!res.ok && transcriptPreview) {
+          transcriptPreview.textContent = submissionFeedback;
         }
       }
     } catch (e) {
       console.error('[Command] Send voice error:', e);
       failSubmission(generation, 'ส่งเสียงไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ');
-      if (transcriptPreview && generation === submissionGeneration) transcriptPreview.textContent = 'เกิดข้อผิดพลาดในการส่งเสียง';
     }
   }
 
@@ -640,6 +685,10 @@
   // --------------------------------------------------------------------------
   async function sendTextCommand(text, mode = 'text') {
     if (!text || !text.trim()) return;
+    if (!canSubmitVisitorCommand()) {
+      setSessionFeedback('ยังส่งคำสั่งไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
+      return;
+    }
     const cleanText = text.trim();
     const generation = beginSubmission();
 
@@ -661,8 +710,13 @@
       });
 
       const data = await finishSubmission(generation, res);
-      if (res.ok && generation === submissionGeneration) {
-        if (textInputField) textInputField.value = '';
+      if (generation === submissionGeneration) {
+        if (res.ok) {
+          if (transcriptPreview) transcriptPreview.textContent = `ส่งคำสั่งแล้ว: "${cleanText}"`;
+          if (textInputField) textInputField.value = '';
+        } else if (transcriptPreview) {
+          transcriptPreview.textContent = submissionFeedback;
+        }
       }
     } catch (e) {
       console.error('[Command] Send text error:', e);

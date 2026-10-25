@@ -47,6 +47,8 @@ function createUI(overrides = {}) {
   const sockets = [];
   const pendingRequests = [];
   const scheduled = [];
+  const storageWrites = [];
+  const storageRemovals = [];
   const initialState = {
     robot_state: 'IDLE', heard_text: '', current_goal: 'start', llm_reason: 'พร้อมนำทาง',
     is_busy: false, lock_status: 'LOCKED', active_session_id: 'visitor-1',
@@ -71,7 +73,11 @@ function createUI(overrides = {}) {
       createElement(tag) { return new Element(tag); }
     },
     localStorage: { getItem: () => 'visitor-1', setItem() {} },
-    sessionStorage: { getItem: () => 'test-token', setItem() {}, removeItem() {} },
+    sessionStorage: {
+      getItem: () => 'test-token',
+      setItem(key, value) { storageWrites.push([key, value]); },
+      removeItem(key) { storageRemovals.push(key); }
+    },
     crypto: { randomUUID: () => 'visitor-1' },
     window: { location: { protocol: 'http:', host: 'localhost' }, MediaRecorder: null },
     navigator: { mediaDevices: {} },
@@ -85,11 +91,12 @@ function createUI(overrides = {}) {
         if (initialStateFetch) return initialStateFetch();
         return Promise.resolve({ ok: true, json: async () => initialState });
       }
-      return new Promise(resolve => pendingRequests.push({ url, init, resolve }));
+      return new Promise((resolve, reject) => pendingRequests.push({ url, init, resolve, reject }));
     },
     setTimeout(callback) { scheduled.push(callback); return scheduled.length; },
     clearTimeout() {},
     alert() {},
+    confirm: () => true,
     console: { log() {}, warn() {}, error() {} }
   };
 
@@ -108,7 +115,7 @@ function createUI(overrides = {}) {
     return new Promise(resolve => setImmediate(resolve));
   }
 
-  return { elements, sockets, pendingRequests, scheduled, initialState, sendState, flush };
+  return { elements, sockets, pendingRequests, scheduled, storageWrites, storageRemovals, initialState, sendState, flush };
 }
 
 async function main() {
@@ -227,6 +234,8 @@ async function main() {
   assert.deepEqual(JSON.parse(chipRequest.init.body), { text: 'ไปจุด B', input_mode: 'chip' });
   chipRequest.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'chip-1', session_id: 'visitor-1' }) });
   await ui.flush();
+  assert.equal(get('transcript-preview').textContent, 'ส่งคำสั่งแล้ว: "ไปจุด B"');
+  assert.equal(get('intent-result-status').textContent, 'ส่งแล้ว รอผลแปลงคำสั่ง');
   for (const [index, expectedText] of [[3, 'กลับจุดเริ่มต้น'], [4, 'หยุดรอตรงนี้ก่อน']]) {
     get('chips-container').children[index].fire('click');
     await ui.flush();
@@ -278,6 +287,57 @@ async function main() {
   await failedInitialFetch.flush();
   assert.match(failedInitialFetch.elements.get('connection-status').textContent, /ข้อมูลล่าสุดยังไม่ยืนยัน/);
   assert.equal(failedInitialFetch.elements.get('btn-send-text').disabled, true);
+
+  get('text-input-field').value = 'bad request';
+  get('text-input-form').fire('submit');
+  await ui.flush();
+  const rejectedText = ui.pendingRequests.at(-1);
+  rejectedText.resolve({ ok: false, status: 422, json: async () => ({
+    detail: [{ loc: ['body', 'text'], msg: '<script>private detail</script>' }]
+  }) });
+  await ui.flush();
+  assert.equal(get('transcript-preview').textContent, 'กรุณาตรวจข้อความคำสั่งแล้วลองใหม่');
+  assert.equal(get('intent-result-status').textContent, 'ส่งคำสั่งไม่สำเร็จ');
+  assert.notEqual(get('intent-result-message').textContent, '<script>private detail</script>');
+
+  get('btn-claim-session').fire('click');
+  await ui.flush();
+  ui.pendingRequests.at(-1).resolve({ ok: false, status: 409, json: async () => ({}) });
+  await ui.flush();
+  assert.match(get('session-feedback').textContent, /มีผู้ถือสิทธิ์/);
+  assert.deepEqual(ui.storageWrites, []);
+
+  const disconnect = get('btn-disconnect').fire('click');
+  await ui.flush();
+  ui.pendingRequests.at(-1).resolve({ ok: false, status: 503, json: async () => ({}) });
+  await disconnect;
+  assert.match(get('session-feedback').textContent, /จบการใช้งานไม่สำเร็จ/);
+  assert.deepEqual(ui.storageRemovals, []);
+
+  get('warning-banner').style.display = 'flex';
+  const heartbeat = get('btn-extend-time').fire('click');
+  await ui.flush();
+  ui.pendingRequests.at(-1).resolve({ ok: false, status: 503, json: async () => ({}) });
+  await heartbeat;
+  assert.equal(get('warning-banner').style.display, 'flex');
+  assert.match(get('session-feedback').textContent, /ต่อเวลาไม่สำเร็จ/);
+
+  get('text-input-field').value = 'offline command';
+  get('text-input-form').fire('submit');
+  await ui.flush();
+  ui.pendingRequests.at(-1).reject(new Error('offline'));
+  await ui.flush();
+  assert.equal(get('transcript-preview').textContent, 'ส่งคำสั่งไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ');
+
+  get('text-input-field').value = 'late response';
+  get('text-input-form').fire('submit');
+  await ui.flush();
+  const lateResponse = ui.pendingRequests.at(-1);
+  ui.sendState({ active_session_id: 'visitor-2', lock_status: 'LOCKED' });
+  lateResponse.resolve({ ok: true, status: 200, json: async () => ({ request_id: 'late', session_id: 'visitor-1' }) });
+  await ui.flush();
+  assert.equal(get('transcript-preview').textContent, 'แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด');
+  assert.equal(get('session-feedback').textContent, '');
 
   process.stdout.write('app render fixture passed\n');
 }

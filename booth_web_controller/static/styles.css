@@ -99,6 +99,13 @@ header.app-header {
   border-color: rgba(245, 158, 11, 0.4);
 }
 
+.session-feedback {
+  min-height: 1.2em;
+  color: #fbbf24;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .brand-wrapper {
   display: flex;
   align-items: center;

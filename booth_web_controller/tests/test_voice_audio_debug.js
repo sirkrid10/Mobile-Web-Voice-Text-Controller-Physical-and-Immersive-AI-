@@ -63,3 +63,39 @@ test('normal recording does not retain a debug audio URL', async () => {
   assert.equal(ui.revoked.length, 0);
   assert.notEqual(ui.elements.get('voice-audio-debug').hidden, false);
 });
+
+test('voice 422 and 503 responses finish transcription with controlled guidance', async () => {
+  const emptyVoice = voiceUI(false);
+  await emptyVoice.flush();
+  emptyVoice.sendState({});
+  const emptyRequest = await emptyVoice.record();
+  emptyRequest.resolve({ ok: false, status: 422, json: async () => ({ detail: 'ไม่พบข้อความจากเสียง' }) });
+  await emptyVoice.flush();
+  assert.equal(
+    emptyVoice.elements.get('transcript-preview').textContent,
+    'ไม่พบเสียงพูดที่แปลงเป็นข้อความได้ กรุณาพูดใกล้ไมค์แล้วลองใหม่'
+  );
+
+  const unavailableVoice = voiceUI(false);
+  await unavailableVoice.flush();
+  unavailableVoice.sendState({});
+  const unavailableRequest = await unavailableVoice.record();
+  unavailableRequest.resolve({ ok: false, status: 503, json: async () => ({ detail: 'secret provider exception' }) });
+  await unavailableVoice.flush();
+  assert.equal(
+    unavailableVoice.elements.get('transcript-preview').textContent,
+    'บริการรับหรือแปลงคำสั่งยังไม่พร้อม กรุณาลองใหม่ภายหลัง'
+  );
+  assert.notEqual(unavailableVoice.elements.get('transcript-preview').textContent, 'secret provider exception');
+
+  const offlineVoice = voiceUI(false);
+  await offlineVoice.flush();
+  offlineVoice.sendState({});
+  const offlineRequest = await offlineVoice.record();
+  offlineRequest.reject(new Error('offline'));
+  await offlineVoice.flush();
+  assert.equal(
+    offlineVoice.elements.get('transcript-preview').textContent,
+    'ส่งเสียงไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ'
+  );
+});
