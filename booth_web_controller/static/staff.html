@@ -23,7 +23,7 @@
           <p>TurtleBot3 Safety & Demo Recovery</p>
         </div>
       </div>
-      <a href="/" class="staff-link-btn" title="Back to Visitor View">
+      <a href="/" class="staff-link-btn" title="Back to Visitor View" aria-label="กลับหน้าผู้เข้าชม">
         📱
       </a>
     </header>
@@ -83,11 +83,11 @@
         
         <div class="form-group-row">
           <div>
-            <label style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
+            <label for="cfg-auto-return" style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
             <p style="font-size: 0.75rem; color: var(--text-dim);">เมื่อจบ Session ให้หุ่นยนต์เดินกลับมารอที่บูธเอง</p>
           </div>
           <label class="switch">
-            <input type="checkbox" id="cfg-auto-return" checked>
+            <input type="checkbox" id="cfg-auto-return" aria-label="เปิดหรือปิดเดินกลับจุดเริ่มต้นอัตโนมัติ" checked>
             <span class="slider"></span>
           </label>
         </div>
