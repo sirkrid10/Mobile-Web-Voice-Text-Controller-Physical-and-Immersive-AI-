@@ -26,7 +26,7 @@ from app.models import (
     StateBroadcast
 )
 from app.session_manager import session_manager
-from app.stt_service import stt_service
+from app.stt_service import STTUnavailableError, stt_service
 from app.ros2_bridge import create_ros2_bridge, BaseROS2Bridge
 
 
@@ -208,9 +208,13 @@ async def command_voice(
     validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
 
     # Transcribe speech
-    transcript = await stt_service.transcribe_audio(audio)
-    if not transcript:
-        transcript = "พาไปที่ AI Exhibition"
+    try:
+        transcript = await stt_service.transcribe_audio(audio)
+    except STTUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="ระบบแปลงเสียงไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง") from exc
+    if not transcript or not transcript.strip():
+        raise HTTPException(status_code=422, detail="ไม่พบข้อความจากเสียง")
+    transcript = transcript.strip()
 
     request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
 

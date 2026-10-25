@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
 from app.session_manager import session_manager
+from app.stt_service import STTService, STTUnavailableError
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +39,8 @@ def reset_session_state():
     session_manager.inactivity_timeout_sec = 60
     if session_manager.auto_return_task and not session_manager.auto_return_task.done():
         session_manager.auto_return_task.cancel()
+    # The TestClient lifespan runs on a different event loop than asyncio.run above.
+    session_manager._lock = asyncio.Lock()
 
 
 def test_session_lock_exclusivity():
@@ -222,6 +225,86 @@ def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatc
     assert session_manager.latest_request_identity is None
 
 
+@pytest.mark.parametrize("provider", ["groq", "openai", "faster_whisper"])
+@pytest.mark.parametrize("transcript", ["ไปจุด B", "", "   "])
+def test_stt_providers_return_successful_and_empty_transcripts_without_fallback(monkeypatch, provider, transcript):
+    service = STTService()
+    service.provider = provider
+
+    async def fake_provider(_path):
+        return transcript
+
+    method = {
+        "groq": "_transcribe_groq",
+        "openai": "_transcribe_openai",
+        "faster_whisper": "_transcribe_faster_whisper",
+    }[provider]
+    monkeypatch.setattr(service, method, fake_provider)
+
+    class FakeUpload:
+        content_type = "audio/wav"
+        filename = "sample.wav"
+
+        async def read(self):
+            return b"audio"
+
+    async def run():
+        return await service.transcribe_audio(FakeUpload())
+
+    assert asyncio.run(run()) == transcript
+
+
+@pytest.mark.parametrize("provider", ["groq", "openai", "faster_whisper", "invalid"])
+def test_stt_provider_failures_raise_controlled_error(monkeypatch, provider):
+    service = STTService()
+    service.provider = provider
+
+    async def fail_provider(_path):
+        raise RuntimeError("provider secret detail")
+
+    for method in ("_transcribe_groq", "_transcribe_openai", "_transcribe_faster_whisper"):
+        monkeypatch.setattr(service, method, fail_provider)
+
+    class FakeUpload:
+        content_type = "audio/wav"
+        filename = "sample.wav"
+
+        async def read(self):
+            return b"audio"
+
+    async def run():
+        return await service.transcribe_audio(FakeUpload())
+
+    with pytest.raises(STTUnavailableError):
+        asyncio.run(run())
+
+
+@pytest.mark.parametrize(("transcript", "status"), [("", 422), ("  \n", 422), (None, 503)])
+def test_voice_failures_do_not_register_or_publish_requests(monkeypatch, transcript, status):
+    from unittest.mock import Mock
+    import app.main as main_module
+
+    async def transcribe(_audio):
+        if transcript is None:
+            raise STTUnavailableError("private provider detail")
+        return transcript
+
+    bridge = Mock()
+    monkeypatch.setattr(main_module, "create_ros2_bridge", lambda *_args: bridge)
+    monkeypatch.setattr(main_module.stt_service, "transcribe_audio", transcribe)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/command/voice",
+            headers={"X-Session-Id": "empty-audio-user"},
+            files={"audio": ("sample.wav", io.BytesIO(b"audio"), "audio/wav")},
+        )
+
+    assert response.status_code == status
+    assert "private provider detail" not in response.text
+    assert session_manager.latest_request_identity is None
+    bridge.publish_user_transcript.assert_not_called()
+
+
 def test_smart_navigation_timer_pause():
     """Protocol 3: Watchdog pauses countdown during NAVIGATING/REPLANNING."""
     asyncio.run(session_manager.claim("dev-timer-test"))
@@ -303,8 +386,12 @@ def test_staff_pin_security_and_emergency_stop():
         assert session_manager.robot_state == "STOPPED"
 
 
-def test_voice_upload_endpoint():
-    """Protocol 6: Voice audio upload & processing fallback."""
+def test_voice_upload_endpoint(monkeypatch):
+    """Voice upload publishes an explicitly injected transcript."""
+    async def transcribe(_audio):
+        return "ไปจุด C"
+
+    monkeypatch.setattr("app.main.stt_service.transcribe_audio", transcribe)
     with TestClient(app) as client:
         dummy_audio = io.BytesIO(b"RIFF....WAVEfmt ....data....")
         res = client.post(
@@ -315,8 +402,7 @@ def test_voice_upload_endpoint():
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "sent"
-        assert "transcript" in data
-        assert len(data["transcript"]) > 0
+        assert data["transcript"] == "ไปจุด C"
 
 
 def test_html_pages_served():
