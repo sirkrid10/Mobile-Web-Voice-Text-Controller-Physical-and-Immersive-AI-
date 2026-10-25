@@ -47,11 +47,9 @@ class Settings(BaseSettings):
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (
         "บทสนทนาสั่งงานหุ่นยนต์ TurtleBot3 ภาษาไทยผสมอังกฤษ (Code-Switching): "
-        "พาไปบูธ Computer Science, ช่วยพาไปบูธ CS, เดินไป booth 09 วิทยาการคอมพิวเตอร์, "
-        "พาไปบูธ Mathematics and Statistics, ไปบูธ Math and Stat, booth 10 คณิตศาสตร์และสถิติ, "
-        "กลับไปที่จุด Start, return to start point, หยุดรอตรงนี้, stop, wait here. "
-        "Take me to Computer Science booth 09, Mathematics and Statistics booth 10, "
-        "navigate to CS, go to Math and Stat, return to start."
+        "จุด A, จุดเอ, A, เอ, จุด B, จุดบี, B, บี, จุด C, จุดซี, C, ซี, "
+        "กลับจุดเริ่มต้น, กลับ start, จุดเริ่มต้น, start point. "
+        "Go to point A, point B, point C, return to start."
     )
 
     # ROS 2 Integration Override
@@ -61,31 +59,38 @@ class Settings(BaseSettings):
     LOCATIONS: List[Dict[str, Any]] = Field(
         default_factory=lambda: [
             {
-                "id": "booth_09",
-                "label": "📍 บูธ 09: วิทยาการคอมพิวเตอร์",
-                "prompt": "พาไปบูธคอมพิวเตอร์",
-                "description": "บูธ 09 ภาควิชาวิทยาการคอมพิวเตอร์",
+                "id": "A",
+                "label": "📍 จุด A",
+                "prompt": "ไปจุด A",
+                "description": "พาไปจุด A",
                 "icon": "code"
             },
             {
-                "id": "booth_10",
-                "label": "📍 บูธ 10: คณิตศาสตร์และสถิติ",
-                "prompt": "พาไปบูธคณิตศาสตร์และสถิติ",
-                "description": "บูธ 10 ภาควิชาคณิตศาสตร์และสถิติ",
+                "id": "B",
+                "label": "📍 จุด B",
+                "prompt": "ไปจุด B",
+                "description": "พาไปจุด B",
                 "icon": "calculator"
             },
             {
+                "id": "C",
+                "label": "📍 จุด C",
+                "prompt": "ไปจุด C",
+                "description": "พาไปจุด C",
+                "icon": "map-pin"
+            },
+            {
                 "id": "start",
-                "label": "🏠 กลับจุดรอเริ่มต้น (Start Point)",
+                "label": "🏠 กลับจุดเริ่มต้น (จุด A)",
                 "prompt": "กลับจุดเริ่มต้น",
                 "description": "จุดรอสแกน QR Code หน้าบูธ",
                 "icon": "home"
             },
             {
                 "id": "wait",
-                "label": "⏸️ หยุดรอตรงนี้ก่อน (Wait)",
+                "label": "⏸️ ส่งคำขอรอ (ยังไม่รองรับ)",
                 "prompt": "หยุดรอตรงนี้ก่อน",
-                "description": "หยุดรอคำสั่งถัดไปชั่วคราว",
+                "description": "ส่งคำขอรอผ่านระบบแปลคำสั่ง (ยังไม่รองรับ)",
                 "icon": "pause"
             }
         ]

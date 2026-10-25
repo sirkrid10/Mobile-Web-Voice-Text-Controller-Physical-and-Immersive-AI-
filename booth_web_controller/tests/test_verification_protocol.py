@@ -12,6 +12,7 @@ import io
 import time
 import asyncio
 import pytest
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -63,25 +64,25 @@ def test_session_lock_exclusivity():
 
 
 def test_text_command_and_auto_claim():
-    """Protocol 2: Text/Chip commands and auto-claim if vacant (routes to booth_09)."""
+    """Protocol 2: Text/Chip commands and auto-claim if vacant (routes to A)."""
     with TestClient(app) as client:
         # First command from visitor auto-claims session
         res = client.post(
             "/api/v1/command/text",
             headers={"X-Session-Id": "dev-visitor-1"},
-            json={"text": "พาไปบูธคอมพิวเตอร์", "input_mode": "text"}
+            json={"text": "ไปจุด A", "input_mode": "text"}
         )
         assert res.status_code == 200
         data = res.json()
         assert data["status"] == "sent"
-        assert data["transcript"] == "พาไปบูธคอมพิวเตอร์"
+        assert data["transcript"] == "ไปจุด A"
         assert data["session_id"] == "dev-visitor-1"
         assert data["request_id"].startswith("req-")
 
-        # Verify active session belongs to dev-visitor-1 and destination is booth_09
+        # Verify active session belongs to dev-visitor-1 and destination is A
         state = session_manager.get_state_broadcast()
         assert state.active_session_id == "dev-visitor-1"
-        assert state.current_goal == "booth_09"
+        assert state.current_goal == "A"
         assert state.latest_intent.status == "NAVIGATE"
         assert state.latest_intent.request_id == data["request_id"]
         assert state.latest_intent.session_id == data["session_id"]
@@ -149,11 +150,64 @@ def test_quick_chip_command_keeps_original_flow_and_correlates_result():
     assert state.latest_request_identity == (payload["request_id"], "chip-visitor")
 
 
+def test_locations_use_visitor_a_b_c_and_start_chip_remains_a_request():
+    assert [(item["id"], item["prompt"]) for item in settings.LOCATIONS[:3]] == [
+        ("A", "ไปจุด A"), ("B", "ไปจุด B"), ("C", "ไปจุด C")
+    ]
+    start = next(item for item in settings.LOCATIONS if item["id"] == "start")
+    assert start["prompt"] == "กลับจุดเริ่มต้น"
+    assert "จุด A" in start["label"]
+
+
+@pytest.mark.parametrize(("text", "destination"), [
+    ("ไปจุด A", "A"), ("พาไปจุด บี", "B"), ("ไปจุด C", "C"), ("กลับ start", "A")
+])
+def test_mock_visitor_requests_map_to_a_b_c_and_start_alias(text, destination):
+    from app.ros2_bridge import MockROS2Bridge
+    target, status, _ = MockROS2Bridge._mock_intent(text)
+    assert status == "NAVIGATE"
+    assert target == destination
+
+
+@pytest.mark.parametrize(("text", "status"), [
+    ("ไปที่บูธ", "CLARIFY"), ("ไปจุด A แล้วจุด B", "CLARIFY"), ("ส่งคำขอรอ", "UNSUPPORTED")
+])
+def test_mock_does_not_invent_destination_for_ambiguous_or_unsupported_text(text, status):
+    from app.ros2_bridge import MockROS2Bridge
+    _, actual_status, _ = MockROS2Bridge._mock_intent(text)
+    assert actual_status == status
+
+
+def test_mock_busy_result_preserves_simulation_and_emits_subtitle(monkeypatch):
+    from app.ros2_bridge import MockROS2Bridge
+
+    loop = asyncio.new_event_loop()
+    bridge = MockROS2Bridge(session_manager, loop)
+    task = Mock()
+    task.done.return_value = False
+    bridge._sim_task = task
+    result = Mock()
+    subtitle = Mock()
+    monkeypatch.setattr(session_manager, "record_intent_result", result)
+    monkeypatch.setattr(bridge, "handle_mock_subtitle", subtitle)
+
+    bridge.publish_user_transcript("req-next", "visitor", "text", "ไปจุด B")
+
+    recorded = result.call_args.args[0]
+    assert recorded.request_id == "req-next"
+    assert recorded.session_id == "visitor"
+    assert recorded.status == "FAILED"
+    assert recorded.error_code == "robot_busy"
+    subtitle.assert_called_once()
+    assert bridge._sim_task is task
+    loop.close()
+
+
 def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatch):
     async def transcribe_and_change_owner(_audio):
         await session_manager.release_session(reason="staff_force_release")
         await session_manager.claim("replacement-owner")
-        return "พาไปบูธคอมพิวเตอร์"
+        return "ไปจุด A"
 
     monkeypatch.setattr("app.main.stt_service.transcribe_audio", transcribe_and_change_owner)
     with TestClient(app) as client:
@@ -202,12 +256,12 @@ def test_smart_navigation_timer_pause():
 def test_auto_return_on_disconnect():
     """Protocol 4: Disconnect triggers delayed auto-return to start booth."""
     with TestClient(app) as client:
-        # Claim session and set destination to booth_09
+        # Claim session and set destination to A
         claim_res = client.post("/api/v1/session/claim", json={"session_id": "dev-return-user"})
         token = claim_res.json()["session_token"]
 
         # Navigate away from start
-        session_manager.current_goal = "booth_09"
+        session_manager.current_goal = "A"
         session_manager.robot_state = "REACHED"
         session_manager.auto_return_delay_sec = 1  # 1s for testing
 

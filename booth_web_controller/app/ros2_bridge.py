@@ -82,21 +82,31 @@ class MockROS2Bridge(BaseROS2Bridge):
     def publish_user_transcript(self, request_id: str, session_id: str, input_mode: str, text: str):
         req_id = request_id
         print(f"[ROS2Bridge Mock] Published to /guide/user_request: req_id={req_id}, session_id={session_id}, text='{text}'")
+        target, status, message = self._mock_intent(text)
+        if status == "NAVIGATE" and self._sim_task and not self._sim_task.done():
+            self.session_manager.record_intent_result(IntentOutcome(
+                request_id=req_id,
+                session_id=session_id,
+                stamp=RosStamp(sec=int(time.time()), nanosec=0),
+                status="FAILED",
+                message="หุ่นยังไม่ว่าง",
+                error_code="robot_busy",
+            ))
+            self.handle_mock_subtitle("หุ่นยังไม่ว่าง กำลังทำคำสั่งก่อนหน้า", ttl_sec=5.0)
+            return
 
-        # Mock LLM intent parsing for target destination
-        target = "booth_09"
-        text_lower = text.lower()
-        if "คณิต" in text_lower or "10" in text_lower or "math" in text_lower or "stat" in text_lower:
-            target = "booth_10"
-        elif "คอม" in text_lower or "09" in text_lower or "computer" in text_lower or "วิทคอม" in text_lower or "cs" in text_lower:
-            target = "booth_09"
-        elif "start" in text_lower or "เริ่มต้น" in text_lower or "กลับ" in text_lower or "จุดรอ" in text_lower:
-            target = "start"
-        elif "stop" in text_lower or "หยุด" in text_lower or "wait" in text_lower:
-            target = None
+        if status != "NAVIGATE":
+            self.session_manager.record_intent_result(IntentOutcome(
+                request_id=req_id,
+                session_id=session_id,
+                stamp=RosStamp(sec=int(time.time()), nanosec=0),
+                status=status,
+                message=message,
+            ))
+            return
 
         if target:
-            target_name = "บูธ 09 วิทยาการคอมพิวเตอร์" if target == "booth_09" else ("บูธ 10 คณิตศาสตร์และสถิติ" if target == "booth_10" else "จุดรอเริ่มต้น (Start)")
+            target_name = self._location_name(target)
             self.session_manager.update_from_llm_mind(
                 heard_text=text,
                 target=target,
@@ -110,12 +120,35 @@ class MockROS2Bridge(BaseROS2Bridge):
                 destination_id=target
             ))
             self._start_navigation_simulation(target)
-        else:
-            self.session_manager.update_from_llm_mind(
-                heard_text=text,
-                target=self.session_manager.current_goal,
-                explanation="รับคำสั่งหยุดรอ หุ่นยนต์หยุดรอตรงนี้ชั่วคราว"
-            )
+
+    @staticmethod
+    def _normalize_mock_text(text: str) -> str:
+        import re
+        normalized = text.strip().lower()
+        normalized = normalized.replace("จุดเอ", "จุด a").replace("จุดบี", "จุด b").replace("จุดซี", "จุด c")
+        normalized = normalized.replace("เอ", " a ").replace("บี", " b ").replace("ซี", " c ")
+        normalized = re.sub(r"[^a-z0-9ก-๙]+", " ", normalized)
+        return " ".join(normalized.split())
+
+    @classmethod
+    def _mock_intent(cls, text: str):
+        normalized = cls._normalize_mock_text(text)
+        if normalized in {"กลับจุดเริ่มต้น", "กลับ start", "กลับ จุดเริ่มต้น", "กลับ จุดเริ่มต้น start"}:
+            return "A", "NAVIGATE", ""
+
+        found = [point for point in ("A", "B", "C") if __import__("re").search(rf"\b{point.lower()}\b", normalized)]
+        if len(found) > 1:
+            return "", "CLARIFY", "ระบุปลายทางเพียงจุดเดียว"
+        if len(found) == 1 and any(word in normalized for word in ("ไป", "พา", "navigate", "go", "take me")):
+            return found[0], "NAVIGATE", ""
+        if any(word in normalized for word in ("wait", "รอ", "หยุด", "stop", "cancel")):
+            return "", "UNSUPPORTED", "คำสั่งนี้ยังไม่รองรับ"
+        return "", "CLARIFY", "กรุณาระบุจุด A, B หรือ C"
+
+    @staticmethod
+    def _location_name(target: str) -> str:
+        location = next((item for item in settings.LOCATIONS if item["id"] == target), None)
+        return location["label"] if location else target
 
     def publish_high_level_action(self, action: str, target: str, explanation: str, source: str = "web_controller"):
         print(f"[ROS2Bridge Mock] Direct navigation action requested: target={target}, source={source}")
@@ -183,11 +216,11 @@ class MockROS2Bridge(BaseROS2Bridge):
 
     def _start_navigation_simulation(self, target: str, action_context: Optional[Dict[str, str]] = None):
         if self._sim_task and not self._sim_task.done():
-            self._sim_task.cancel()
+            return
 
         async def _run_sim():
             try:
-                target_name = "บูธ 09 วิทยาการคอมพิวเตอร์" if target == "booth_09" else ("บูธ 10 คณิตศาสตร์และสถิติ" if target == "booth_10" else "จุดรอเริ่มต้น")
+                target_name = self._location_name(target)
                 # 1. Start navigating (phase: NAVIGATING)
                 self.session_manager.update_from_ros_state(state="NAVIGATING", goal=target)
                 self.session_manager.update_from_llm_mind(
