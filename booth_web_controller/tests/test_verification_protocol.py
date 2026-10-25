@@ -597,7 +597,8 @@ def test_html_pages_served():
         res_index = client.get("/")
         assert res_index.status_code == 200
         assert "TurtleBot3 Controller" in res_index.text
-        assert "หุ่นยนต์ว่าง พร้อมรับคำสั่ง!" in res_index.text
+        assert "ยังไม่มีผู้ถือสิทธิ์ควบคุม" in res_index.text
+        assert "กำลังเชื่อมต่อและรอสถานะหุ่นยนต์" in res_index.text
 
         res_staff = client.get("/staff")
         assert res_staff.status_code == 200
