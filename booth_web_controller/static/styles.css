@@ -4,6 +4,9 @@
    ============================================================================== */
 
 :root {
+  color-scheme: light;
+  forced-color-adjust: none;
+  -webkit-forced-color-adjust: none;
   --bg-primary: #0a0e17;
   --bg-secondary: #111827;
   --bg-card: rgba(17, 24, 39, 0.75);
@@ -1267,12 +1270,89 @@ input:checked + .slider:before {
 .visitor-page .start-session-btn:disabled { border-color: #64746e; background: #64746e; color: #fff; cursor: not-allowed; }
 
 .visitor-page #view-queue {
-  min-height: 112px;
+  min-height: 140px;
   border-color: #987a29;
   background: #fffaf0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
-.visitor-page #view-queue .view-state-desc { color: #5f4b12; font-weight: 600; }
+.visitor-page #view-queue .view-state-desc {
+  color: #5f4b12;
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visitor-page .queue-indicator {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  color: #b45309;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visitor-page .queue-indicator-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #f59e0b;
+  opacity: 0.6;
+  animation: queuePulseRing 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes queuePulseRing {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  70% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.visitor-page .queue-wait-icon {
+  width: 26px;
+  height: 26px;
+  animation: queueHourglassRock 3s ease-in-out infinite;
+}
+
+@keyframes queueHourglassRock {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-18deg); }
+  40% { transform: rotate(18deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(0deg); }
+}
+
+.visitor-page .queue-waiting-dots {
+  display: inline-flex;
+  margin-left: 3px;
+  letter-spacing: 1px;
+}
+
+.visitor-page .queue-waiting-dots .dot {
+  opacity: 0.2;
+  animation: queueDotFade 1.4s infinite;
+  font-weight: 800;
+}
+
+.visitor-page .queue-waiting-dots .dot:nth-child(1) { animation-delay: 0s; }
+.visitor-page .queue-waiting-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.visitor-page .queue-waiting-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes queueDotFade {
+  0%, 100% { opacity: 0.2; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
 .visitor-page #view-active { width: 100%; min-width: 0; }
 
 .visitor-page .active-layout {
@@ -1624,8 +1704,12 @@ input:checked + .slider:before {
   .visitor-page .loading-mark,
   .visitor-page .status-dot-pulse::after,
   .visitor-page .wave-bar,
-  .visitor-page .mic-pulse-ring { animation: none !important; }
+  .visitor-page .mic-pulse-ring,
+  .visitor-page .queue-indicator-pulse,
+  .visitor-page .queue-wait-icon,
+  .visitor-page .queue-waiting-dots .dot { animation: none !important; }
   .visitor-page .wave-bar { height: 8px; }
+  .visitor-page .queue-waiting-dots .dot { opacity: 1 !important; transform: none !important; }
 }
 
 
@@ -1926,4 +2010,27 @@ input:checked + .slider:before {
 .visitor-page[data-theme="dark"] .extend-time-btn {
   background: #f59e0b;
   color: #0f172a;
+}
+
+.visitor-page[data-theme="dark"] #view-queue {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.visitor-page[data-theme="dark"] #view-queue .view-state-desc {
+  color: #fbbf24;
+}
+
+.visitor-page[data-theme="dark"] .queue-indicator {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+
+.visitor-page[data-theme="dark"] .queue-indicator-pulse {
+  border-color: #f59e0b;
+}
+
+.visitor-page[data-theme="dark"] {
+  color-scheme: dark;
 }
