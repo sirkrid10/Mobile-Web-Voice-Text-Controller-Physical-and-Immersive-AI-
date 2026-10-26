@@ -1885,3 +1885,42 @@ input:checked + .slider:before {
 .visitor-page[data-theme="dark"] .intent-result-detail {
   color: #94a3b8;
 }
+
+
+.visitor-page[data-theme="dark"] .connection-status {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.visitor-page[data-theme="dark"] .connection-status.connected {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+
+.visitor-page[data-theme="dark"] .connection-status.disconnected {
+  border-color: rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.15);
+  color: #fda4af;
+}
+
+.visitor-page[data-theme="dark"] .session-feedback {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(14, 165, 233, 0.14);
+  color: #bae6fd;
+}
+
+.visitor-page[data-theme="dark"] .timeout-warning-card {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.visitor-page[data-theme="dark"] .warning-text {
+  color: #fef08a;
+}
+
+.visitor-page[data-theme="dark"] .extend-time-btn {
+  background: #f59e0b;
+  color: #0f172a;
+}
