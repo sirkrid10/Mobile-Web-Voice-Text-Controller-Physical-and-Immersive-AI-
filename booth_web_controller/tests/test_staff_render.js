@@ -194,3 +194,20 @@ test('invalid cached and typed PINs do not reveal the Staff dashboard', async ()
   assert.match(unavailable.elements.get('staff-auth-feedback').textContent, /HTTP 503/);
   assert.equal(unavailable.getStoredPin(), '');
 });
+
+test('staff dashboard renders live robot mind status, goal, transcript, and reason', async () => {
+  const ui = createStaffUI();
+  await new Promise(resolve => setImmediate(resolve));
+  ui.updateState({
+    robot_state: 'IDLE',
+    current_goal: 'start',
+    heard_text: 'พาไปดูหุ่นยนต์',
+    llm_reason: 'กำลังนำทางไปจุด A'
+  });
+  await ui.intervals[0]();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ui.elements.get('staff-robot-state-text').textContent, 'พร้อมรับคำสั่ง (Idle)');
+  assert.equal(ui.elements.get('staff-robot-goal-tag').textContent, 'จุดเริ่มต้นระบบ (start)');
+  assert.equal(ui.elements.get('staff-robot-heard-text').textContent, '"พาไปดูหุ่นยนต์"');
+  assert.equal(ui.elements.get('staff-robot-reason-text').textContent, 'กำลังนำทางไปจุด A');
+});

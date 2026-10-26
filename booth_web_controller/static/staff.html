@@ -59,6 +59,34 @@
         </p>
       </section>
 
+      <!-- 1.5 Live Robot & Visitor Status Monitor (Transcript, Subtitle, Destination) -->
+      <section class="staff-section-card" id="staff-robot-status-card" style="border-color: rgba(6, 182, 212, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+          <div class="status-indicator-wrap">
+            <div class="status-dot-pulse state-idle" id="staff-robot-dot" aria-hidden="true"></div>
+            <div class="status-label-group">
+              <p style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">หุ่นยนต์กำลังทำอะไร</p>
+              <h3 id="staff-robot-state-text" style="font-size: 1.25rem; font-weight: 800; color: #fff;">กำลังรอสถานะ</h3>
+            </div>
+          </div>
+          <div class="goal-tag" style="background: rgba(34, 85, 204, 0.25); border: 1px solid #3b82f6; border-radius: 10px; padding: 6px 12px;">
+            <span style="font-size: 0.82rem; color: #93c5fd; font-weight: 700;">ปลายทาง:</span>
+            <span id="staff-robot-goal-tag" style="font-size: 0.95rem; color: #bfdbfe; font-weight: 700;">—</span>
+          </div>
+        </div>
+
+        <div class="mind-section" style="margin-top: 10px;">
+          <div class="mind-row heard" style="padding: 10px 12px; background: rgba(56, 189, 248, 0.12); border-left: 4px solid var(--accent-cyan); border-radius: 8px;">
+            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: #7dd3fc; text-transform: none;">หุ่นยนต์ได้ยินว่า:</span>
+            <span class="content" id="staff-robot-heard-text" style="font-size: 1.05rem; font-weight: 600; color: #e0f2fe; margin-top: 2px;">(ยังไม่มีคำสั่งล่าสุด)</span>
+          </div>
+          <div class="mind-row" style="padding: 10px 12px;">
+            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: var(--text-dim); text-transform: none;">คำบรรยายสถานะล่าสุด</span>
+            <span class="content" id="staff-robot-reason-text" style="font-size: 1.05rem; font-weight: 600; color: #f8fafc; margin-top: 2px;">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
+          </div>
+        </div>
+      </section>
+
       <!-- 2. Recovery & Reset Actions -->
       <section class="staff-section-card">
         <h3 class="section-title">⚡ การกู้คืนระบบด่วน (Quick Demo Recovery)</h3>
@@ -194,6 +222,12 @@
       const actionErrorCode = document.getElementById('staff-action-error-code');
       const actionRosStatus = document.getElementById('staff-action-ros-status');
       const actionErrorMessage = document.getElementById('staff-action-error-message');
+
+      const staffRobotDot = document.getElementById('staff-robot-dot');
+      const staffRobotStateText = document.getElementById('staff-robot-state-text');
+      const staffRobotGoalTag = document.getElementById('staff-robot-goal-tag');
+      const staffRobotHeardText = document.getElementById('staff-robot-heard-text');
+      const staffRobotReasonText = document.getElementById('staff-robot-reason-text');
 
       let currentPin = '';
       let authInProgress = false;
@@ -359,6 +393,7 @@
           const data = await res.json();
           rawStateDump.textContent = JSON.stringify(data, null, 2);
           renderActionOutcome(data);
+          renderRobotMind(data);
           setDataStatus('connected');
         } catch (e) {
           console.error(e);
@@ -418,6 +453,41 @@
         setTextIfChanged(actionErrorCode, `รหัสข้อผิดพลาด: ${errorCode}`);
         setTextIfChanged(actionRosStatus, `สถานะ ROS: ${rosStatus}`);
         setTextIfChanged(actionErrorMessage, `รายละเอียด: ${action.error_msg || '—'}`);
+      }
+
+
+      function renderRobotMind(state) {
+        if (!staffRobotStateText) return;
+
+        const stateLabels = {
+          'IDLE': { label: 'พร้อมรับคำสั่ง (Idle)', class: 'state-idle' },
+          'NAVIGATING': { label: 'กำลังนำทาง (Navigating)', class: 'state-navigating' },
+          'REPLANNING': { label: 'พบสิ่งกีดขวาง กำลังคำนวณใหม่ (Replanning)', class: 'state-replanning' },
+          'REACHED': { label: 'ถึงจุดหมายแล้ว (Reached)', class: 'state-reached' },
+          'STOPPED': { label: 'หยุด/ยกเลิกการนำทาง (Stopped)', class: 'state-stopped' },
+          'NOT_READY': { label: 'ยังไม่พร้อม (Not ready)', class: 'state-stopped' },
+          'UNKNOWN': { label: 'ยังไม่ทราบสถานะ (Unknown)', class: 'state-stopped' },
+          'FAILED': { label: 'เกิดข้อผิดพลาด (Failed)', class: 'state-stopped' }
+        };
+
+        const info = stateLabels[state.robot_state] || { label: state.robot_state || 'กำลังรอสถานะ', class: 'state-idle' };
+        setTextIfChanged(staffRobotStateText, info.label);
+
+        if (staffRobotDot) {
+          staffRobotDot.className = 'status-dot-pulse ' + info.class;
+        }
+
+        if (staffRobotGoalTag) {
+          setTextIfChanged(staffRobotGoalTag, formatGoalTarget(state.current_goal, state.locations));
+        }
+
+        if (staffRobotHeardText) {
+          setTextIfChanged(staffRobotHeardText, state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งล่าสุด)');
+        }
+
+        if (staffRobotReasonText) {
+          setTextIfChanged(staffRobotReasonText, state.llm_reason || 'พร้อมรับคำสั่งจากผู้เข้าชมบูธ');
+        }
       }
 
       function formatGoalTarget(destinationId, locations) {
