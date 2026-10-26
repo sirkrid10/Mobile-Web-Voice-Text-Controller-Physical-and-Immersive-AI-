@@ -2,47 +2,73 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>TurtleBot3 Voice & Text Controller | Physical & Immersive AI</title>
   <meta name="description" content="Mobile Web Voice and Text Controller for TurtleBot3 Navigation and VR Mind View at Exhibition Booth">
   
-  <!-- Modern Typography from Google Fonts -->
+  <!-- Thai-first type with system fallbacks for offline use. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="visitor-page">
   <div class="app-container">
     
     <!-- Top Application Header -->
     <header class="app-header">
       <div class="brand-wrapper">
-        <div class="brand-icon">🤖</div>
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v3M8 6h8a4 4 0 0 1 4 4v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a4 4 0 0 1 4-4Z"/>
+            <path d="M8.5 11h.01M15.5 11h.01M9 15h6"/>
+          </svg>
+        </div>
         <div class="brand-titles">
           <h1>TurtleBot3 Controller</h1>
           <p>Physical & Immersive AI Booth</p>
         </div>
       </div>
       <div class="header-actions">
-        <a href="/staff" class="staff-link-btn" title="Staff Control Panel" id="btn-staff-link">
-          🔒
+        <button type="button" class="theme-toggle-btn" id="btn-theme-toggle" title="สลับโหมด Dark/Light" aria-label="สลับโหมดการแสดงผล มืด/สว่าง">
+          <svg class="theme-icon sun-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="theme-icon moon-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        <a href="/staff" class="staff-link-btn" title="Staff Control Panel" id="btn-staff-link" aria-label="เปิดแผงควบคุมเจ้าหน้าที่">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M12 14v3"/>
+          </svg>
         </a>
       </div>
     </header>
 
+    <p id="connection-status" class="connection-status" role="status" aria-live="polite" style="display: none;">
+      กำลังเชื่อมต่อ รอสถานะล่าสุดก่อนส่งคำสั่ง
+    </p>
+    <p id="session-feedback" class="session-feedback" role="status" aria-live="polite" style="display: none;"></p>
+
     <!-- ====================================================================
          VIEW 1: AVAILABLE (Start Screen)
          ==================================================================== -->
+    <section id="view-loading" class="view-state-card" aria-live="polite">
+      <span class="loading-mark" aria-hidden="true"></span>
+      <p class="view-state-desc" id="view-loading-message">กำลังเชื่อมต่อและรอสถานะล่าสุด…</p>
+    </section>
+
     <section id="view-available" class="view-state-card" style="display: none;">
-      <div class="view-state-icon icon-available">✨</div>
-      <h2 class="view-state-title">หุ่นยนต์ว่าง พร้อมรับคำสั่ง!</h2>
+      <div class="view-state-icon icon-available" aria-hidden="true">✨</div>
+      <h2 class="view-state-title">เริ่มสั่งงานหุ่นยนต์</h2>
       <p class="view-state-desc">
-        คุณสามารถสั่งงานหุ่นยนต์ TurtleBot3 ได้ด้วยเสียงพูดหรือข้อความ แตะปุ่มด้านล่างเพื่อเริ่มการควบคุม
+        แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้
       </p>
       <button type="button" class="start-session-btn" id="btn-claim-session">
-        🚀 แตะเพื่อเริ่มสั่งงานหุ่นยนต์
+        ขอสิทธิ์ควบคุม
       </button>
     </section>
 
@@ -50,117 +76,146 @@
          VIEW 2: QUEUE / OBSERVER MODE
          ==================================================================== -->
     <section id="view-queue" class="view-state-card" style="display: none;">
-      <div class="view-state-icon icon-queue">⏳</div>
-      <h2 class="view-state-title">มีผู้ชมกำลังสั่งการหุ่นยนต์</h2>
-      <p class="view-state-desc">
-        ระบบจะเปิดสิทธิ์ให้คุณสั่งงานทันทีเมื่อคิวปัจจุบันเสร็จสิ้น คุณสามารถดูความคิดและเส้นทางของหุ่นยนต์แบบสดๆ ได้ด้านล่าง
-      </p>
+      <div class="queue-indicator" aria-hidden="true">
+        <span class="queue-indicator-pulse"></span>
+        <svg class="queue-wait-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 22h14"/>
+          <path d="M5 2h14"/>
+          <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/>
+          <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>
+        </svg>
+      </div>
+      <p class="view-state-desc">มีผู้ใช้งานอยู่ กรุณารอสักครู่<span class="queue-waiting-dots" aria-hidden="true"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></p>
     </section>
 
     <!-- ====================================================================
          VIEW 3: ACTIVE CONTROLLER
          ==================================================================== -->
-    <div id="view-active" style="display: flex; flex-direction: column; gap: 16px;">
-      
-      <!-- Session Bar & Countdown -->
+    <div id="view-active" style="display: none; flex-direction: column; gap: 16px;">
       <div class="session-bar">
         <div class="session-info">
           <span class="session-badge active" id="session-status-badge">
-            <span id="session-countdown">ถือสิทธิ์ควบคุม: 60s</span>
+            <svg class="session-clock" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+            </svg>
+            <span id="session-countdown">ถือสิทธิ์ควบคุม: 120s</span>
           </span>
         </div>
         <button type="button" class="disconnect-btn" id="btn-disconnect">
-          🚪 จบการใช้งาน
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>
+          </svg>
+          <span>จบการใช้งาน</span>
         </button>
       </div>
 
-      <!-- Warning Timeout Banner (<= 15s) -->
-      <div id="warning-banner" class="timeout-warning-card" style="display: none;">
-        <div class="warning-text">
-          ⚠️ เวลาการควบคุมใกล้หมดลง คุณยังต้องการสั่งการต่อหรือไม่?
+      <div class="active-layout">
+
+        <div id="warning-banner" class="timeout-warning-card" style="display: none;">
+          <div class="warning-text">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m10.3 4.9-7 12.2A2 2 0 0 0 5 20h14a2 2 0 0 0 1.7-2.9l-7-12.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>
+            </svg>
+            <span>เวลาการควบคุมใกล้หมดลง คุณยังต้องการสั่งการต่อหรือไม่?</span>
+          </div>
+          <button type="button" class="extend-time-btn" id="btn-extend-time">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 11a8 8 0 0 0-14.8-4L3 10"/><path d="M3 4v6h6M4 13a8 8 0 0 0 14.8 4L21 14"/><path d="M21 20v-6h-6"/>
+            </svg>
+            <span>ต่อเวลาอีก 120 วินาที</span>
+          </button>
         </div>
-        <button type="button" class="extend-time-btn" id="btn-extend-time">
-          ⏳ ยังใช้งานอยู่ (+60s)
-        </button>
-      </div>
 
-      <!-- Live Robot-Mind Status Card -->
-      <section class="robot-card">
-        <div class="robot-card-header">
-          <div class="status-indicator-wrap">
-            <div class="status-dot-pulse state-idle" id="robot-dot"></div>
-            <div class="status-label-group">
-              <h3 id="robot-state-text">พร้อมรับคำสั่ง (Idle)</h3>
-              <p>Robot-Mind Status</p>
+        <section class="robot-card" id="robot-status-card" style="display: none;" aria-labelledby="robot-state-text">
+          <div class="robot-card-header">
+            <div class="status-indicator-wrap">
+              <div class="status-dot-pulse state-idle" id="robot-dot" aria-hidden="true"></div>
+              <div class="status-label-group">
+                <p class="status-kicker">หุ่นยนต์กำลังทำอะไร</p>
+                <h2 id="robot-state-text">กำลังรอสถานะ</h2>
+              </div>
+            </div>
+            <div class="goal-tag">
+              <span class="goal-label">ปลายทาง</span>
+              <span id="robot-goal-tag">—</span>
             </div>
           </div>
-          <div class="goal-tag" id="robot-goal-tag">📍 START_BOOTH</div>
-        </div>
 
-        <div class="mind-section">
-          <div class="mind-row heard">
-            <span class="title">👂 หุ่นยนต์ได้ยินว่า (Voice Transcript):</span>
-            <span class="content" id="robot-heard-text">"(ยังไม่มีคำสั่งเสียงล่าสุด)"</span>
+          <div class="mind-section">
+            <div class="mind-row heard">
+              <span class="title">หุ่นยนต์ได้ยินว่า:</span>
+              <span class="content" id="robot-heard-text">(ยังไม่มีคำสั่งล่าสุด)</span>
+            </div>
+            <div class="mind-row">
+              <span class="title">คำบรรยายสถานะล่าสุด</span>
+              <span class="content" id="robot-reason-text"></span>
+            </div>
           </div>
-          <div class="mind-row">
-            <span class="title">🧠 ความคิดและการตัดสินใจ (LLM Reasoning):</span>
-            <span class="content" id="robot-reason-text">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
+        </section>
+
+        <section class="command-panel" aria-labelledby="command-panel-title">
+          <div class="command-panel-heading">
+            <h2 id="command-panel-title">สั่งงานหุ่นยนต์</h2>
+            <p>เลือกพูด พิมพ์ หรือแตะปุ่มคำสั่งลัด</p>
           </div>
-        </div>
-      </section>
 
-      <!-- Push-to-Talk Microphone Component -->
-      <section class="mic-control-section">
-        <div class="mic-button-wrapper">
-          <button type="button" class="mic-button" id="mic-button" aria-label="Microphone Voice Command">
-            <span class="mic-icon">🎙️</span>
-            <span class="mic-label" id="mic-label">แตะเพื่อพูด</span>
-          </button>
-          <div class="mic-pulse-ring"></div>
-        </div>
+          <section class="mic-control-section" aria-label="สั่งงานด้วยเสียง">
+            <div class="mic-button-wrapper">
+              <button type="button" class="mic-button" id="mic-button" aria-label="เริ่มบันทึกเสียง" aria-pressed="false">
+                <svg class="mic-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5v1a7 7 0 0 0 14 0v-1M12 19.5v2M9 21.5h6"/>
+                </svg>
+                <span class="mic-label" id="mic-label">แตะเพื่อพูด</span>
+              </button>
+              <div class="mic-pulse-ring" aria-hidden="true"></div>
+            </div>
 
-        <!-- Waveform Animation -->
-        <div class="waveform-container" id="waveform">
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-          <div class="wave-bar"></div>
-        </div>
+            <div class="waveform-container" id="waveform" aria-hidden="true">
+              <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+              <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            </div>
 
-        <!-- Transcript Preview -->
-        <div class="mic-hint" id="transcript-preview">
-          แตะหนึ่งครั้งเพื่อเริ่มพูด หรือกดค้างไว้ขณะพูด
-        </div>
-      </section>
+            <div class="mic-hint" id="transcript-preview" role="status" aria-live="polite">
+              แตะเพื่อพูด หรือกดค้างขณะพูด
+            </div>
+            <div id="voice-audio-debug" class="mic-hint" hidden>
+              <p>ฟังไฟล์เสียงเดียวกับที่ส่งถอดข้อความ</p>
+              <audio id="voice-audio-player" controls preload="metadata" style="max-width: 100%;"></audio>
+              <p><a id="voice-audio-download">ดาวน์โหลดเสียงล่าสุด</a></p>
+              <p id="voice-audio-description"></p>
+            </div>
+          </section>
 
-      <!-- Quick Scenario Chips -->
-      <section class="chips-section">
-        <div class="section-title">📍 ปุ่มคำสั่งลัด (Quick Scenario Chips)</div>
-        <div class="chips-grid" id="chips-container">
-          <!-- Chips will be rendered dynamically by app.js -->
-        </div>
-      </section>
+          <section class="chips-section" aria-labelledby="quick-chips-title">
+            <h3 class="section-title" id="quick-chips-title">ปุ่มคำสั่งลัด</h3>
+            <div class="chips-grid" id="chips-container">
+              <!-- Chips will be rendered dynamically by app.js -->
+            </div>
+          </section>
 
-      <!-- Fallback Text Input Bar -->
-      <section class="text-input-section">
-        <div class="section-title">⌨️ ช่องพิมพ์คำสั่งสำรอง (Fallback Text Input)</div>
-        <form class="input-bar-form" id="text-input-form">
-          <input 
-            type="text" 
-            class="text-input-field" 
-            id="text-input-field" 
-            placeholder="เช่น 'พาไปที่เวที', 'ไป AI Exhibition'..."
-            autocomplete="off"
-          >
-          <button type="submit" class="send-btn" id="btn-send-text" aria-label="Send Text Command">
-            ➤
-          </button>
-        </form>
-      </section>
+          <section class="text-input-section" aria-labelledby="text-command-title">
+            <h3 class="section-title" id="text-command-title">พิมพ์คำสั่ง</h3>
+            <form class="input-bar-form" id="text-input-form">
+              <label class="visually-hidden" for="text-input-field">พิมพ์คำสั่งถึงหุ่นยนต์</label>
+              <input type="text" class="text-input-field" id="text-input-field" placeholder="เช่น ไปจุด A หรือกลับจุดเริ่มต้น" autocomplete="off">
+              <button type="submit" class="send-btn" id="btn-send-text" aria-label="ส่งคำสั่งข้อความ">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>
+                </svg>
+              </button>
+            </form>
+          </section>
+        </section>
 
+        <section class="intent-result-card" id="intent-result-card" aria-labelledby="intent-result-title">
+          <h2 id="intent-result-title">ผลแปลงคำสั่ง</h2>
+          <div class="intent-result-content" aria-live="polite" aria-atomic="true">
+            <p class="intent-result-status" id="intent-result-status">ยังไม่มีผลแปลงคำสั่ง</p>
+            <p class="intent-result-message" id="intent-result-message"></p>
+            <p class="intent-result-detail" id="intent-result-detail"></p>
+          </div>
+        </section>
+      </div>
     </div>
 
   </div>

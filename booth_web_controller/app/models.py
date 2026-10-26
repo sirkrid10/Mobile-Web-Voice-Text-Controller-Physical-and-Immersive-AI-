@@ -44,6 +44,36 @@ class CommandResponse(BaseModel):
     transcript: str
     inactivity_remaining_sec: int
     session_token: Optional[str] = None
+    request_id: str
+    session_id: str
+
+
+class RosStamp(BaseModel):
+    sec: int
+    nanosec: int
+
+
+class IntentOutcome(BaseModel):
+    request_id: str
+    session_id: str
+    stamp: RosStamp
+    status: Literal["NAVIGATE", "CLARIFY", "UNSUPPORTED", "FAILED"]
+    destination_id: str = ""
+    message: str = ""
+    error_code: str = ""
+
+
+class DirectActionOutcome(BaseModel):
+    request_id: str
+    source: str
+    destination_id: str
+    outcome: Literal[
+        "sending", "accepted", "unavailable", "rejected", "succeeded",
+        "aborted", "canceled", "failed", "transport_error"
+    ]
+    ros_status: Optional[int] = None
+    error_code: Optional[int] = None
+    error_msg: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +84,12 @@ class StaffConfigUpdate(BaseModel):
     auto_return_enabled: Optional[bool] = None
     inactivity_timeout_sec: Optional[int] = Field(None, ge=10, le=600)
     auto_return_delay_sec: Optional[int] = Field(None, ge=1, le=120)
+
+
+class StaffConfigSnapshot(BaseModel):
+    auto_return_enabled: bool
+    inactivity_timeout_sec: int
+    auto_return_delay_sec: int
 
 
 class StaffMockEvent(BaseModel):
@@ -68,7 +104,7 @@ class StaffMockEvent(BaseModel):
 # ---------------------------------------------------------------------------
 
 class StateBroadcast(BaseModel):
-    robot_state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED"]
+    robot_state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED", "NOT_READY", "UNKNOWN"]
     heard_text: str
     current_goal: Optional[str]
     llm_reason: str
@@ -82,3 +118,5 @@ class StateBroadcast(BaseModel):
     auto_return_delay_sec: int
     obstacle_detected: bool
     locations: List[Dict[str, Any]]
+    latest_intent: Optional[IntentOutcome] = None
+    latest_action: Optional[DirectActionOutcome] = None

@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, Callable
 from fastapi import HTTPException
 
 from app.config import settings
-from app.models import StateBroadcast
+from app.models import DirectActionOutcome, IntentOutcome, StateBroadcast
 
 
 class SessionManager:
@@ -35,6 +35,9 @@ class SessionManager:
         self.llm_explanation: str = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
         self.obstacle_detected: bool = False
         self.robot_pose: Dict[str, float] = {"x": 0.0, "y": 0.0}
+        self.latest_request_identity: Optional[tuple[str, str]] = None
+        self.latest_intent: Optional[IntentOutcome] = None
+        self.latest_action: Optional[DirectActionOutcome] = None
 
         # External hooks
         self.ros_bridge: Optional[Any] = None
@@ -66,6 +69,8 @@ class SessionManager:
                 self.active_session_id = session_id
                 self.active_session_token = secrets.token_hex(16)
                 self.last_activity_ts = time.time()
+                self.latest_request_identity = None
+                self.latest_intent = None
 
                 # Cancel any pending auto-return task since a new visitor arrived
                 if self.auto_return_task and not self.auto_return_task.done():
@@ -107,6 +112,8 @@ class SessionManager:
                 self.active_session_id = session_id
                 self.active_session_token = secrets.token_hex(16)
                 self.last_activity_ts = time.time()
+                self.latest_request_identity = None
+                self.latest_intent = None
                 if self.auto_return_task and not self.auto_return_task.done():
                     self.auto_return_task.cancel()
                     self.auto_return_task = None
@@ -115,20 +122,59 @@ class SessionManager:
 
             # Existing claim verification
             if self.active_session_id == session_id:
-                self.last_activity_ts = time.time()
-                return self.active_session_token
+                if session_token and session_token == self.active_session_token:
+                    self.last_activity_ts = time.time()
+                    return self.active_session_token
+                raise HTTPException(status_code=403, detail="Invalid session token for active controller.")
 
             raise HTTPException(status_code=403, detail="Robot is currently controlled by another visitor.")
+
+    async def begin_user_request(self, session_id: str, expected_token: str) -> tuple[str, str]:
+        """Register a command before publishing so immediate ROS results can correlate."""
+        async with self._lock:
+            if self.active_session_id != session_id or self.active_session_token != expected_token:
+                raise HTTPException(status_code=403, detail="Session ownership changed before command submission.")
+            identity = (f"req-{secrets.token_hex(8)}", session_id)
+            self.latest_request_identity = identity
+            self.latest_intent = None
+            self._trigger_broadcast()
+            return identity
+
+    def record_intent_result(self, result: IntentOutcome) -> bool:
+        """Accept one result only for the current visitor request."""
+        if self.latest_request_identity != (result.request_id, result.session_id):
+            return False
+        if self.active_session_id != result.session_id:
+            return False
+        if self.latest_intent and self.latest_intent.request_id == result.request_id:
+            return False
+        self.latest_intent = result
+        self._trigger_broadcast()
+        return True
+
+    def record_action_outcome(self, result: DirectActionOutcome) -> bool:
+        """Update the snapshot only for the newest backend-owned Action."""
+        if self.latest_action and self.latest_action.request_id != result.request_id:
+            if result.outcome != "sending":
+                return False
+        terminal = {"unavailable", "rejected", "succeeded", "aborted", "canceled", "failed", "transport_error"}
+        if (
+            self.latest_action
+            and self.latest_action.request_id == result.request_id
+            and self.latest_action.outcome in terminal
+        ):
+            return False
+        self.latest_action = result
+        self._trigger_broadcast()
+        return True
 
     # -----------------------------------------------------------------------
     # Heartbeat (Extend Session Time)
     # -----------------------------------------------------------------------
-    async def heartbeat(self, session_token: Optional[str] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
+    async def heartbeat(self, session_token: str) -> Dict[str, Any]:
         async with self._lock:
-            is_valid_token = bool(session_token and self.active_session_token and session_token == self.active_session_token)
-            is_valid_id = bool(session_id and self.active_session_id and session_id == self.active_session_id)
-            if not (is_valid_token or is_valid_id):
-                raise HTTPException(status_code=403, detail="Invalid or expired session token/ID.")
+            if not self.active_session_token or session_token != self.active_session_token:
+                raise HTTPException(status_code=403, detail="Invalid or expired session token.")
 
             self.last_activity_ts = time.time()
             return {
@@ -186,6 +232,8 @@ class SessionManager:
             released_session = self.active_session_id
             self.active_session_id = None
             self.active_session_token = None
+            self.latest_request_identity = None
+            self.latest_intent = None
             print(f"[SessionManager] Released session {released_session} (reason: {reason})")
 
             # Check Auto-Return criteria
@@ -319,7 +367,9 @@ class SessionManager:
             auto_return_enabled=self.auto_return_enabled,
             auto_return_delay_sec=self.auto_return_delay_sec,
             obstacle_detected=self.obstacle_detected,
-            locations=settings.LOCATIONS
+            locations=settings.LOCATIONS,
+            latest_intent=self.latest_intent,
+            latest_action=self.latest_action
         )
 
 

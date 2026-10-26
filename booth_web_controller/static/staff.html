@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>Staff Control & Recovery Panel | TurtleBot3</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,24 +24,31 @@
           <p>TurtleBot3 Safety & Demo Recovery</p>
         </div>
       </div>
-      <a href="/" class="staff-link-btn" title="Back to Visitor View">
+      <a href="/" class="staff-link-btn" title="Back to Visitor View" aria-label="กลับหน้าผู้เข้าชม">
         📱
       </a>
     </header>
 
     <!-- PIN Authentication Card (Hidden once authenticated) -->
     <section class="staff-section-card" id="pin-section">
-      <h2 style="font-size: 1.1rem; color: #fff;">🔐 กรุณาระบุรหัส PIN ของเจ้าหน้าที่</h2>
-      <div style="display: flex; gap: 8px;">
-        <input type="password" id="staff-pin-input" class="text-input-field" placeholder="Default: 1234" maxlength="8">
-        <button type="button" class="start-session-btn" id="btn-submit-pin" style="padding: 10px 20px;">
+      <form id="staff-pin-form">
+        <label for="staff-pin-input" style="font-size: 1.1rem; color: #fff;">🔐 กรุณาระบุรหัส PIN ของเจ้าหน้าที่</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="password" id="staff-pin-input" class="text-input-field" autocomplete="current-password" required maxlength="8">
+          <button type="submit" class="start-session-btn" id="btn-submit-pin" style="padding: 10px 20px;">
           เข้าใช้งาน
-        </button>
-      </div>
+          </button>
+        </div>
+      </form>
+      <p id="staff-auth-feedback" class="session-feedback" role="status" aria-live="polite"></p>
     </section>
 
     <!-- Main Staff Dashboard -->
     <div id="staff-dashboard" style="display: none; flex-direction: column; gap: 18px;">
+      <p id="staff-data-status" class="connection-status connecting" role="status" aria-live="polite">
+        กำลังเชื่อมต่อ รอสถานะล่าสุด
+      </p>
+      <p id="staff-feedback" class="session-feedback" role="status" aria-live="polite"></p>
       
       <!-- 1. Emergency Stop (Giant Red Button) -->
       <section class="staff-section-card danger-card">
@@ -50,6 +58,34 @@
         <p style="font-size: 0.8rem; color: #fca5a5; text-align: center;">
           กดเพื่อสั่งหยุดการเคลื่อนที่ของ TurtleBot3 ทันที (Cancel Goal & Cmd_vel Zero)
         </p>
+      </section>
+
+      <!-- 1.5 Live Robot & Visitor Status Monitor (Transcript, Subtitle, Destination) -->
+      <section class="staff-section-card" id="staff-robot-status-card" style="border-color: rgba(6, 182, 212, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+          <div class="status-indicator-wrap">
+            <div class="status-dot-pulse state-idle" id="staff-robot-dot" aria-hidden="true"></div>
+            <div class="status-label-group">
+              <p style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">หุ่นยนต์กำลังทำอะไร</p>
+              <h3 id="staff-robot-state-text" style="font-size: 1.25rem; font-weight: 800; color: #fff;">กำลังรอสถานะ</h3>
+            </div>
+          </div>
+          <div class="goal-tag" style="background: rgba(34, 85, 204, 0.25); border: 1px solid #3b82f6; border-radius: 10px; padding: 6px 12px;">
+            <span style="font-size: 0.82rem; color: #93c5fd; font-weight: 700;">ปลายทาง:</span>
+            <span id="staff-robot-goal-tag" style="font-size: 0.95rem; color: #bfdbfe; font-weight: 700;">—</span>
+          </div>
+        </div>
+
+        <div class="mind-section" style="margin-top: 10px;">
+          <div class="mind-row heard" style="padding: 10px 12px; background: rgba(56, 189, 248, 0.12); border-left: 4px solid var(--accent-cyan); border-radius: 8px;">
+            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: #7dd3fc; text-transform: none;">หุ่นยนต์ได้ยินว่า:</span>
+            <span class="content" id="staff-robot-heard-text" style="font-size: 1.05rem; font-weight: 600; color: #e0f2fe; margin-top: 2px;">(ยังไม่มีคำสั่งล่าสุด)</span>
+          </div>
+          <div class="mind-row" style="padding: 10px 12px;">
+            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: var(--text-dim); text-transform: none;">คำบรรยายสถานะล่าสุด</span>
+            <span class="content" id="staff-robot-reason-text" style="font-size: 1.05rem; font-weight: 600; color: #f8fafc; margin-top: 2px;">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
+          </div>
+        </div>
       </section>
 
       <!-- 2. Recovery & Reset Actions -->
@@ -71,40 +107,40 @@
       </section>
 
       <!-- 3. Auto-Return & Timing Configuration -->
-      <section class="staff-section-card">
+      <form class="staff-section-card" id="staff-config-form">
         <h3 class="section-title">⚙️ ตั้งค่าระบบกลับจุดเริ่มต้น & เวลาคิว (Settings)</h3>
         
         <div class="form-group-row">
           <div>
-            <label style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
+            <label for="cfg-auto-return" style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
             <p style="font-size: 0.75rem; color: var(--text-dim);">เมื่อจบ Session ให้หุ่นยนต์เดินกลับมารอที่บูธเอง</p>
           </div>
           <label class="switch">
-            <input type="checkbox" id="cfg-auto-return" checked>
+            <input type="checkbox" id="cfg-auto-return" aria-label="เปิดหรือปิดเดินกลับจุดเริ่มต้นอัตโนมัติ" checked>
             <span class="slider"></span>
           </label>
         </div>
 
         <div class="form-group-row">
           <label for="cfg-timeout">เวลา Inactivity สูงสุด (วินาที):</label>
-          <input type="number" id="cfg-timeout" class="number-input" value="60" min="10" max="300">
+          <input type="number" id="cfg-timeout" class="number-input" value="120" min="10" max="600" step="1" required>
         </div>
 
         <div class="form-group-row">
           <label for="cfg-delay">ระยะเวลาหน่วงก่อนเดินกลับ (วินาที):</label>
-          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="60">
+          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="120" step="1" required>
         </div>
 
-        <button type="button" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
+        <button type="submit" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
           💾 บันทึกการตั้งค่า (Save Settings)
         </button>
-      </section>
+      </form>
 
       <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
       <section class="staff-section-card">
         <h3 class="section-title">🧪 จำลองสถานการณ์หุ่นยนต์ (Mock Perception Triggers)</h3>
         <p style="font-size: 0.78rem; color: var(--text-dim);">
-          ใช้ทดสอบการตอบสนองของระบบและหน้าจอ VR หากฮาร์ดแวร์หรือแสงในบูธมีปัญหา
+          เปลี่ยนเฉพาะสถานะจำลองที่ Backend แสดงบนหน้าเว็บ ไม่ได้รับประกันว่ามีการสั่ง Robot หรือ Unity จริง
         </p>
 
         <div class="staff-action-grid" style="grid-template-columns: 1fr 1fr;">
@@ -130,7 +166,21 @@
         </div>
       </section>
 
-      <!-- 5. Real-Time Raw State Inspection -->
+      <!-- 5. Direct Action Outcomes -->
+      <section class="staff-section-card">
+        <h3 class="section-title">🚦 ผลคำสั่ง Action จาก Staff / Auto-return</h3>
+        <div class="staff-action-result" aria-live="polite" aria-atomic="true">
+          <p class="staff-action-status" id="staff-action-status">ยังไม่มีผล Action</p>
+          <p id="staff-action-source">ผู้ส่ง: —</p>
+          <p id="staff-action-destination">ปลายทาง: —</p>
+          <p id="staff-action-error-code">รหัสข้อผิดพลาด: —</p>
+          <p id="staff-action-ros-status">สถานะ ROS: —</p>
+          <p id="staff-action-error-message">รายละเอียด: —</p>
+        </div>
+        <p class="staff-action-note">แสดงคำสั่งตรงจากหน้า Staff และ Auto-return เท่านั้น ไม่ใช่สถานะคำสั่งนำทางจาก intent.</p>
+      </section>
+
+      <!-- 6. Real-Time Raw State Inspection -->
       <section class="staff-section-card">
         <h3 class="section-title">📡 สถานะดิบล่าสุด (Live State Inspection)</h3>
         <pre id="raw-state-dump" style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #38bdf8; overflow-x: auto;">
@@ -146,8 +196,11 @@
     (function() {
       const pinSection = document.getElementById('pin-section');
       const staffDashboard = document.getElementById('staff-dashboard');
+      const pinForm = document.getElementById('staff-pin-form');
       const pinInput = document.getElementById('staff-pin-input');
       const btnSubmitPin = document.getElementById('btn-submit-pin');
+      const authFeedback = document.getElementById('staff-auth-feedback');
+      const staffFeedback = document.getElementById('staff-feedback');
 
       const btnEstop = document.getElementById('btn-emergency-stop');
       const btnReturnStart = document.getElementById('btn-return-start');
@@ -156,34 +209,105 @@
       const cfgAutoReturn = document.getElementById('cfg-auto-return');
       const cfgTimeout = document.getElementById('cfg-timeout');
       const cfgDelay = document.getElementById('cfg-delay');
-      const btnSaveConfig = document.getElementById('btn-save-config');
+      const configForm = document.getElementById('staff-config-form');
 
       const btnMockNav = document.getElementById('btn-mock-nav');
       const btnMockObstacle = document.getElementById('btn-mock-obstacle');
       const btnMockReached = document.getElementById('btn-mock-reached');
       const btnMockIdle = document.getElementById('btn-mock-idle');
       const rawStateDump = document.getElementById('raw-state-dump');
+      const dataStatus = document.getElementById('staff-data-status');
+      const actionStatus = document.getElementById('staff-action-status');
+      const actionSource = document.getElementById('staff-action-source');
+      const actionDestination = document.getElementById('staff-action-destination');
+      const actionErrorCode = document.getElementById('staff-action-error-code');
+      const actionRosStatus = document.getElementById('staff-action-ros-status');
+      const actionErrorMessage = document.getElementById('staff-action-error-message');
 
-      let currentPin = sessionStorage.getItem('staff_pin') || '';
+      const staffRobotDot = document.getElementById('staff-robot-dot');
+      const staffRobotStateText = document.getElementById('staff-robot-state-text');
+      const staffRobotGoalTag = document.getElementById('staff-robot-goal-tag');
+      const staffRobotHeardText = document.getElementById('staff-robot-heard-text');
+      const staffRobotReasonText = document.getElementById('staff-robot-reason-text');
 
-      function checkAuth() {
-        if (currentPin) {
+      let currentPin = '';
+      let authInProgress = false;
+
+      function applyConfig(data) {
+        cfgAutoReturn.checked = data.auto_return_enabled;
+        cfgTimeout.value = data.inactivity_timeout_sec;
+        cfgDelay.value = data.auto_return_delay_sec;
+      }
+
+      function clearStaffAuth(message) {
+        sessionStorage.removeItem('staff_pin');
+        currentPin = '';
+        pinSection.style.display = 'flex';
+        staffDashboard.style.display = 'none';
+        authFeedback.textContent = message;
+      }
+
+      async function authenticateStaff(candidate, fromStorage = false) {
+        if (!candidate || authInProgress) return;
+        authInProgress = true;
+        authFeedback.textContent = 'กำลังตรวจสอบ PIN...';
+        btnSubmitPin.disabled = true;
+        try {
+          const res = await fetch('/api/v1/staff/config', {
+            method: 'GET',
+            headers: { 'X-Staff-Pin': candidate }
+          });
+          if (res.status === 401) {
+            if (fromStorage) sessionStorage.removeItem('staff_pin');
+            currentPin = '';
+            pinSection.style.display = 'flex';
+            staffDashboard.style.display = 'none';
+            authFeedback.textContent = 'PIN ไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่';
+            return;
+          }
+          if (!res.ok) {
+            authFeedback.textContent = `ตรวจสอบ PIN ไม่สำเร็จ (HTTP ${res.status})`;
+            return;
+          }
+          const data = await res.json();
+          if (typeof data.auto_return_enabled !== 'boolean' ||
+              !Number.isInteger(data.inactivity_timeout_sec) ||
+              !Number.isInteger(data.auto_return_delay_sec)) {
+            authFeedback.textContent = 'ตรวจสอบ PIN ไม่สำเร็จ: ได้รับค่าตั้งค่าที่ไม่ถูกต้อง';
+            return;
+          }
+          currentPin = candidate;
+          sessionStorage.setItem('staff_pin', candidate);
+          applyConfig(data);
+          authFeedback.textContent = '';
+          staffFeedback.textContent = '';
           pinSection.style.display = 'none';
           staffDashboard.style.display = 'flex';
           loadLiveState();
+        } catch (e) {
+          console.error('Staff PIN verification failed:', e);
+          authFeedback.textContent = 'ติดต่อระบบไม่ได้ จึงยังตรวจสอบ PIN ไม่สำเร็จ';
+        } finally {
+          authInProgress = false;
+          btnSubmitPin.disabled = false;
+        }
+      }
+
+      function checkAuth() {
+        const savedPin = sessionStorage.getItem('staff_pin') || '';
+        if (savedPin) {
+          pinSection.style.display = 'flex';
+          staffDashboard.style.display = 'none';
+          authenticateStaff(savedPin, true);
         } else {
           pinSection.style.display = 'flex';
           staffDashboard.style.display = 'none';
         }
       }
 
-      btnSubmitPin.addEventListener('click', () => {
-        const val = pinInput.value.trim();
-        if (val) {
-          currentPin = val;
-          sessionStorage.setItem('staff_pin', val);
-          checkAuth();
-        }
+      pinForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        authenticateStaff(pinInput.value.trim());
       });
 
       async function staffApi(endpoint, body = {}) {
@@ -197,16 +321,20 @@
             body: JSON.stringify(body)
           });
           if (res.status === 401) {
-            alert('รหัส PIN ไม่ถูกต้อง!');
-            sessionStorage.removeItem('staff_pin');
-            currentPin = '';
-            checkAuth();
+            clearStaffAuth('การยืนยัน PIN หมดอายุ กรุณาเข้าสู่ระบบเจ้าหน้าที่อีกครั้ง');
             return null;
           }
-          return await res.json();
+          if (!res.ok) {
+            console.error(`Staff API request failed: HTTP ${res.status}`);
+            staffFeedback.textContent = `ส่งคำขอไม่สำเร็จ (HTTP ${res.status})`;
+            return null;
+          }
+          const data = await res.json();
+          staffFeedback.textContent = '';
+          return data;
         } catch (e) {
           console.error('Staff API Error:', e);
-          alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+          staffFeedback.textContent = 'ติดต่อระบบไม่ได้ คำขอยังไม่สำเร็จ';
           return null;
         }
       }
@@ -214,13 +342,13 @@
       // Actions
       btnEstop.addEventListener('click', async () => {
         const res = await staffApi('/api/v1/staff/emergency-stop');
-        if (res) alert('🚨 สั่ง EMERGENCY STOP เรียบร้อยแล้ว!');
+        if (res) alert('ส่งคำขอหยุดฉุกเฉินแล้ว');
         loadLiveState();
       });
 
       btnReturnStart.addEventListener('click', async () => {
         const res = await staffApi('/api/v1/staff/return-to-start');
-        if (res) alert('🏠 สั่งให้หุ่นยนต์กลับจุดเริ่มต้นหน้าร้านแล้ว');
+        if (res) alert('🏠 ส่งคำขอกลับจุดเริ่มต้นแล้ว ดูผลการทำงานได้ที่แผงผลคำสั่ง Action');
         loadLiveState();
       });
 
@@ -230,38 +358,150 @@
         loadLiveState();
       });
 
-      btnSaveConfig.addEventListener('click', async () => {
+      configForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const timeout = Number(cfgTimeout.value);
+        const delay = Number(cfgDelay.value);
+        if (!Number.isInteger(timeout) || timeout < 10 || timeout > 600 ||
+            !Number.isInteger(delay) || delay < 1 || delay > 120) {
+          staffFeedback.textContent = 'ค่า timeout ต้องเป็นจำนวนเต็ม 10–600 และ delay ต้องเป็นจำนวนเต็ม 1–120 วินาที';
+          return;
+        }
         const res = await staffApi('/api/v1/staff/config', {
           auto_return_enabled: cfgAutoReturn.checked,
-          inactivity_timeout_sec: parseInt(cfgTimeout.value, 10),
-          auto_return_delay_sec: parseInt(cfgDelay.value, 10)
+          inactivity_timeout_sec: timeout,
+          auto_return_delay_sec: delay
         });
-        if (res) alert('💾 บันทึกการตั้งค่าเรียบร้อยแล้ว');
-        loadLiveState();
+        if (res) {
+          applyConfig(res);
+          staffFeedback.textContent = 'บันทึกการตั้งค่าแล้ว';
+        }
       });
 
       // Mock perception
-      btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'AI_EXHIBITION' }).then(loadLiveState));
-      btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'AI_EXHIBITION', obstacle_detected: true }).then(loadLiveState));
-      btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'AI_EXHIBITION' }).then(loadLiveState));
+      btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'B' }).then(loadLiveState));
+      btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'B', obstacle_detected: true }).then(loadLiveState));
+      btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'B' }).then(loadLiveState));
       btnMockIdle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'IDLE' }).then(loadLiveState));
 
       async function loadLiveState() {
         try {
           const res = await fetch('/api/v1/state');
-          if (res.ok) {
-            const data = await res.json();
-            rawStateDump.textContent = JSON.stringify(data, null, 2);
-            cfgAutoReturn.checked = data.auto_return_enabled;
-            cfgDelay.value = data.auto_return_delay_sec;
+          if (!res.ok) {
+            setDataStatus('disconnected');
+            return;
           }
+          const data = await res.json();
+          rawStateDump.textContent = JSON.stringify(data, null, 2);
+          renderActionOutcome(data);
+          renderRobotMind(data);
+          setDataStatus('connected');
         } catch (e) {
           console.error(e);
+          setDataStatus('disconnected');
         }
       }
 
+      function setDataStatus(status) {
+        dataStatus.className = `connection-status ${status}`;
+        dataStatus.textContent = status === 'connected'
+          ? 'เชื่อมต่อแล้ว · ได้รับสถานะล่าสุด'
+          : 'ดึงสถานะไม่สำเร็จ · ข้อมูลที่แสดงอาจค้าง';
+      }
+
+      function setTextIfChanged(element, value) {
+        if (element && element.textContent !== value) element.textContent = value;
+      }
+
+      function renderActionOutcome(state) {
+        const action = state.latest_action;
+        if (!action) {
+          setTextIfChanged(actionStatus, 'ยังไม่มีผล Action');
+          setTextIfChanged(actionSource, 'ผู้ส่ง: —');
+          setTextIfChanged(actionDestination, 'ปลายทาง: —');
+          setTextIfChanged(actionErrorCode, 'รหัสข้อผิดพลาด: —');
+          setTextIfChanged(actionRosStatus, 'สถานะ ROS: —');
+          setTextIfChanged(actionErrorMessage, 'รายละเอียด: —');
+          return;
+        }
+
+        const outcomeLabels = {
+          sending: 'กำลังส่งคำสั่ง',
+          accepted: 'Robot รับงานแล้ว',
+          unavailable: 'ไม่พบ Action server',
+          rejected: 'Robot ปฏิเสธงาน',
+          succeeded: 'Action เสร็จสำเร็จ',
+          aborted: 'Action ถูกยุติ',
+          canceled: 'Action ถูกยกเลิก',
+          failed: 'Action ไม่สำเร็จ',
+          transport_error: 'ส่งหรือรับผล Action ไม่สำเร็จ'
+        };
+        const outcome = typeof action.outcome === 'string' ? action.outcome : '';
+        const status = outcomeLabels[outcome] || (outcome
+          ? `ไม่รู้จักสถานะ Action (${outcome})`
+          : 'ไม่รู้จักสถานะ Action');
+        const destination = formatGoalTarget(action.destination_id, state.locations);
+        const errorCode = action.error_code !== null && action.error_code !== undefined
+          ? String(action.error_code)
+          : '—';
+        const rosStatus = action.ros_status !== null && action.ros_status !== undefined
+          ? String(action.ros_status)
+          : '—';
+
+        setTextIfChanged(actionStatus, status);
+        setTextIfChanged(actionSource, `ผู้ส่ง: ${action.source || '—'}`);
+        setTextIfChanged(actionDestination, `ปลายทาง: ${destination}`);
+        setTextIfChanged(actionErrorCode, `รหัสข้อผิดพลาด: ${errorCode}`);
+        setTextIfChanged(actionRosStatus, `สถานะ ROS: ${rosStatus}`);
+        setTextIfChanged(actionErrorMessage, `รายละเอียด: ${action.error_msg || '—'}`);
+      }
+
+
+      function renderRobotMind(state) {
+        if (!staffRobotStateText) return;
+
+        const stateLabels = {
+          'IDLE': { label: 'พร้อมรับคำสั่ง (Idle)', class: 'state-idle' },
+          'NAVIGATING': { label: 'กำลังนำทาง (Navigating)', class: 'state-navigating' },
+          'REPLANNING': { label: 'พบสิ่งกีดขวาง กำลังคำนวณใหม่ (Replanning)', class: 'state-replanning' },
+          'REACHED': { label: 'ถึงจุดหมายแล้ว (Reached)', class: 'state-reached' },
+          'STOPPED': { label: 'หยุด/ยกเลิกการนำทาง (Stopped)', class: 'state-stopped' },
+          'NOT_READY': { label: 'ยังไม่พร้อม (Not ready)', class: 'state-stopped' },
+          'UNKNOWN': { label: 'ยังไม่ทราบสถานะ (Unknown)', class: 'state-stopped' },
+          'FAILED': { label: 'เกิดข้อผิดพลาด (Failed)', class: 'state-stopped' }
+        };
+
+        const info = stateLabels[state.robot_state] || { label: state.robot_state || 'กำลังรอสถานะ', class: 'state-idle' };
+        setTextIfChanged(staffRobotStateText, info.label);
+
+        if (staffRobotDot) {
+          staffRobotDot.className = 'status-dot-pulse ' + info.class;
+        }
+
+        if (staffRobotGoalTag) {
+          setTextIfChanged(staffRobotGoalTag, formatGoalTarget(state.current_goal, state.locations));
+        }
+
+        if (staffRobotHeardText) {
+          setTextIfChanged(staffRobotHeardText, state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งล่าสุด)');
+        }
+
+        if (staffRobotReasonText) {
+          setTextIfChanged(staffRobotReasonText, state.llm_reason || 'พร้อมรับคำสั่งจากผู้เข้าชมบูธ');
+        }
+      }
+
+      function formatGoalTarget(destinationId, locations) {
+        if (!destinationId) return '—';
+        if (destinationId === 'start') return 'จุดเริ่มต้นระบบ (start)';
+        const location = Array.isArray(locations)
+          ? locations.find(item => item && item.id === destinationId)
+          : null;
+        return location && typeof location.label === 'string' ? location.label : destinationId;
+      }
+
       setInterval(() => {
-        if (currentPin) loadLiveState();
+        if (currentPin && staffDashboard.style.display !== 'none') loadLiveState();
       }, 2000);
 
       checkAuth();

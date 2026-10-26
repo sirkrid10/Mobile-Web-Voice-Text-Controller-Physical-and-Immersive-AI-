@@ -22,11 +22,11 @@ from app.models import (
     ClaimSessionRequest, ClaimSessionResponse,
     HeartbeatResponse, DisconnectResponse,
     TextCommandRequest, CommandResponse,
-    StaffConfigUpdate, StaffMockEvent,
+    StaffConfigUpdate, StaffConfigSnapshot, StaffMockEvent,
     StateBroadcast
 )
 from app.session_manager import session_manager
-from app.stt_service import stt_service
+from app.stt_service import STTUnavailableError, stt_service
 from app.ros2_bridge import create_ros2_bridge, BaseROS2Bridge
 
 
@@ -177,24 +177,18 @@ async def claim_session(req: ClaimSessionRequest):
 
 
 @app.post("/api/v1/session/heartbeat", response_model=HeartbeatResponse, summary="Extend session timeout (Still here)")
-async def heartbeat_session(
-    x_session_token: Optional[str] = Header(None, alias="X-Session-Token"),
-    x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
-):
-    res = await session_manager.heartbeat(x_session_token, x_session_id)
+async def heartbeat_session(x_session_token: Optional[str] = Header(None, alias="X-Session-Token")):
+    if not x_session_token:
+        raise HTTPException(status_code=400, detail="Missing X-Session-Token header")
+    result = await session_manager.heartbeat(x_session_token)
     await ws_manager.broadcast_state()
-    return res
+    return result
 
 
 @app.post("/api/v1/session/disconnect", response_model=DisconnectResponse, summary="Release session & trigger auto-return")
-async def disconnect_session(
-    x_session_token: Optional[str] = Header(None, alias="X-Session-Token"),
-    x_session_id: Optional[str] = Header(None, alias="X-Session-Id")
-):
-    is_valid_token = bool(x_session_token and session_manager.active_session_token and x_session_token == session_manager.active_session_token)
-    is_valid_id = bool(x_session_id and session_manager.active_session_id and x_session_id == session_manager.active_session_id)
-    if not (is_valid_token or is_valid_id):
-        raise HTTPException(status_code=403, detail="Invalid session token or ID for active controller")
+async def disconnect_session(x_session_token: Optional[str] = Header(None, alias="X-Session-Token")):
+    if not x_session_token or x_session_token != session_manager.active_session_token:
+        raise HTTPException(status_code=403, detail="Invalid session token for active controller")
     auto_return_scheduled = await session_manager.release_session(reason="user_disconnect")
     await ws_manager.broadcast_state()
     return {"status": "disconnected", "auto_return_scheduled": auto_return_scheduled}
@@ -214,27 +208,39 @@ async def command_voice(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    active_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
 
     # Transcribe speech
-    transcript = await stt_service.transcribe_audio(audio)
-    if not transcript:
-        transcript = "พาไปที่ AI Exhibition"
+    try:
+        transcript = await stt_service.transcribe_audio(audio)
+    except STTUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="ระบบแปลงเสียงไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง") from exc
+    if not transcript or not transcript.strip():
+        raise HTTPException(status_code=422, detail="ไม่พบข้อความจากเสียง")
+    transcript = transcript.strip()
+
+    request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
 
     # Publish to ROS 2
     if ros_bridge_instance:
-        ros_bridge_instance.publish_user_transcript(
-            session_id=x_session_id,
-            input_mode="voice",
-            text=transcript
-        )
+        try:
+            ros_bridge_instance.publish_user_transcript(
+                request_id=request_id,
+                session_id=registered_session_id,
+                input_mode="voice",
+                text=transcript
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Unable to publish command: {exc}") from exc
 
     await ws_manager.broadcast_state()
     return {
         "status": "sent",
         "transcript": transcript,
         "inactivity_remaining_sec": session_manager.get_remaining_sec(),
-        "session_token": active_token
+        "request_id": request_id,
+        "session_id": registered_session_id,
+        "session_token": validated_token
     }
 
 
@@ -248,22 +254,29 @@ async def command_text(
         raise HTTPException(status_code=400, detail="Missing X-Session-Id header")
 
     # Validate claim or auto-claim
-    active_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
+    request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
 
     # Publish to ROS 2
     if ros_bridge_instance:
-        ros_bridge_instance.publish_user_transcript(
-            session_id=x_session_id,
-            input_mode=req.input_mode,
-            text=req.text
-        )
+        try:
+            ros_bridge_instance.publish_user_transcript(
+                request_id=request_id,
+                session_id=registered_session_id,
+                input_mode=req.input_mode,
+                text=req.text
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Unable to publish command: {exc}") from exc
 
     await ws_manager.broadcast_state()
     return {
         "status": "sent",
         "transcript": req.text,
         "inactivity_remaining_sec": session_manager.get_remaining_sec(),
-        "session_token": active_token
+        "request_id": request_id,
+        "session_id": registered_session_id,
+        "session_token": validated_token
     }
 
 
@@ -296,6 +309,16 @@ async def staff_update_config(req: StaffConfigUpdate, _: bool = Depends(verify_s
         "inactivity_timeout_sec": session_manager.inactivity_timeout_sec,
         "auto_return_delay_sec": session_manager.auto_return_delay_sec
     }
+
+
+@app.get("/api/v1/staff/config", response_model=StaffConfigSnapshot,
+         summary="Read staff settings after PIN verification")
+async def staff_read_config(_: bool = Depends(verify_staff_pin)):
+    return StaffConfigSnapshot(
+        auto_return_enabled=session_manager.auto_return_enabled,
+        inactivity_timeout_sec=session_manager.inactivity_timeout_sec,
+        auto_return_delay_sec=session_manager.auto_return_delay_sec,
+    )
 
 
 @app.post("/api/v1/staff/force-release", summary="Force unlock active session lock")

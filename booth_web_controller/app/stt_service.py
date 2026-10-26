@@ -6,10 +6,13 @@ local faster-whisper on WSL 2, and graceful fallback for offline booth testing.
 import os
 import tempfile
 import asyncio
-from typing import Optional
 from fastapi import UploadFile
 
 from app.config import settings
+
+
+class STTUnavailableError(Exception):
+    """The configured transcription provider could not produce a transcript."""
 
 
 class STTService:
@@ -68,7 +71,7 @@ class STTService:
                 temp_file.write(content)
 
             file_size = os.path.getsize(temp_path)
-            print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type})")
+            print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type}, provider={self.provider}, language={settings.STT_LANGUAGE})")
 
             # Route to configured provider
             if self.provider == "groq":
@@ -78,12 +81,13 @@ class STTService:
             elif self.provider == "faster_whisper":
                 return await self._transcribe_faster_whisper(temp_path)
             else:
-                return await self._transcribe_fallback(temp_path)
+                raise STTUnavailableError("Unsupported transcription provider")
 
         except Exception as e:
             print(f"[STTService] STT transcription failed with provider '{self.provider}': {e}")
-            print("[STTService] Falling back to graceful simulation transcript.")
-            return "พาไปบูธ Computer Science"
+            if isinstance(e, STTUnavailableError):
+                raise
+            raise STTUnavailableError("Transcription provider failed") from e
         finally:
             if temp_path and os.path.exists(temp_path):
                 try:
@@ -94,10 +98,12 @@ class STTService:
     async def _transcribe_groq(self, file_path: str) -> str:
         try:
             client = self._get_groq_client()
+            print(f"[STTService] Groq model={settings.STT_GROQ_MODEL}, language={settings.STT_LANGUAGE}")
             with open(file_path, "rb") as audio:
                 transcription = await client.audio.transcriptions.create(
-                    model="whisper-large-v3-turbo",
+                    model=settings.STT_GROQ_MODEL,
                     file=audio,
+                    language=settings.STT_LANGUAGE,
                     prompt=settings.STT_INITIAL_PROMPT,
                     temperature=0.0
                 )
@@ -105,8 +111,7 @@ class STTService:
             print(f"[STTService] Groq transcription: '{result}'")
             return result
         except Exception as e:
-            print(f"[STTService] Groq failed: {e}. Falling back to fallback mock...")
-            return await self._transcribe_fallback(file_path)
+            raise STTUnavailableError("Groq transcription failed") from e
 
     async def _transcribe_openai(self, file_path: str) -> str:
         try:
@@ -115,6 +120,7 @@ class STTService:
                 transcription = await client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio,
+                    language=settings.STT_LANGUAGE,
                     prompt=settings.STT_INITIAL_PROMPT,
                     temperature=0.0
                 )
@@ -122,14 +128,14 @@ class STTService:
             print(f"[STTService] OpenAI transcription: '{result}'")
             return result
         except Exception as e:
-            print(f"[STTService] OpenAI failed: {e}. Falling back to fallback mock...")
-            return await self._transcribe_fallback(file_path)
+            raise STTUnavailableError("OpenAI transcription failed") from e
 
     async def _transcribe_faster_whisper(self, file_path: str) -> str:
         def _run_model():
             model = self._get_local_model()
             segments, info = model.transcribe(
                 file_path,
+                language=settings.STT_LANGUAGE,
                 initial_prompt=settings.STT_INITIAL_PROMPT,
                 vad_filter=True
             )
@@ -138,10 +144,7 @@ class STTService:
 
         result = await asyncio.to_thread(_run_model)
         print(f"[STTService] faster-whisper transcription: '{result}'")
-        return result or "พาไปที่ AI Exhibition"
-
-    async def _transcribe_fallback(self, file_path: str) -> str:
-        return "พาไปบูธ Computer Science"
+        return result
 
 
 stt_service = STTService()

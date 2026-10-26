@@ -5,7 +5,7 @@ Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 """
 
 from typing import List, Dict, Any
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,25 +24,41 @@ class Settings(BaseSettings):
     STAFF_PIN: str = "1234"
 
     # Session & Auto-Return Timing (Seconds)
-    INACTIVITY_TIMEOUT_SEC: int = 60
+    INACTIVITY_TIMEOUT_SEC: int = 120
     WARNING_THRESHOLD_SEC: int = 15
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5
-    START_BOOTH_ID: str = "start"
+    START_BOOTH_ID: str = "A"
+    DIRECT_ACTION_VALIDITY_SEC: float = 30.0
+
+    @field_validator("START_BOOTH_ID")
+    @classmethod
+    def validate_start_booth(cls, value: str) -> str:
+        if value not in ("A", "B", "C"):
+            raise ValueError("START_BOOTH_ID must use the Robot A/B/C contract; set A for return")
+        return value
+
+    @field_validator("DIRECT_ACTION_VALIDITY_SEC")
+    @classmethod
+    def validate_direct_action_validity(cls, value: float) -> float:
+        import math
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("DIRECT_ACTION_VALIDITY_SEC must be finite and greater than zero")
+        return value
 
     # Speech-to-Text (STT) Settings: "groq" | "openai" | "faster_whisper"
     STT_PROVIDER: str = "groq"
+    STT_LANGUAGE: str = "th"
+    STT_GROQ_MODEL: str = "whisper-large-v3"
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (
         "บทสนทนาสั่งงานหุ่นยนต์ TurtleBot3 ภาษาไทยผสมอังกฤษ (Code-Switching): "
-        "พาไปบูธ Computer Science, ช่วยพาไปบูธ CS, เดินไป booth 09 วิทยาการคอมพิวเตอร์, "
-        "พาไปบูธ Mathematics and Statistics, ไปบูธ Math and Stat, booth 10 คณิตศาสตร์และสถิติ, "
-        "กลับไปที่จุด Start, return to start point, หยุดรอตรงนี้, stop, wait here. "
-        "Take me to Computer Science booth 09, Mathematics and Statistics booth 10, "
-        "navigate to CS, go to Math and Stat, return to start."
+        "จุด A, จุดเอ, A, เอ, จุด B, จุดบี, B, บี, จุด C, จุดซี, C, ซี, "
+        "กลับจุดเริ่มต้น, กลับ start, จุดเริ่มต้น, start point. "
+        "Go to point A, point B, point C, return to start."
     )
 
     # ROS 2 Integration Override
@@ -52,31 +68,38 @@ class Settings(BaseSettings):
     LOCATIONS: List[Dict[str, Any]] = Field(
         default_factory=lambda: [
             {
-                "id": "booth_09",
-                "label": "📍 บูธ 09: วิทยาการคอมพิวเตอร์",
-                "prompt": "พาไปบูธคอมพิวเตอร์",
-                "description": "บูธ 09 ภาควิชาวิทยาการคอมพิวเตอร์",
+                "id": "A",
+                "label": "📍 จุด A",
+                "prompt": "ไปจุด A",
+                "description": "พาไปจุด A",
                 "icon": "code"
             },
             {
-                "id": "booth_10",
-                "label": "📍 บูธ 10: คณิตศาสตร์และสถิติ",
-                "prompt": "พาไปบูธคณิตศาสตร์และสถิติ",
-                "description": "บูธ 10 ภาควิชาคณิตศาสตร์และสถิติ",
+                "id": "B",
+                "label": "📍 จุด B",
+                "prompt": "ไปจุด B",
+                "description": "พาไปจุด B",
                 "icon": "calculator"
             },
             {
+                "id": "C",
+                "label": "📍 จุด C",
+                "prompt": "ไปจุด C",
+                "description": "พาไปจุด C",
+                "icon": "map-pin"
+            },
+            {
                 "id": "start",
-                "label": "🏠 กลับจุดรอเริ่มต้น (Start Point)",
+                "label": "🏠 กลับจุดเริ่มต้น (จุด A)",
                 "prompt": "กลับจุดเริ่มต้น",
                 "description": "จุดรอสแกน QR Code หน้าบูธ",
                 "icon": "home"
             },
             {
                 "id": "wait",
-                "label": "⏸️ หยุดรอตรงนี้ก่อน (Wait)",
+                "label": "⏸️ ส่งคำขอรอ (ยังไม่รองรับ)",
                 "prompt": "หยุดรอตรงนี้ก่อน",
-                "description": "หยุดรอคำสั่งถัดไปชั่วคราว",
+                "description": "ส่งคำขอรอผ่านระบบแปลคำสั่ง (ยังไม่รองรับ)",
                 "icon": "pause"
             }
         ]
