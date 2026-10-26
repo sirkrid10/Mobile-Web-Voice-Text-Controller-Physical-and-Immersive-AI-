@@ -197,7 +197,7 @@ nano .env
 | `HOST` | `0.0.0.0` | Bind IP for Web Server |
 | `PORT` | `8000` | Port for Web Server |
 | `STAFF_PIN` | `1234` | 4-digit PIN for staff panel access (`/staff`) |
-| `INACTIVITY_TIMEOUT_SEC` | `60` | Inactivity countdown seconds before session unlock |
+| `INACTIVITY_TIMEOUT_SEC` | `120` | Inactivity countdown seconds before session unlock |
 | `AUTO_RETURN_ENABLED` | `true` | Automatically return to Start Booth upon session end |
 | `AUTO_RETURN_DELAY_SEC` | `5` | Grace period (seconds) before triggering Auto-Return |
 | `START_BOOTH_ID` | `start` | Canonical location identifier for the starting booth |

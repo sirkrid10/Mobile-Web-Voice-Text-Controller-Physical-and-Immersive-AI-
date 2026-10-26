@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     STAFF_PIN: str = "1234"
 
     # Session & Auto-Return Timing (Seconds)
-    INACTIVITY_TIMEOUT_SEC: int = 60
+    INACTIVITY_TIMEOUT_SEC: int = 120
     WARNING_THRESHOLD_SEC: int = 15
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5

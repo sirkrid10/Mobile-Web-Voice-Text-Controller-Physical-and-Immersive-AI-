@@ -1106,6 +1106,10 @@ input:checked + .slider:before {
   font-family: 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif;
 }
 
+body.visitor-page {
+  overflow-x: clip;
+}
+
 .visitor-page .app-container {
   width: min(100%, 1120px);
   max-width: 1120px;
@@ -1363,12 +1367,15 @@ input:checked + .slider:before {
 }
 
 .visitor-page .session-bar {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 100;
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--visitor-line);
   border-radius: 13px;
   background: var(--visitor-surface);
-  box-shadow: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .visitor-page .session-info { min-width: 0; }
