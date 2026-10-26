@@ -139,13 +139,14 @@ async def _run_integration(monkeypatch):
         return response
 
     try:
-        await wait_for(lambda: session_manager.robot_state == "IDLE", description="Robot HOME readiness")
+        await wait_for(lambda: session_manager.robot_state == "IDLE", description="Robot READY readiness")
 
         for text, destination, input_mode in (
             ("ไปจุด A", "A", "text"),
             ("พาไปจุด บี", "B", "chip"),
             ("ไปจุด C", "C", "chip"),
             ("กลับ start", "A", "chip"),
+            ("ไปจุด B อีกครั้ง", "B", "text"),
         ):
             response = await submit_text(text, destination, input_mode)
             outcome = session_manager.latest_intent
@@ -162,18 +163,22 @@ async def _run_integration(monkeypatch):
                 lambda: intent.controller._active is None,
                 description=f"terminal Action result for {destination}",
             )
+            await wait_for(
+                intent.controller._robot_ready,
+                description=f"new Robot readiness heartbeat after {destination}",
+            )
 
-        # Auto-return after a visitor trip remains a direct system goal to start.
+        # Auto-return uses the same A/B/C Action contract, targeting A.
         assert await session_manager.release_session(reason="user_disconnect")
         await wait_for(
             lambda: session_manager.latest_action is not None
             and session_manager.latest_action.source == "auto_return"
-            and session_manager.latest_action.destination_id == "start",
-            description="auto-return direct start Action",
+            and session_manager.latest_action.destination_id == "A",
+            description="auto-return direct A Action",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "start" and session_manager.robot_state == "IDLE",
-            description="auto-return HOME",
+            lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
+            description="auto-return ARRIVED at A",
         )
 
         claim = await session_manager.claim("integration-visitor")
@@ -219,7 +224,7 @@ async def _run_integration(monkeypatch):
         await session_manager.return_to_start_now()
         staff_action_id = session_manager.latest_action.request_id
         assert session_manager.latest_action.source == "staff_override"
-        assert session_manager.latest_action.destination_id == "start"
+        assert session_manager.latest_action.destination_id == "A"
         await wait_for(
             lambda: session_manager.robot_state == "NAVIGATING",
             description="staff Return Home Robot motion",
@@ -238,7 +243,7 @@ async def _run_integration(monkeypatch):
         assert busy.request_id != staff_action_id
         assert busy.session_id == "integration-visitor"
         assert session_manager.latest_action.request_id == staff_action_id
-        assert session_manager.latest_action.destination_id == "start"
+        assert session_manager.latest_action.destination_id == "A"
         assert visitor_request_id not in {
             state.request_id for state in observer.navigation
         }
@@ -247,14 +252,13 @@ async def _run_integration(monkeypatch):
             description="busy Subtitle through SubtitleNode to thought",
         )
         await wait_for(
-            lambda: "หุ่นยังไม่ว่าง" not in session_manager.llm_explanation
-            and "กลับ" in session_manager.llm_explanation,
+            lambda: "หุ่นยังไม่ว่าง" not in session_manager.llm_explanation,
             timeout=2,
-            description="busy subtitle expiry exposes fresh navigation thought",
+            description="busy subtitle expires without replaying consumed navigation",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "start" and session_manager.robot_state == "IDLE",
-            description="staff Return Home completion",
+            lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
+            description="staff return ARRIVED at A",
         )
 
         # A successful voice transcript follows the same UserRequest and Action flow.

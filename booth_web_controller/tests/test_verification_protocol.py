@@ -3,7 +3,7 @@ Uses FastAPI TestClient to test:
 1. Session Lock Exclusivity Test (dev-A vs dev-B 409 Conflict)
 2. ROS 2 Bridge Publication & Text/Chip Commands (/guide/user_request)
 3. Smart Navigation Timer Pause Test (paused during NAVIGATING/REPLANNING)
-4. Auto-Return to Start Booth on Disconnect Test (target: start)
+4. Auto-Return to Start Booth on Disconnect Test (target: A)
 5. Staff PIN Authentication & Emergency Stop
 6. Voice Audio Command Processing (with fallback)
 """
@@ -44,6 +44,18 @@ def reset_session_state():
     session_manager._lock = asyncio.Lock()
     yield
     session_manager.set_broadcast_callback(None)
+
+
+@pytest.mark.parametrize("target", ["A", "B", "C", "start"])
+def test_robot_return_config_accepts_only_abc(target):
+    from app.config import Settings
+    from pydantic import ValidationError
+
+    if target == "start":
+        with pytest.raises(ValidationError, match="Robot A/B/C contract"):
+            Settings(START_BOOTH_ID=target)
+    else:
+        assert Settings(START_BOOTH_ID=target).START_BOOTH_ID == target
 
 
 def test_session_lock_exclusivity():
@@ -429,7 +441,7 @@ def test_staff_return_home_replaces_active_mock_visitor_navigation():
         bridge = MockROS2Bridge(session_manager, asyncio.get_running_loop())
         session_manager.set_ros_bridge(bridge)
         session_manager.latest_action = None
-        session_manager.update_from_ros_state(state="IDLE", goal="start")
+        session_manager.update_from_ros_state(state="IDLE", goal="A")
         bridge._start_navigation_simulation("B")
         visitor_task = bridge._sim_task
         await asyncio.sleep(0)
@@ -439,16 +451,16 @@ def test_staff_return_home_replaces_active_mock_visitor_navigation():
         staff_task = bridge._sim_task
 
         assert staff_task is not visitor_task
-        assert session_manager.current_goal == "start"
-        assert session_manager.latest_action.destination_id == "start"
+        assert session_manager.current_goal == "A"
+        assert session_manager.latest_action.destination_id == "A"
         assert session_manager.latest_action.source == "staff_override"
         assert session_manager.latest_action.outcome == "accepted"
 
         await asyncio.wrap_future(staff_task)
-        assert session_manager.current_goal == "start"
+        assert session_manager.current_goal == "A"
         assert session_manager.latest_action.request_id == staff_action_id
         assert session_manager.latest_action.outcome == "succeeded"
-        assert session_manager.robot_state == "IDLE"
+        assert session_manager.robot_state == "REACHED"
         bridge.shutdown()
         session_manager.set_ros_bridge(None)
 
@@ -618,7 +630,7 @@ def test_auto_return_on_disconnect():
         token = claim_res.json()["session_token"]
 
         # Navigate away from start
-        session_manager.current_goal = "A"
+        session_manager.current_goal = "B"
         session_manager.robot_state = "REACHED"
         session_manager.auto_return_delay_sec = 1  # 1s for testing
 
@@ -633,7 +645,20 @@ def test_auto_return_on_disconnect():
 
         # Wait for delayed auto-return task to trigger
         time.sleep(1.3)
-        assert session_manager.current_goal == settings.START_BOOTH_ID  # "start"
+        assert session_manager.current_goal == settings.START_BOOTH_ID == "A"
+
+
+def test_disconnect_at_a_does_not_schedule_redundant_return():
+    with TestClient(app) as client:
+        claim = client.post("/api/v1/session/claim", json={"session_id": "at-a"})
+        token = claim.json()["session_token"]
+        session_manager.current_goal = "A"
+        session_manager.robot_state = "REACHED"
+        response = client.post(
+            "/api/v1/session/disconnect", headers={"X-Session-Token": token}
+        )
+        assert response.status_code == 200
+        assert response.json()["auto_return_scheduled"] is False
 
 
 def test_staff_pin_security_and_emergency_stop():

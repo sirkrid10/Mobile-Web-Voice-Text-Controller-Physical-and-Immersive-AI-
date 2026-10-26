@@ -283,9 +283,8 @@ class MockROS2Bridge(BaseROS2Bridge):
                 print(f"[ROS2Bridge Mock] Navigating towards {target}...")
                 await asyncio.sleep(4.0)
 
-                # 2. Reached destination (phase: ARRIVED or HOME)
-                final_state = "IDLE" if target == "start" else "REACHED"
-                self.session_manager.update_from_ros_state(state=final_state, goal=target)
+                # A/B/C, including return to A, all finish at ARRIVED.
+                self.session_manager.update_from_ros_state(state="REACHED", goal=target)
                 self.session_manager.update_from_llm_mind(
                     heard_text=self.session_manager.heard_text,
                     target=target,
@@ -299,7 +298,7 @@ class MockROS2Bridge(BaseROS2Bridge):
                         error_code=0,
                         error_msg="Mock navigation completed",
                     ))
-                print(f"[ROS2Bridge Mock] Reached destination {target} ({final_state})!")
+                print(f"[ROS2Bridge Mock] Reached destination {target} (REACHED)!")
             except asyncio.CancelledError:
                 if action_context:
                     self.session_manager.record_action_outcome(DirectActionOutcome(

@@ -28,8 +28,15 @@ class Settings(BaseSettings):
     WARNING_THRESHOLD_SEC: int = 15
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5
-    START_BOOTH_ID: str = "start"
+    START_BOOTH_ID: str = "A"
     DIRECT_ACTION_VALIDITY_SEC: float = 30.0
+
+    @field_validator("START_BOOTH_ID")
+    @classmethod
+    def validate_start_booth(cls, value: str) -> str:
+        if value not in ("A", "B", "C"):
+            raise ValueError("START_BOOTH_ID must use the Robot A/B/C contract; set A for return")
+        return value
 
     @field_validator("DIRECT_ACTION_VALIDITY_SEC")
     @classmethod
