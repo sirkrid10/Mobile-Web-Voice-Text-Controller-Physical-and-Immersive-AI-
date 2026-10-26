@@ -48,6 +48,44 @@
 
   const btnClaim = document.getElementById('btn-claim-session');
   const btnDisconnect = document.getElementById('btn-disconnect');
+  const btnThemeToggle = document.getElementById('btn-theme-toggle');
+
+  // --------------------------------------------------------------------------
+  // Theme Toggle (Dark / Light Mode)
+  // --------------------------------------------------------------------------
+  function applyTheme(theme) {
+    const bodyEl = typeof document !== 'undefined' ? document.body : null;
+    if (bodyEl && bodyEl.setAttribute) {
+      if (theme === 'dark') {
+        bodyEl.setAttribute('data-theme', 'dark');
+      } else if (bodyEl.removeAttribute) {
+        bodyEl.removeAttribute('data-theme');
+      }
+    }
+  }
+
+  function initTheme() {
+    try {
+      const savedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null;
+      const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+      applyTheme(initialTheme);
+    } catch (e) {}
+
+    if (btnThemeToggle) {
+      btnThemeToggle.addEventListener('click', () => {
+        const bodyEl = typeof document !== 'undefined' ? document.body : null;
+        const isDark = bodyEl && bodyEl.getAttribute && bodyEl.getAttribute('data-theme') === 'dark';
+        const newTheme = isDark ? 'light' : 'dark';
+        applyTheme(newTheme);
+        try {
+          if (typeof localStorage !== 'undefined') localStorage.setItem('theme', newTheme);
+        } catch (e) {}
+      });
+    }
+  }
+
+  initTheme();
   const btnExtend = document.getElementById('btn-extend-time');
   const warningBanner = document.getElementById('warning-banner');
 

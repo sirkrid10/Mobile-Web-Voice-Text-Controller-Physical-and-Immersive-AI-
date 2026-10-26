@@ -1624,3 +1624,264 @@ input:checked + .slider:before {
   .visitor-page .mic-pulse-ring { animation: none !important; }
   .visitor-page .wave-bar { height: 8px; }
 }
+
+
+/* --------------------------------------------------------------------------
+   Visitor Page Theme Toggle Button & Dark Mode System
+   -------------------------------------------------------------------------- */
+.visitor-page .theme-toggle-btn {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--visitor-line);
+  border-radius: 11px;
+  background: var(--visitor-surface);
+  color: var(--visitor-muted);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  touch-action: manipulation;
+}
+
+.visitor-page .theme-toggle-btn:hover {
+  background: #edf3f1;
+  color: var(--visitor-ink);
+}
+
+.visitor-page .theme-toggle-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.visitor-page .theme-toggle-btn .sun-icon {
+  display: none;
+}
+
+.visitor-page .theme-toggle-btn .moon-icon {
+  display: block;
+}
+
+/* Dark Mode Overrides */
+.visitor-page[data-theme="dark"] {
+  --visitor-ink: #f8fafc;
+  --visitor-muted: #cbd5e1;
+  --visitor-line: #334155;
+  --visitor-surface: #1e293b;
+  --visitor-canvas: #0f172a;
+  --visitor-accent: #38bdf8;
+  --visitor-accent-dark: #0284c7;
+  --visitor-red: #fb7185;
+  --status-idle: #34d399;
+  --status-nav: #38bdf8;
+  --status-replan: #fbbf24;
+  --status-stop: #f43f5e;
+  --status-reached: #c084fc;
+  background: var(--visitor-canvas);
+  color: var(--visitor-ink);
+}
+
+.visitor-page[data-theme="dark"] .brand-titles h1 {
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .brand-titles p {
+  color: #94a3b8;
+}
+
+.visitor-page[data-theme="dark"] .theme-toggle-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .theme-toggle-btn:hover {
+  background: #334155;
+  color: #38bdf8;
+}
+
+.visitor-page[data-theme="dark"] .theme-toggle-btn .sun-icon {
+  display: block;
+  color: #fbbf24;
+}
+
+.visitor-page[data-theme="dark"] .theme-toggle-btn .moon-icon {
+  display: none;
+}
+
+.visitor-page[data-theme="dark"] .staff-link-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.visitor-page[data-theme="dark"] .staff-link-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .view-state-card,
+.visitor-page[data-theme="dark"] .robot-card,
+.visitor-page[data-theme="dark"] .command-panel,
+.visitor-page[data-theme="dark"] .session-bar {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.visitor-page[data-theme="dark"] .view-state-title,
+.visitor-page[data-theme="dark"] .status-label-group h2,
+.visitor-page[data-theme="dark"] .command-panel-heading h2 {
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .view-state-desc,
+.visitor-page[data-theme="dark"] .command-panel-heading p {
+  color: #cbd5e1;
+}
+
+.visitor-page[data-theme="dark"] .icon-available {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.visitor-page[data-theme="dark"] .start-session-btn {
+  border-color: #38bdf8;
+  background: #0284c7;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
+.visitor-page[data-theme="dark"] .start-session-btn:hover {
+  background: #0369a1;
+}
+
+.visitor-page[data-theme="dark"] .session-badge {
+  border-color: #065f46;
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+.visitor-page[data-theme="dark"] .disconnect-btn {
+  border-color: #881337;
+  background: #4c0519;
+  color: #fda4af;
+}
+
+.visitor-page[data-theme="dark"] .disconnect-btn:hover {
+  background: #701a35;
+  color: #fff;
+}
+
+.visitor-page[data-theme="dark"] .status-label-group .status-kicker,
+.visitor-page[data-theme="dark"] .section-title,
+.visitor-page[data-theme="dark"] .mind-row .title,
+.visitor-page[data-theme="dark"] .intent-result-card h2 {
+  color: #94a3b8;
+}
+
+.visitor-page[data-theme="dark"] .goal-tag {
+  border-color: #1e40af;
+  background: #172554;
+  color: #60a5fa;
+}
+
+.visitor-page[data-theme="dark"] .goal-label {
+  color: #93c5fd;
+}
+
+.visitor-page[data-theme="dark"] .mind-row {
+  border-top-color: #334155;
+}
+
+.visitor-page[data-theme="dark"] .mind-row .content {
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .mind-row.heard {
+  background: #172554;
+  border-left-color: #38bdf8;
+}
+
+.visitor-page[data-theme="dark"] .mind-row.heard .content {
+  color: #60a5fa;
+}
+
+.visitor-page[data-theme="dark"] .mic-button {
+  background: #0284c7;
+  border-color: #38bdf8;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+}
+
+.visitor-page[data-theme="dark"] .mic-button:hover {
+  background: #0369a1;
+}
+
+.visitor-page[data-theme="dark"] .wave-bar {
+  background: #38bdf8;
+}
+
+.visitor-page[data-theme="dark"] .mic-hint {
+  color: #94a3b8;
+}
+
+.visitor-page[data-theme="dark"] .chip-btn {
+  border-color: #0284c7;
+  background: #1e293b;
+  color: #38bdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.visitor-page[data-theme="dark"] .chip-btn:hover {
+  border-color: #38bdf8;
+  background: #0369a1;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);
+}
+
+.visitor-page[data-theme="dark"] .chip-btn:active {
+  background: #0c4a6e;
+}
+
+.visitor-page[data-theme="dark"] .text-input-field {
+  border-color: #475569;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.visitor-page[data-theme="dark"] .text-input-field::placeholder {
+  color: #64748b;
+}
+
+.visitor-page[data-theme="dark"] .text-input-field:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.visitor-page[data-theme="dark"] .send-btn {
+  border-color: #38bdf8;
+  background: #0284c7;
+  color: #fff;
+}
+
+.visitor-page[data-theme="dark"] .send-btn:hover {
+  background: #0369a1;
+}
+
+.visitor-page[data-theme="dark"] .intent-result-card {
+  border-top-color: #38bdf8;
+}
+
+.visitor-page[data-theme="dark"] .intent-result-status {
+  color: #f8fafc;
+}
+
+.visitor-page[data-theme="dark"] .intent-result-message {
+  color: #93c5fd;
+}
+
+.visitor-page[data-theme="dark"] .intent-result-detail {
+  color: #94a3b8;
+}
