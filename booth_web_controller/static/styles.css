@@ -1444,27 +1444,30 @@ input:checked + .slider:before {
 .visitor-page .command-panel-heading h2 { color: var(--visitor-ink); font-size: 1.35rem; font-weight: 800; line-height: 1.4; }
 .visitor-page .command-panel-heading p { margin-top: 2px; color: var(--visitor-muted); font-size: 1.02rem; font-weight: 500; line-height: 1.5; }
 .visitor-page .mic-control-section { min-width: 0; gap: 8px; padding: 8px 0; }
-.visitor-page .mic-button-wrapper { width: 124px; height: 124px; }
+.visitor-page .mic-button-wrapper { width: 140px; height: 140px; }
 .visitor-page .mic-pulse-ring { background: rgba(34, 85, 204, 0.14); }
 
 .visitor-page .mic-button {
-  width: 100px;
-  height: 100px;
-  gap: 5px;
-  border: 2px solid #fff;
+  width: 118px;
+  height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
   background: var(--visitor-accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(34, 85, 204, 0.24);
+  box-shadow: 0 4px 16px rgba(34, 85, 204, 0.28);
   touch-action: none;
 }
 
-.visitor-page .mic-button:hover { background: var(--visitor-accent-dark); box-shadow: 0 2px 8px rgba(34, 85, 204, 0.24); transform: none; }
-.visitor-page .mic-button:active { transform: scale(0.97); }
+.visitor-page .mic-button:hover { background: var(--visitor-accent-dark); box-shadow: 0 4px 18px rgba(34, 85, 204, 0.32); transform: none; }
+.visitor-page .mic-button:active { transform: scale(0.96); }
 .visitor-page .mic-button.recording,
-.visitor-page .mic-button.recording:hover { background: var(--visitor-red); box-shadow: 0 0 0 4px rgba(165, 45, 60, 0.14); }
+.visitor-page .mic-button.recording:hover { background: var(--visitor-red); box-shadow: 0 0 0 5px rgba(165, 45, 60, 0.18); }
 .visitor-page .mic-button:disabled { background: #52635d; color: #fff; opacity: 1; }
-.visitor-page .mic-icon { width: 28px; height: 28px; font-size: initial; }
-.visitor-page .mic-label { max-width: 100px; color: #fff; font-family: inherit; font-size: 0.95rem; font-weight: 800; letter-spacing: 0; line-height: 1.3; text-align: center; text-transform: none; }
+.visitor-page .mic-icon { width: 48px; height: 48px; font-size: initial; }
+.visitor-page .mic-label { display: none; }
 .visitor-page .waveform-container { height: 20px; }
 .visitor-page .wave-bar { background: var(--visitor-accent); }
 .visitor-page .mic-hint { width: 100%; color: var(--visitor-muted); font-size: 1.05rem; font-weight: 600; line-height: 1.55; overflow-wrap: anywhere; }
