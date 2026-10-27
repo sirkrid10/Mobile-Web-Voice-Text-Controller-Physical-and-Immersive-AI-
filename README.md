@@ -140,6 +140,49 @@ bash tests/test_run_booth.sh
 
 ติดตั้ง Tailscale ภายใน Ubuntu WSL ที่รัน ROS ปิด Tailscale ฝั่ง Windows และให้ VM/Pi อนุญาตการติดต่อผ่าน tailnet ติดตั้งชุดล่าสุดของ repo `turtlebot-llm` ไว้เป็นโฟลเดอร์ข้าง repo นี้ และ build `ai_interfaces` กับ `agent_pkg` ตามคู่มือ LLM ก่อน
 
+### เตรียม Tailscale ก่อนเปิดระบบ
+
+ใช้ Tailscale ภายใน Ubuntu WSL และ Disconnect ตัวบน Windows ฝั่ง VM และ Pi ที่รับส่ง DDS ต้องออนไลน์ผ่าน Tailscale และอนุญาตการติดต่อกับเครื่อง LLM ด้วย
+
+ตรวจสถานะจาก Ubuntu WSL ก่อนเปิด ROS:
+
+```bash
+tailscale status
+tailscale ip -4
+ip -4 addr show tailscale0
+```
+
+ต้องเห็น Tailscale IP ของ WSL บน `tailscale0` และเห็น VM `100.127.193.83` อยู่ในรายการ หาก Tailscale ยังไม่ได้เชื่อมต่อ:
+
+```bash
+sudo tailscale up
+```
+
+หากคำสั่งแจ้งว่าติดต่อ Tailscale daemon ไม่ได้ ให้เริ่ม service แล้วเชื่อมต่ออีกครั้ง:
+
+```bash
+sudo systemctl start tailscaled
+sudo tailscale up
+```
+
+หากต้องการให้ daemon เริ่มอัตโนมัติเมื่อ Ubuntu WSL เริ่มทำงาน ให้ตั้งครั้งเดียว:
+
+```bash
+sudo systemctl enable tailscaled
+```
+
+หากมีลิงก์ login ให้เปิดและยืนยันด้วยบัญชีที่ได้รับอนุญาตเข้าถึง VM ไม่ต้อง login ใหม่ทุกครั้ง ตรวจเส้นทางไป VM ก่อนรันระบบได้ด้วย:
+
+```bash
+tailscale ping 100.127.193.83
+```
+
+การ ping สำเร็จยืนยันเส้นทาง Tailscale เท่านั้น ยังต้องตรวจ ROS ด้วย probe หรือ echo ตามคำสั่งด้านล่าง
+
+### หลังเปลี่ยน Wi-Fi หรือ hotspot
+
+ใช้คำสั่ง `run_tailscale.sh` เดิมได้โดยไม่ต้องเปลี่ยน IP Wi-Fi ใน config ตราบใดที่ Tailscale IP ของ VM ยังเดิมและทุกเครื่องติดต่อกันได้ ตรวจ `tailscale status` และ `tailscale ping 100.127.193.83` ก่อน หาก ROS ไม่กลับมาเชื่อมเอง ให้ยืนยันว่าไม่มี Goal ค้างและหุ่นอยู่ในสถานะที่เหมาะสมก่อนหยุดชุดเดิม แล้วเปิด intent, subtitle และ Backend ใหม่ด้วยคำสั่ง Tailscale ด้านล่าง อย่าเปิด node ซ้อนหรือ source สคริปต์ LAN ทับ
+
 เมื่อไม่มี Goal ค้าง ให้หยุด Backend เดิมก่อนเปิดด้วย terminal เฉพาะ:
 
 ```bash
