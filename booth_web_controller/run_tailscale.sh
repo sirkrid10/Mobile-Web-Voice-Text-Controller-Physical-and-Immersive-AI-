@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ $# -gt 1 || "${1:-}" == --help || "${1:-}" == -h ]]; then
+    echo "Usage: bash $0 [VM_TAILSCALE_IP]"
+    exit
+fi
+export TURTLEBOT_TAILSCALE_SERVER_IP="${1:-${TURTLEBOT_TAILSCALE_SERVER_IP:-100.127.193.83}}"
+export TURTLEBOT_SETUP_SCRIPT="${SCRIPT_DIR}/../../turtlebot-llm/setup_tailscale_ros.sh"
+unset ROS_DOMAIN_ID ROS_AUTOMATIC_DISCOVERY_RANGE ROS_DISCOVERY_SERVER
+unset FASTRTPS_DEFAULT_PROFILES_FILE FASTDDS_DEFAULT_PROFILES_FILE
+unset ROS_LOCALHOST_ONLY ROS_STATIC_PEERS ROS_SUPER_CLIENT FASTDDS_BUILTIN_TRANSPORTS
+unset TURTLEBOT_FASTDDS_PROFILE ROBOT_SUPER_CLIENT_XML
+export ROS_PROFILE=robot USE_MOCK_ROS2=false RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export TURTLEBOT_START_ROS_DAEMON=0
+exec bash "$SCRIPT_DIR/run_booth.sh"

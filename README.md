@@ -332,3 +332,30 @@ python3 -c 'import rclpy, ai_interfaces; print(rclpy.__file__); print(ai_interfa
 ### ได้ผล NAVIGATE แต่หุ่นไม่เดิน หรือคำสั่งถัดไปค้าง
 
 NAVIGATE ยืนยันการตีความเท่านั้น จับคู่ request ID ใน UserRequest, IntentResult, NavigationState และ log Action ตรวจว่า goal เดิมมี terminal result แล้ว มี heartbeat ใหม่พร้อม `ready_for_goal=true` และ valid_until ของ goal ใหม่ยังไม่หมดอายุ อย่าเพิ่ม freshness หรือข้าม readiness เพื่อกลบอาการ ปัญหาการรับหลาย goal ต่อเนื่องยังต้องวินิจฉัยจาก log ของแต่ละคำขอ
+
+
+## รัน Backend ผ่าน Tailscale
+
+ติดตั้ง Tailscale ภายใน Ubuntu WSL ที่รัน ROS ปิด Tailscale ฝั่ง Windows และให้ VM/Pi อนุญาตการติดต่อผ่าน tailnet ติดตั้งชุดล่าสุดของ repo `turtlebot-llm` ไว้เป็นโฟลเดอร์ข้าง repo นี้ และ build `ai_interfaces` กับ `agent_pkg` ตามคู่มือ LLM ก่อน
+
+เมื่อไม่มี Goal ค้าง ให้หยุด Backend เดิมก่อนเปิดด้วย terminal เฉพาะ:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh
+```
+
+Launcher โหลด `turtlebot-llm/setup_tailscale_ros.sh` ใช้ ROS จริง, domain 30, Discovery Server `100.127.193.83:11811` และ DDS profile เดียวกับ intent/subtitle ไม่ต้อง source สคริปต์ LAN ก่อน และห้าม source ทับภายหลัง
+
+เปิด intent และ subtitle แยก terminal จาก repo LLM ด้วย `bash run_tailscale.sh intent` และ `bash run_tailscale.sh subtitle` หาก VM เปลี่ยน Tailscale IP ให้ส่ง IP ใหม่เป็น argument สุดท้ายของทั้งสามคำสั่ง หรือ export `TURTLEBOT_TAILSCALE_SERVER_IP` ให้ตรงกันทุก terminal
+
+เมื่อเปลี่ยน profile ครั้งแรกต้องหยุดชุดเดิมทั้งหมดก่อน สคริปต์ไม่หยุด node ให้และไม่แก้ firewall การเปลี่ยน Wi-Fi มักไม่เปลี่ยน Tailscale IP แต่ยังต้องตรวจว่าทั้ง VM และ WSL ออนไลน์ หากต้องกลับ LAN ให้หยุดชุด Tailscale แล้วเปิด terminal ใหม่ด้วย `run_robot.sh` ตามคู่มือ LAN
+
+ตรวจจาก terminal แยกโดยไม่ส่ง Goal:
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+python3 tools/tailscale/robot_vm_link_probe.py --samples 10 --timeout 5 --warmup-sec 2
+ros2 topic info /guide/user_request --verbose --no-daemon
+```
