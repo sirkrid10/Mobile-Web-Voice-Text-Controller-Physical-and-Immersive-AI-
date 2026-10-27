@@ -176,6 +176,47 @@ python3 tools/tailscale/robot_vm_link_probe.py --samples 10 --timeout 5 --warmup
 ros2 topic info /guide/user_request --verbose --no-daemon
 ```
 
+### Terminal สำหรับ echo ข้อมูล ROS ผ่าน Tailscale
+
+เปิดแต่ละคำสั่งใน terminal แยกกัน ทุก terminal ต้องโหลด Tailscale setup ก่อน ไม่ source `setup_demo_auto_ip.sh` ทับ หากใช้ VM IP ที่ต่างจากค่าเริ่มต้น ให้ระบุ IP เดียวกับชุดที่รันอยู่หลัง `setup_tailscale_ros.sh`
+
+#### ดูคำขอจาก Frontend
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+ros2 topic echo /guide/user_request ai_interfaces/msg/UserRequest --no-daemon
+```
+
+#### ดูผลตีความ intent
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+ros2 topic echo /guide/intent_result ai_interfaces/msg/IntentResult --no-daemon
+```
+
+#### ดูสถานะ Robot
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+ros2 topic echo /robot/navigation_state ai_interfaces/msg/NavigationState \
+  --no-daemon --qos-reliability reliable --qos-durability volatile
+```
+
+ใช้ volatile เพื่อรับสถานะใหม่และรองรับ publisher ทั้ง volatile และ transient-local หากยืนยันแล้วว่า Robot publisher เป็น transient-local และต้องการรับสถานะที่เก็บไว้ทันที ให้เปลี่ยนเป็น `--qos-durability transient_local`
+
+#### ดู Subtitle
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+ros2 topic echo /vr/subtitle ai_interfaces/msg/Subtitle --no-daemon
+```
+
+คำสั่งเหล่านี้อ่านข้อมูลและไม่ส่ง Goal ใช้ `request_id` จับคู่คำขอ ผล intent และสถานะ Robot ผล `NAVIGATE` ยืนยันการตีความเท่านั้น ต้องดู NavigationState และ Action terminal result ใน log intent ร่วมกันเพื่อยืนยันผลการนำทาง
+
 ## ทางเลือก: รัน Robot ผ่าน LAN แยกแต่ละ terminal
 
 Build `ai_interfaces` และ `agent_pkg` ใน repo [turtlebot-llm](https://github.com/Lilieay/turtlebot-llm) ลง `install-colcon` ก่อน ฝั่ง Robot ต้องเปิด Bridge, Nav2 และ Discovery Server ของตัวเอง ตัวอย่างใช้ IP `10.202.238.194` ให้เปลี่ยนเป็น IP ปัจจุบันในทุก terminal และไม่เปิด mock Robot ซ้อนบน domain นี้
