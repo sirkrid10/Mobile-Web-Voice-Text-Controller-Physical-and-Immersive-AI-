@@ -48,6 +48,15 @@ def map_navigation_state(phase: str, ready_for_goal: bool, error_code: int) -> s
 # ---------------------------------------------------------------------------
 
 class BaseROS2Bridge(ABC):
+    async def existing_agent_responds(self, name):
+        return False
+
+    def robot_observation(self):
+        return dict(getattr(self, '_robot_observation', {}))
+
+    async def inspect_connections(self):
+        return {'mode': 'mock', 'intent': 'unavailable', 'subtitle': 'unavailable'}
+
     def set_subtitle_callback(self, callback):
         """Observe accepted captions without changing ROS or web state contracts."""
         self._subtitle_callback = callback
@@ -466,6 +475,13 @@ class RealROS2Bridge(BaseROS2Bridge):
                     mapped_state = map_navigation_state(phase, ready_for_goal, error_code)
 
                     def _sync():
+                        outer._robot_observation = {
+                            'robot_received_at': time.time(),
+                            'robot_source_at': msg.stamp.sec + msg.stamp.nanosec / 1e9
+                                if msg.stamp.sec > 0 and 0 <= msg.stamp.nanosec < 1_000_000_000 else None,
+                            'robot_phase': phase, 'robot_ready_for_goal': ready_for_goal,
+                            'robot_error_code': error_code,
+                        }
                         outer.session_manager.update_from_ros_state(
                             state=mapped_state,
                             goal=dest_id,
@@ -524,6 +540,8 @@ class RealROS2Bridge(BaseROS2Bridge):
         self.node = BoothWebBridgeNode()
         from rclpy.parameter import Parameter
         from rclpy.parameter_client import AsyncParameterClient
+        self._intent_health_client = AsyncParameterClient(self.node, '/intent_node')
+        self._subtitle_health_client = AsyncParameterClient(self.node, '/subtitle_node')
         self._subtitle_mode_control = SubtitleModeControl(
             AsyncParameterClient(self.node, '/subtitle_node'),
             lambda mode: Parameter('subtitle_mode', value=mode),
@@ -533,6 +551,25 @@ class RealROS2Bridge(BaseROS2Bridge):
         self.thread = threading.Thread(target=self.executor.spin, daemon=True)
         self.thread.start()
         print("[ROS2Bridge] Real ROS 2 Jazzy Node running in daemon background thread.")
+
+    async def inspect_connections(self):
+        from app.ros_health import probe_parameters
+        intent, subtitle = await asyncio.gather(
+            probe_parameters(self._intent_health_client, ['clock_skew_sec']),
+            probe_parameters(self._subtitle_health_client, ['subtitle_mode']),
+        )
+        return {
+            'mode': 'real', 'intent': intent, 'subtitle': subtitle,
+            'domain_id': os.environ.get('ROS_DOMAIN_ID', '0'),
+            'discovery_server': os.environ.get('ROS_DISCOVERY_SERVER', ''),
+            'graph_nodes': sorted(self.node.get_node_names()),
+            'action_server_observed': self.node.action_client_navigate.server_is_ready(),
+        }
+
+    async def existing_agent_responds(self, name):
+        from app.ros_health import probe_parameters
+        client, parameter = (self._intent_health_client, 'clock_skew_sec') if name == 'intent' else (self._subtitle_health_client, 'subtitle_mode')
+        return await probe_parameters(client, [parameter]) == 'responding'
 
     async def read_subtitle_mode(self):
         return await self._subtitle_mode_control.read()

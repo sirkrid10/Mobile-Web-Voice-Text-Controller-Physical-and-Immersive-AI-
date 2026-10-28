@@ -37,6 +37,8 @@ fi
     printf 'args=%s\n' "$*"
     printf 'profile=%s\n' "${ROS_PROFILE:-}"
     printf 'mock=%s\n' "${USE_MOCK_ROS2:-}"
+    printf 'managed=%s\n' "${MANAGE_AGENT_NODES:-}"
+    printf 'workspace=%s\n' "${AGENT_WORKSPACE:-}"
     printf 'domain=%s\n' "${ROS_DOMAIN_ID:-}"
     printf 'discovery=%s\n' "${ROS_AUTOMATIC_DISCOVERY_RANGE:-}"
     printf 'server=%s\n' "${ROS_DISCOVERY_SERVER:-}"
@@ -86,7 +88,12 @@ grep -q "cwd=${BACKEND}" "${SERVER_LOG}"
 grep -q 'domain=83' "${SERVER_LOG}"
 grep -q 'discovery=LOCALHOST' "${SERVER_LOG}"
 grep -q 'mock=false' "${SERVER_LOG}"
-grep -q -- '--host 127.0.0.2 --port 8124 --reload' "${SERVER_LOG}"
+grep -q -- '--host 127.0.0.2 --port 8124' "${SERVER_LOG}"
+grep -q 'managed=true' "${SERVER_LOG}"
+if grep -q -- '--reload' "${SERVER_LOG}"; then exit 1; fi
+run_launcher MANAGE_AGENT_NODES=false
+grep -q 'managed=false' "${SERVER_LOG}"
+grep -q -- '--reload' "${SERVER_LOG}"
 
 # Robot mode maps the legacy XML name and passes the dynamic profile values through.
 rm -f "${SERVER_LOG}"
@@ -103,11 +110,13 @@ rm -f "${SERVER_LOG}"
 env HOME="${FAKE_HOME}" TEST_BIN="${FAKE_BIN}" SHARED_LOG="${SHARED_LOG}" SERVER_LOG="${SERVER_LOG}" \
     USE_MOCK_ROS2=true TURTLEBOT_SETUP_SCRIPT="${TEST_ROOT}/missing-setup.sh" bash "${BACKEND}/run_booth.sh"
 grep -q 'mock=true' "${SERVER_LOG}"
+grep -q 'managed=false' "${SERVER_LOG}"
 
 expect_failure TURTLEBOT_SETUP_SCRIPT="${TEST_ROOT}/missing-setup.sh"
 expect_failure ROS_PROFILE=invalid
 expect_failure ROS_DOMAIN_ID=179
 expect_failure ROS_WORKSPACE_SETUP="${TEST_ROOT}/another/setup.bash"
+expect_failure AGENT_WORKSPACE="${TEST_ROOT}/another"
 expect_failure ROBOT_SUPER_CLIENT_XML="${PROFILE_XML}"
 expect_failure ROS_PROFILE=robot ROBOT_SUPER_CLIENT_XML="${PROFILE_XML}" TURTLEBOT_FASTDDS_PROFILE="${TEST_ROOT}/other.xml"
 

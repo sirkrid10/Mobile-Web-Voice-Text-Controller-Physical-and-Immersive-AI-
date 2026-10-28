@@ -103,6 +103,35 @@
             <p class="staff-action-note">“ส่งแล้ว” หมายถึง Intent เรียกส่ง Action แล้ว ยังไม่ยืนยันว่าหุ่นรับงานหรือเริ่มเดิน</p>
           </section>
 
+          <section class="staff-section-card" aria-labelledby="staff-health-title">
+            <h3 class="section-title" id="staff-health-title">ตรวจการเชื่อมต่อระบบ</h3>
+            <div class="staff-health-row">
+              <span id="staff-system-checked">ยังไม่ได้ตรวจ</span>
+              <button type="button" class="btn-staff-action" id="staff-system-refresh">อ่านสถานะล่าสุด</button>
+            </div>
+            <div class="staff-health-block">
+              <h4>Tailscale / VM</h4>
+              <p id="staff-health-tailscale">กำลังรอตรวจ</p>
+              <p id="staff-health-vm">ยังไม่มีข้อมูล VM</p>
+            </div>
+            <div class="staff-health-block">
+              <h4>ROS / Discovery</h4>
+              <p id="staff-health-ros">กำลังรอตรวจ</p>
+              <p id="staff-health-action"></p>
+              <p class="staff-action-note" id="staff-health-graph"></p>
+            </div>
+            <div class="staff-health-block">
+              <h4>Robot</h4>
+              <p id="staff-health-robot">ยังไม่มีสถานะสดที่ยืนยันได้</p>
+              <p class="staff-action-note" id="staff-health-robot-age"></p>
+            </div>
+            <div class="staff-health-block">
+              <h4>VR Subtitle</h4>
+              <p id="staff-health-vr">ยังไม่มีข้อมูลการเชื่อมต่อ</p>
+              <p class="staff-action-note">จำนวนนี้คือ WebSocket ที่เชื่อมกับ Backend การส่งสำเร็จยังไม่ยืนยันว่าแสดงบนจอ VR แล้ว</p>
+            </div>
+          </section>
+
           <!-- 5. Direct Action Outcomes -->
           <section class="staff-section-card">
             <h3 class="section-title">🚦 ผลคำสั่ง Action จาก Staff / Auto-return</h3>
@@ -127,6 +156,50 @@
         </div>
         <div class="staff-column staff-control-column">
           <h2 class="staff-column-title">ควบคุมและตั้งค่า</h2>
+          <section class="staff-section-card" id="staff-system-card" aria-labelledby="staff-system-title">
+            <h3 class="section-title" id="staff-system-title">จัดการ Intent / Subtitle</h3>
+            <p id="staff-system-mode">กำลังอ่านโหมดดูแล process</p>
+            <p class="staff-action-note" id="staff-system-note"></p>
+            <div class="staff-process-buttons">
+              <button type="button" class="btn-staff-action" data-agent-mode="automatic" disabled>Automatic · เปิดทั้งสอง node</button>
+              <button type="button" class="btn-staff-action" data-agent-mode="manual" disabled>Manual · ปิดแล้วเปิดเอง</button>
+            </div>
+            <div class="staff-process-node">
+              <h4>Intent</h4>
+              <p class="staff-health-status" id="staff-intent-process">กำลังอ่านสถานะ process</p>
+              <p id="staff-intent-rpc">ROS: กำลังรอตรวจ</p>
+              <p class="staff-action-note" id="staff-intent-detail"></p>
+              <div class="staff-process-buttons">
+                <button type="button" class="btn-staff-action" data-node="intent" data-node-action="start" disabled>เปิด</button>
+                <button type="button" class="btn-staff-action" data-node="intent" data-node-action="stop" disabled>ปิด</button>
+                <button type="button" class="btn-staff-action" data-node="intent" data-node-action="restart" disabled>Restart</button>
+                <button type="button" class="btn-staff-action" data-node="intent" data-node-action="kill" disabled>Kill · บังคับปิด</button>
+              </div>
+              <details>
+                <summary>Log ล่าสุดของ Intent</summary>
+                <pre class="staff-process-log" id="staff-intent-logs">ยังไม่มี log</pre>
+              </details>
+            </div>
+            <div class="staff-process-node">
+              <h4>Subtitle</h4>
+              <p class="staff-health-status" id="staff-subtitle-process">กำลังอ่านสถานะ process</p>
+              <p id="staff-subtitle-rpc">ROS: กำลังรอตรวจ</p>
+              <p class="staff-action-note" id="staff-subtitle-detail"></p>
+              <div class="staff-process-buttons">
+                <button type="button" class="btn-staff-action" data-node="subtitle" data-node-action="start" disabled>เปิด</button>
+                <button type="button" class="btn-staff-action" data-node="subtitle" data-node-action="stop" disabled>ปิด</button>
+                <button type="button" class="btn-staff-action" data-node="subtitle" data-node-action="restart" disabled>Restart</button>
+                <button type="button" class="btn-staff-action" data-node="subtitle" data-node-action="kill" disabled>Kill · บังคับปิด</button>
+              </div>
+              <details>
+                <summary>Log ล่าสุดของ Subtitle</summary>
+                <pre class="staff-process-log" id="staff-subtitle-logs">ยังไม่มี log</pre>
+              </details>
+            </div>
+            <p class="staff-action-note">ปิด node ไม่ใช่ Emergency Stop และไม่ยืนยันว่าหุ่นหยุดเดิน ใช้ปุ่มหยุดฉุกเฉินด้านบนเมื่อต้องการหยุดหุ่น</p>
+            <p id="staff-system-feedback" role="status" aria-live="polite"></p>
+          </section>
+
           <!-- 2. Recovery & Reset Actions -->
           <section class="staff-section-card">
             <h3 class="section-title">⚡ การกู้คืนระบบด่วน (Quick Demo Recovery)</h3>
@@ -230,6 +303,7 @@
 
   </div>
 
+  <script src="/static/staff_system.js"></script>
   <script>
     (function() {
       const pinSection = document.getElementById('pin-section');
@@ -278,6 +352,19 @@
       let subtitleModeKnown = false;
       let subtitleModeVersion = 0;
 
+      const systemPanel = window.StaffSystem?.create({
+        onUnauthorized: () => clearStaffAuth('การยืนยัน PIN หมดอายุ กรุณาเข้าสู่ระบบเจ้าหน้าที่อีกครั้ง'),
+        onSubtitleChange: () => {
+          subtitleModeVersion += 1;
+          subtitleModeBusy = false;
+          subtitleModeKnown = false;
+          subtitleModeSelect.disabled = true;
+          subtitleModeSave.disabled = true;
+          subtitleModeRefresh.disabled = false;
+          subtitleModeCurrent.textContent = 'node เปลี่ยนแล้ว กดอ่านโหมดปัจจุบันเมื่อ Subtitle พร้อม';
+        }
+      });
+
       let staffSocket = null;
       let liveStateVersion = 0;
       let currentPin = '';
@@ -291,6 +378,7 @@
 
       function clearStaffAuth(message) {
         stopLiveSocket();
+        systemPanel?.stop();
         subtitleModeVersion += 1;
         subtitleModeBusy = false;
         subtitleModeKnown = false;
@@ -343,6 +431,7 @@
           connectLiveSocket();
           loadLiveState();
           requestSubtitleMode('GET');
+          systemPanel?.start(candidate);
         } catch (e) {
           console.error('Staff PIN verification failed:', e);
           authFeedback.textContent = 'ติดต่อระบบไม่ได้ จึงยังตรวจสอบ PIN ไม่สำเร็จ';

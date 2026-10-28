@@ -117,6 +117,11 @@ class StaffMockEvent(BaseModel):
     pose: Optional[Dict[str, float]] = None
 
 
+class AgentModeUpdate(BaseModel):
+    model_config = {'extra': 'forbid'}
+    mode: Literal['automatic', 'manual']
+
+
 # ---------------------------------------------------------------------------
 # Robot & System State
 # ---------------------------------------------------------------------------

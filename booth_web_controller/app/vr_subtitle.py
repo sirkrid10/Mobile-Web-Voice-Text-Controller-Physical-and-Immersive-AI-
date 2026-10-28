@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import uuid
+import time
 
 from starlette.websockets import WebSocketDisconnect
 
@@ -24,6 +25,15 @@ class VRSubtitleHub:
         self.stream_id = uuid.uuid4().hex
         self.sequence = 0
         self.latest = self._encode('', 0, '', '', 0)
+        self.last_published_at = None
+        self.last_sent_at = None
+        self.last_sent_sequence = None
+
+    def inspection(self):
+        return {'connections': len(self._clients), 'sequence': self.sequence,
+                'last_published_at': self.last_published_at, 'last_sent_at': self.last_sent_at,
+                'last_sent_sequence': self.last_sent_sequence,
+                'display_confirmed': False}
 
     def _encode(self, text, stamp_ms, request_id, observation_id, sequence):
         return json.dumps({
@@ -43,6 +53,7 @@ class VRSubtitleHub:
             return
         self.sequence += 1
         self.latest = packet
+        self.last_published_at = time.time()
         for queue in self._clients:
             if queue.full():
                 queue.get_nowait()
@@ -61,6 +72,8 @@ class VRSubtitleHub:
             while True:
                 packet = await queue.get()
                 await asyncio.wait_for(websocket.send_text(packet), self.send_timeout)
+                self.last_sent_at = time.time()
+                self.last_sent_sequence = json.loads(packet)['sequence']
 
         async def receive():
             while True:

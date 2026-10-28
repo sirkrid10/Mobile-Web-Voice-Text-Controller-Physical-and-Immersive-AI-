@@ -6,7 +6,7 @@ and static file serving for Mobile Web Voice & Text Controller.
 import os
 import json
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Literal
 from contextlib import asynccontextmanager
 
 from fastapi import (
@@ -23,13 +23,15 @@ from app.models import (
     HeartbeatResponse, DisconnectResponse,
     TextCommandRequest, CommandResponse,
     StaffConfigUpdate, StaffConfigSnapshot, StaffMockEvent,
-    StateBroadcast, SubtitleModeUpdate, SubtitleModeSnapshot
+    StateBroadcast, SubtitleModeUpdate, SubtitleModeSnapshot, AgentModeUpdate
 )
 from app.session_manager import session_manager
 from app.stt_service import STTUnavailableError, stt_service
 from app.ros2_bridge import create_ros2_bridge, BaseROS2Bridge
 from app.subtitle_mode import SubtitleModeError
 from app.vr_subtitle import VRSubtitleHub
+from app.agent_processes import AgentProcesses, ProcessControlError
+from app.system_health import SystemHealth
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +75,8 @@ ws_manager = ConnectionManager()
 vr_subtitles = VRSubtitleHub()
 ros_bridge_instance: Optional[BaseROS2Bridge] = None
 watchdog_task: Optional[asyncio.Task] = None
+agent_processes: Optional[AgentProcesses] = None
+system_health: Optional[SystemHealth] = None
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +100,7 @@ async def session_watchdog_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ros_bridge_instance, watchdog_task
+    global ros_bridge_instance, watchdog_task, agent_processes, system_health
     loop = asyncio.get_running_loop()
 
     # 1. Initialize ROS 2 Bridge (Real or Mock)
@@ -106,17 +110,29 @@ async def lifespan(app: FastAPI):
     session_manager.set_ros_bridge(ros_bridge_instance)
     session_manager.set_broadcast_callback(ws_manager.broadcast_state)
 
-    # 2. Start Background Watchdog
-    watchdog_task = asyncio.create_task(session_watchdog_loop())
-
-    yield
-
-    # Teardown
-    if watchdog_task and not watchdog_task.done():
-        watchdog_task.cancel()
-    if ros_bridge_instance:
+    agent_processes = AgentProcesses(
+        settings.AGENT_WORKSPACE,
+        enabled=settings.MANAGE_AGENT_NODES and not settings.USE_MOCK_ROS2,
+        clock_skew=settings.AGENT_CLOCK_SKEW_SEC,
+        probe_external=ros_bridge_instance.existing_agent_responds,
+    )
+    try:
+        await agent_processes.open()
+        system_health = SystemHealth(ros_bridge_instance, agent_processes, vr_subtitles, mock=settings.USE_MOCK_ROS2)
+        system_health.start()
+        watchdog_task = asyncio.create_task(session_watchdog_loop())
+        yield
+    finally:
+        if system_health:
+            await system_health.close()
+        await agent_processes.close()
+        if watchdog_task and not watchdog_task.done():
+            watchdog_task.cancel()
+            await asyncio.gather(watchdog_task, return_exceptions=True)
         ros_bridge_instance.shutdown()
-    print("[Main] Shutdown complete.")
+        system_health = None
+        agent_processes = None
+        print("[Main] Shutdown complete.")
 
 
 app = FastAPI(
@@ -355,6 +371,38 @@ async def staff_set_subtitle_mode(req: SubtitleModeUpdate, _: bool = Depends(ver
 async def staff_force_release(_: bool = Depends(verify_staff_pin)):
     await session_manager.force_release()
     return {"status": "released"}
+
+
+@app.get('/api/v1/staff/system')
+async def staff_system(_: bool = Depends(verify_subtitle_staff_pin)):
+    if system_health is None:
+        raise HTTPException(status_code=503, detail='System inspection is not running')
+    return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
+
+
+@app.post('/api/v1/staff/system/mode')
+async def staff_agent_mode(req: AgentModeUpdate, _: bool = Depends(verify_subtitle_staff_pin)):
+    if agent_processes is None:
+        raise HTTPException(status_code=503, detail='Process manager is not running')
+    try:
+        await agent_processes.set_mode(req.mode)
+    except ProcessControlError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
+
+
+@app.post('/api/v1/staff/system/nodes/{node}/{action}')
+async def staff_agent_control(
+    node: Literal['intent', 'subtitle'], action: Literal['start', 'stop', 'restart', 'kill'],
+    _: bool = Depends(verify_subtitle_staff_pin),
+):
+    if agent_processes is None:
+        raise HTTPException(status_code=503, detail='Process manager is not running')
+    try:
+        await agent_processes.control(node, action)
+    except ProcessControlError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
 
 
 @app.post("/api/v1/staff/mock-event", summary="Simulate ROS 2 perception and robot navigation state")

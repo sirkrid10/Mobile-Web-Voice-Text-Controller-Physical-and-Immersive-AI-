@@ -5,6 +5,7 @@ Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 """
 
 from typing import List, Dict, Any
+from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,9 @@ class Settings(BaseSettings):
 
     # Staff Security
     STAFF_PIN: str = "1234"
+    MANAGE_AGENT_NODES: bool = False
+    AGENT_WORKSPACE: str = str(Path(__file__).resolve().parents[3] / 'turtlebot-llm')
+    AGENT_CLOCK_SKEW_SEC: float = Field(0.6, ge=0, le=0.6, allow_inf_nan=False)
 
     # Session & Auto-Return Timing (Seconds)
     INACTIVITY_TIMEOUT_SEC: int = 120

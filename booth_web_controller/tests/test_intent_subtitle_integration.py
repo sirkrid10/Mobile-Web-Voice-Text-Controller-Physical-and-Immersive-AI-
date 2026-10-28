@@ -140,6 +140,15 @@ async def _run_integration(monkeypatch):
 
     try:
         await wait_for(lambda: session_manager.robot_state == "IDLE", description="Robot READY readiness")
+        await wait_for(
+            lambda: bridge._intent_health_client.services_are_ready()
+            and bridge._subtitle_health_client.services_are_ready(),
+            description="read-only node health services",
+        )
+        health = await bridge.inspect_connections()
+        assert health['intent'] == 'responding'
+        assert health['subtitle'] == 'responding'
+        assert bridge.robot_observation()['robot_source_at'] > 0
 
         for text, destination, input_mode in (
             ("ไปจุด A", "A", "text"),

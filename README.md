@@ -5,7 +5,7 @@
 
 ชุดวันงานใช้ `main` หรือ tag `release-2026-10-28` ให้ตรงกันใน repo LLM, Backend และ Unity
 ดู [รายการ release และลำดับเปิดวันงาน](https://github.com/Lilieay/turtlebot-llm/blob/main/docs/releases/2026-10-28.md)
-คำสั่งเปิดยังเป็น Intent → Subtitle → Backend เดิม VR เปิดช่องรับซับพร้อม Backend ไม่ต้องมี node เพิ่ม
+ชุด release เดิมเปิด Intent → Subtitle → Backend ส่วน branch พัฒนาหน้า Staff รุ่นนี้เปิด Backend ครั้งเดียวแล้วดูแล Intent/Subtitle ให้ ดูขั้นตอนด้านล่าง VR เปิดช่องรับซับพร้อม Backend ไม่ต้องมี node เพิ่ม
 ให้ฝั่งหุ่นเปิด VM, Discovery Server และ Robot Bridge ก่อน แล้วเลือก Friendly ผ่าน Staff หลัง restart Subtitle ทุกครั้งหากต้องการโหมดคุยแบบวันทดสอบ
 
 [![Target OS](https://img.shields.io/badge/OS-WSL2_Ubuntu_24.04_LTS-orange.svg)](https://ubuntu.com/)
@@ -27,7 +27,7 @@ Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม �
 
 ก่อนเปิดชุดจริง ตรวจ `tailscale status` และ `tailscale ping 100.127.193.83` ใน WSL ให้ VM ติดต่อได้ ใช้ Tailscale ภายใน WSL และ disconnect ฝั่ง Windows ตามการตั้งค่าชุดนี้ อย่าเปิด node ซ้อนกับชุดเดิม และไม่เปิด mock Robot บน domain ของหุ่นจริง
 
-### Build หลังแก้ subtitle (เครื่องที่ติดตั้งไว้แล้ว)
+### Build หลังอัปเดต Staff/LLM (เครื่องที่ติดตั้งไว้แล้ว)
 
 ```bash
 cd ~/ros2_ws/turtlebot-llm
@@ -35,31 +35,92 @@ source /opt/ros/jazzy/setup.bash
 source install-colcon/setup.bash
 source .venv/bin/activate
 colcon --log-base log-colcon build --build-base build-colcon \
-  --install-base install-colcon --packages-select agent_pkg
+  --install-base install-colcon --packages-select ai_interfaces agent_pkg
 ```
 
-ใช้ `.env` เดิม โดย Intent ใช้ `GROQ_API_KEY` และ Subtitle ใช้ `GROQ_SUBTITLE_API_KEY` แยกกัน ไม่ต้อง rebuild ฝั่งหุ่นสำหรับงานแก้ซับ เพราะ interfaces ไม่เปลี่ยน หลัง build เปิด subtitle ใหม่เพื่อโหลดโค้ดล่าสุด เครื่องใหม่ให้ติดตั้งและ build interfaces ตามหัวข้อติดตั้งด้านล่างก่อน
+ใช้ `.env` ของ LLM เดิม โดย Intent ใช้ `GROQ_API_KEY` และ Subtitle ใช้ `GROQ_SUBTITLE_API_KEY` แยกกัน รุ่น Staff นี้เพิ่ม `IntentDispatch` แต่ Action และ message เดิมของ Robot ไม่เปลี่ยน หลัง build เปิด Backend ใหม่เพื่อโหลดทั้งสอง node เครื่องใหม่ให้ติดตั้ง dependencies ตามคู่มือ LLM ก่อน
 
-### Terminal 1: Intent
+### เปิดจาก terminal เดียว
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh
+```
+
+Launcher เปิด Intent และ Subtitle เป็น process ลูกของ Backend โดยใช้ ROS environment ชุดเดียวกัน ไม่ต้องเปิดสอง node นี้แยกอีก ระบบใช้ Python และ `.env` ของ repo LLM ไม่ใช้ API key ของ STT แทน key ของ Intent/Subtitle
+
+คำสั่งเดิม `bash ./run_tailscale.sh intent` และ `bash ./run_tailscale.sh subtitle` ใน repo LLM ยังใช้ได้ หากต้องการเปิดแยก terminal ให้เลือก Manual ก่อน หรือเปิด Backend ด้วย `MANAGE_AGENT_NODES=false` ตามขั้นตอน fallback ด้านล่าง
+
+เมื่อปิด Backend ตามปกติ ระบบจะปิด process ที่ดูแลด้วย การเปิด Backend ใหม่จะเปิด node ที่ยังตั้งให้ทำงานอยู่ ค่า Stop/Kill และ Manual จำไว้ตาม workspace ถ้าตัวก่อนค้างหลัง Backend ถูก kill ระบบจะตรวจตัวตน process ก่อนปิดตัวเก่าและเปิดใหม่
+
+หากมี node เปิดจาก terminal อยู่แล้ว ระบบจะไม่เปิดซ้อน และไม่ปิด process ภายนอก ส่วนการตอบกลับจาก ROS node ที่มีอยู่ใช้เป็นเหตุผลป้องกันการเปิดซ้ำได้ แต่การไม่พบใน ROS graph อย่างเดียวไม่ใช้ยืนยันว่า node หาย
+
+### ควบคุม process และตรวจการเชื่อมต่อจาก Staff
+
+เปิด `/staff` และยืนยัน PIN เดิม:
+
+- **เปิด / ปิด / Restart / Kill** ควบคุม Intent และ Subtitle ที่ Backend เปิดเท่านั้น Stop รอให้ปิดไม่เกิน 4 วินาที แล้วบังคับปิดหากยังค้าง Kill บังคับปิดทันที
+- **Manual** ปิดสอง process ที่ดูแลและหยุดการเปิดอัตโนมัติ เพื่อให้เปิดเองใน terminal
+- **Automatic** ออกจาก Manual และเปิดทั้งสอง node ที่ไม่มีตัวอื่นรันซ้อน
+- ดู PID, เวลาเริ่ม, exit code, จำนวน restart ในรอบ Backend นี้ และ log ล่าสุดแบบจำกัดจำนวน ข้อมูลนี้ใช้ PIN และไม่อยู่ในสถานะเว็บผู้เข้าชม
+
+การปิด node ไม่ใช่การหยุดหุ่น ใช้ Emergency Stop เมื่อต้องการหยุดการเคลื่อนที่ หลัง Restart Subtitle ให้กดอ่านโหมดปัจจุบัน และเลือก Friendly ใหม่หากต้องการ
+
+ส่วนตรวจการเชื่อมต่อแยกข้อมูลต่อไปนี้:
+
+| ข้อมูล | สิ่งที่ยืนยันได้ |
+| --- | --- |
+| Process | โปรแกรมยังทำงานอยู่ ไม่ยืนยันว่า ROS รับส่งได้ |
+| Intent / Subtitle ROS | คำขออ่าน parameter ตอบกลับจริง ไม่เรียก cancel/recover หรือส่ง Goal |
+| Tailscale / VM | สถานะ local, Online ที่ peer รายงาน และผล Tailscale ping แยกกัน |
+| ROS / Discovery | domain, Discovery Server ที่ตั้งไว้, graph และการพบ Action server ไม่ทดสอบ UDP Discovery ด้วย TCP |
+| Robot | เวลาได้รับ NavigationState และอายุ stamp ต้นทาง ภายใน 3 วินาทีและนำหน้าไม่เกิน 0.6 วินาทีจึงถือว่าสด |
+| VR | จำนวน WebSocket ที่เชื่อมอยู่ เวลาและลำดับส่งล่าสุด ยังไม่ยืนยันการแสดงบนอุปกรณ์ |
+
+ข้อมูลเชื่อมต่ออัปเดตราวทุก 5–10 วินาที กดอ่านสถานะล่าสุดเพื่ออ่านผลตรวจล่าสุดได้ การตรวจล้มเหลวหรือไม่พบ service แสดงว่ายังยืนยันไม่ได้ ไม่เหมารวมว่าหุ่นหรือ VM ปิดอยู่
+
+### Fallback เมื่อ UI ใช้ไม่ได้
+
+คำสั่งต่อไปนี้ใช้ Python มาตรฐาน ไม่ต้องเปิดเว็บ ไม่ต้องมี ROS และไม่ต้องใช้ PIN ใช้บัญชี Linux เดียวกับ Backend และระบุ workspace เดียวกับ `AGENT_WORKSPACE` ข้อมูลตัวดูแลเก็บแบบ private ใน `~/.local/state/turtlebot-agents-*` จึงใช้ได้แม้ terminal มี runtime environment ต่างกัน:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+python3 booth_web_controller/tools/agent_nodes.py status --workspace ~/ros2_ws/turtlebot-llm
+python3 booth_web_controller/tools/agent_nodes.py stop-all --workspace ~/ros2_ws/turtlebot-llm
+```
+
+`stop-all` บันทึก Manual ก่อนส่งสัญญาณปิด ถ้ายังค้างหลังรอจะบังคับปิด หรือใช้คำสั่งนี้เพื่อ Kill ทันที:
+
+```bash
+python3 booth_web_controller/tools/agent_nodes.py kill-all --workspace ~/ros2_ws/turtlebot-llm
+```
+
+คำสั่งตรวจ boot ID, PID และเวลาเริ่ม process ก่อนส่งสัญญาณ จึงไม่ใช้ `pkill python` และไม่แตะ node ที่เปิดจาก terminal หรือ process อื่น หลังปิดแล้วเปิดสอง terminal ตามเดิม:
 
 ```bash
 cd ~/ros2_ws/turtlebot-llm
 bash ./run_tailscale.sh intent
 ```
 
-### Terminal 2: Subtitle
-
 ```bash
 cd ~/ros2_ws/turtlebot-llm
 bash ./run_tailscale.sh subtitle
 ```
 
-### Terminal 3: Backend
+หากต้องเปิด Backend แบบไม่ดูแล process ตั้งแต่ต้น ใช้:
 
 ```bash
-cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+MANAGE_AGENT_NODES=false bash booth_web_controller/run_tailscale.sh
+```
+
+เมื่อต้องการกลับ Automatic ให้ปิด node ที่เปิดเองก่อน แล้วกด Automatic ใน Staff ของ Backend ที่เปิดตัวดูแลไว้ หรือเตรียมโหมดสำหรับการเปิด Backend รอบถัดไป:
+
+```bash
+python3 booth_web_controller/tools/agent_nodes.py automatic --workspace ~/ros2_ws/turtlebot-llm
 bash booth_web_controller/run_tailscale.sh
 ```
+
+ตัวเปิด Backend ปกติเปิดตัวดูแลในโหมด ROS จริงและปิด `--reload` เพื่อไม่ restart node ตามการแก้ไฟล์ Direct uvicorn ต้องตั้ง `MANAGE_AGENT_NODES=true` เอง ส่วน Mock จะไม่เปิด ROS node จริง Backend สองตัวที่ใช้ workspace เดียวกันมีเจ้าของตัวดูแลได้ตัวเดียว
 
 ### ตรวจ Intent และการส่ง Action จากหน้า Staff
 
@@ -83,7 +144,7 @@ colcon --log-base log-colcon build --build-base build-colcon \
   --install-base install-colcon --packages-select ai_interfaces agent_pkg
 ```
 
-เปิด Intent และ Backend ใหม่ด้วยสคริปต์เดิม แล้วกด Ctrl+Shift+R ที่หน้า Staff ข้อมูลตรวจการส่งเพิ่ม message ใหม่โดยไม่เปลี่ยน Action หรือ message เดิมของ Robot และ VR
+เปิด Backend ใหม่ด้วย launcher เพื่อโหลด Intent/Subtitle รุ่นล่าสุด แล้วกด Ctrl+Shift+R ที่หน้า Staff หากใช้ Manual ให้เปิด Intent ใหม่ด้วย ข้อมูลตรวจการส่งเพิ่ม message ใหม่โดยไม่เปลี่ยน Action หรือ message เดิมของ Robot และ VR
 
 ### เลือกโหมด subtitle จากหน้า Staff
 
@@ -161,7 +222,7 @@ tailscale ping 100.127.193.83
 
 Launcher โหลด `turtlebot-llm/setup_tailscale_ros.sh` ใช้ ROS จริง, domain 30, Discovery Server `100.127.193.83:11811` และ DDS profile เดียวกับ intent/subtitle ไม่ source สคริปต์ LAN ทับ และไม่เปิด mock Robot บน domain นี้
 
-หาก VM เปลี่ยน Tailscale IP ให้ส่ง IP ใหม่เป็น argument สุดท้ายของทั้งสามคำสั่ง หรือ export `TURTLEBOT_TAILSCALE_SERVER_IP` ให้ตรงกันทุก terminal
+หาก VM เปลี่ยน Tailscale IP ให้ส่ง IP ใหม่เป็น argument ของ Backend launcher ตัวดูแลจะส่ง environment เดียวกันให้สอง node หากใช้ Manual ให้ระบุ IP เดียวกันทั้งสาม terminal
 
 เมื่อเปลี่ยน profile ครั้งแรกต้องหยุดชุดเดิมทั้งหมดก่อน สคริปต์ไม่หยุด node ให้และไม่แก้ firewall การเปลี่ยน Wi-Fi มักไม่เปลี่ยน Tailscale IP แต่ยังต้องตรวจว่าทั้ง VM และ WSL ออนไลน์ หากต้องกลับ LAN ให้หยุดชุด Tailscale แล้วเปิด terminal ใหม่ด้วย `run_robot.sh` ตามคู่มือ LAN
 

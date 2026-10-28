@@ -567,7 +567,7 @@ def test_stt_provider_failures_raise_controlled_error(monkeypatch, provider):
 
 @pytest.mark.parametrize(("transcript", "status"), [("", 422), ("  \n", 422), (None, 503)])
 def test_voice_failures_do_not_register_or_publish_requests(monkeypatch, transcript, status):
-    from unittest.mock import Mock
+    from unittest.mock import Mock, AsyncMock
     import app.main as main_module
 
     async def transcribe(_audio):
@@ -576,6 +576,8 @@ def test_voice_failures_do_not_register_or_publish_requests(monkeypatch, transcr
         return transcript
 
     bridge = Mock()
+    bridge.inspect_connections = AsyncMock(return_value={})
+    bridge.robot_observation.return_value = {}
     monkeypatch.setattr(main_module, "create_ros2_bridge", lambda *_args: bridge)
     monkeypatch.setattr(main_module.stt_service, "transcribe_audio", transcribe)
     with TestClient(app) as client:

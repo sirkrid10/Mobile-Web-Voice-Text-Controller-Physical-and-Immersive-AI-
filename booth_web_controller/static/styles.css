@@ -2159,3 +2159,74 @@ body.visitor-page {
   font-size: 0.78rem;
   overflow-wrap: anywhere;
 }
+
+.staff-process-node,
+.staff-health-block {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.staff-process-node h4,
+.staff-health-block h4 {
+  color: var(--text-main);
+}
+
+.staff-process-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.staff-process-buttons button {
+  min-width: 0;
+  min-height: 44px;
+}
+
+.staff-process-buttons [data-node-action="kill"] {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.staff-process-buttons button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.staff-process-node summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.staff-process-log {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #080d16;
+  color: #cbd5e1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+
+.staff-health-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.staff-health-status[data-level="ok"] { color: #6ee7b7; }
+.staff-health-status[data-level="error"] { color: #fca5a5; }
+.staff-health-status[data-level="unknown"] { color: #fcd34d; }

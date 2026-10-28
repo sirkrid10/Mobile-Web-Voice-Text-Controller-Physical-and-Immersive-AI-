@@ -13,7 +13,7 @@ CONFIG_KEYS=(
     ROS_DISCOVERY_SERVER FASTRTPS_DEFAULT_PROFILES_FILE FASTDDS_DEFAULT_PROFILES_FILE
     ROS_WORKSPACE_SETUP ROBOT_SUPER_CLIENT_XML TURTLEBOT_SETUP_SCRIPT
     TURTLEBOT_FASTDDS_PROFILE TURTLEBOT_ROBOT_HOST TURTLEBOT_ROBOT_IP
-    HOST PORT USE_MOCK_ROS2
+    HOST PORT USE_MOCK_ROS2 MANAGE_AGENT_NODES AGENT_WORKSPACE AGENT_CLOCK_SKEW_SEC
 )
 for key in "${CONFIG_KEYS[@]}"; do
     if [[ -v "$key" ]]; then
@@ -64,10 +64,13 @@ if [[ "${USE_MOCK_ROS2,,}" != "true" ]]; then
     [[ "${ROS_PROFILE}" == local || "${ROS_PROFILE}" == robot ]] \
         || fail "ROS_PROFILE must be local or robot (got '${ROS_PROFILE}')."
 
-    TURTLEBOT_SETUP_SCRIPT="${TURTLEBOT_SETUP_SCRIPT:-${SCRIPT_DIR}/../../turtlebot-llm/setup_demo_auto_ip.sh}"
+    TURTLEBOT_SETUP_SCRIPT="${TURTLEBOT_SETUP_SCRIPT:-${AGENT_WORKSPACE:-${SCRIPT_DIR}/../../turtlebot-llm}/setup_demo_auto_ip.sh}"
     [[ -r "${TURTLEBOT_SETUP_SCRIPT}" ]] || fail "Shared TurtleBot setup is not readable: ${TURTLEBOT_SETUP_SCRIPT}"
     TURTLEBOT_SETUP_SCRIPT="$(realpath "${TURTLEBOT_SETUP_SCRIPT}")"
     SHARED_WORKSPACE="$(cd "$(dirname "${TURTLEBOT_SETUP_SCRIPT}")" && pwd)"
+    if [[ -n "${AGENT_WORKSPACE:-}" && "$(realpath -m "${AGENT_WORKSPACE}")" != "${SHARED_WORKSPACE}" ]]; then
+        fail "AGENT_WORKSPACE must match the workspace supplying ROS setup. Export AGENT_WORKSPACE before running the launcher."
+    fi
     SHARED_SETUP="${SHARED_WORKSPACE}/install-colcon/setup.bash"
     if [[ -n "${ROS_WORKSPACE_SETUP:-}" ]]; then
         requested_workspace="$(realpath -m "${ROS_WORKSPACE_SETUP}")"
@@ -127,7 +130,7 @@ if [[ "${USE_MOCK_ROS2,,}" != "true" ]]; then
 try:
     import rclpy
     from ai_interfaces.action import GuideToDestination
-    from ai_interfaces.msg import IntentResult
+    from ai_interfaces.msg import IntentResult, IntentDispatch
 except ImportError as exc:
     raise SystemExit(f"ROS backend imports unavailable: {exc}")
 
@@ -139,8 +142,11 @@ PY
         fi
     fi
     export USE_MOCK_ROS2=false
+    export AGENT_WORKSPACE="${AGENT_WORKSPACE:-${SHARED_WORKSPACE}}"
+    export MANAGE_AGENT_NODES="${MANAGE_AGENT_NODES:-true}"
 else
     export USE_MOCK_ROS2=true
+    export MANAGE_AGENT_NODES=false
     echo "[Booth Controller] USE_MOCK_ROS2=true; skipping ROS setup."
 fi
 
@@ -161,4 +167,8 @@ echo "[Booth Controller] Profile=${ROS_PROFILE}, USE_MOCK_ROS2=${USE_MOCK_ROS2}"
 echo "[Booth Controller] Binding server to http://${HOST}:${PORT}"
 echo "[Booth Controller] Visitor UI: http://localhost:${PORT}/"
 echo "[Booth Controller] Staff Panel: http://localhost:${PORT}/staff"
-exec python3 -m uvicorn app.main:app --host "${HOST}" --port "${PORT}" --reload
+server_args=(app.main:app --host "${HOST}" --port "${PORT}")
+if [[ "${MANAGE_AGENT_NODES,,}" != true ]]; then
+    server_args+=(--reload)
+fi
+exec python3 -m uvicorn "${server_args[@]}"
