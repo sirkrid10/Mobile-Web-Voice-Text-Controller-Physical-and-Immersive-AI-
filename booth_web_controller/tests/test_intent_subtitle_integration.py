@@ -155,6 +155,16 @@ async def _run_integration(monkeypatch):
             assert outcome.session_id == response["session_id"]
             assert outcome.request_id == response["request_id"]
             await wait_for(
+                lambda: session_manager.latest_intent_dispatch is not None,
+                description="sender-side Action dispatch evidence",
+            )
+            snapshot = session_manager.get_state_broadcast()
+            assert snapshot.latest_request_id == response["request_id"]
+            assert snapshot.latest_intent_dispatch.request_id == response["request_id"]
+            assert snapshot.latest_intent_dispatch.session_id == response["session_id"]
+            assert snapshot.latest_intent_dispatch.destination_id == destination
+            assert snapshot.latest_intent_dispatch.status == "sent"
+            await wait_for(
                 lambda: session_manager.current_goal == destination
                 and session_manager.robot_state == "REACHED",
                 description=f"Robot arrival at {destination}",

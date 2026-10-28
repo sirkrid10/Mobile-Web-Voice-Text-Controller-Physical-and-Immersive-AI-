@@ -12,7 +12,7 @@
   
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="staff-page">
   <div class="staff-container">
     
     <!-- Staff Header -->
@@ -60,152 +60,172 @@
         </p>
       </section>
 
-      <!-- 1.5 Live Robot & Visitor Status Monitor (Transcript, Subtitle, Destination) -->
-      <section class="staff-section-card" id="staff-robot-status-card" style="border-color: rgba(6, 182, 212, 0.35);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-          <div class="status-indicator-wrap">
-            <div class="status-dot-pulse state-idle" id="staff-robot-dot" aria-hidden="true"></div>
-            <div class="status-label-group">
-              <p style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">หุ่นยนต์กำลังทำอะไร</p>
-              <h3 id="staff-robot-state-text" style="font-size: 1.25rem; font-weight: 800; color: #fff;">กำลังรอสถานะ</h3>
+      <div class="staff-workspace">
+        <div class="staff-column staff-monitor-column">
+          <h2 class="staff-column-title">ติดตามสถานะและคำสั่ง</h2>
+          <!-- 1.5 Live Robot & Visitor Status Monitor (Transcript, Subtitle, Destination) -->
+          <section class="staff-section-card" id="staff-robot-status-card" style="border-color: rgba(6, 182, 212, 0.35);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+              <div class="status-indicator-wrap">
+                <div class="status-dot-pulse state-idle" id="staff-robot-dot" aria-hidden="true"></div>
+                <div class="status-label-group">
+                  <p style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;">หุ่นยนต์กำลังทำอะไร</p>
+                  <h3 id="staff-robot-state-text" style="font-size: 1.25rem; font-weight: 800; color: #fff;">กำลังรอสถานะ</h3>
+                </div>
+              </div>
+              <div class="goal-tag" style="background: rgba(34, 85, 204, 0.25); border: 1px solid #3b82f6; border-radius: 10px; padding: 6px 12px;">
+                <span style="font-size: 0.82rem; color: #93c5fd; font-weight: 700;">ปลายทาง:</span>
+                <span id="staff-robot-goal-tag" style="font-size: 0.95rem; color: #bfdbfe; font-weight: 700;">—</span>
+              </div>
             </div>
-          </div>
-          <div class="goal-tag" style="background: rgba(34, 85, 204, 0.25); border: 1px solid #3b82f6; border-radius: 10px; padding: 6px 12px;">
-            <span style="font-size: 0.82rem; color: #93c5fd; font-weight: 700;">ปลายทาง:</span>
-            <span id="staff-robot-goal-tag" style="font-size: 0.95rem; color: #bfdbfe; font-weight: 700;">—</span>
-          </div>
+
+            <div class="mind-section" style="margin-top: 10px;">
+              <div class="mind-row heard" style="padding: 10px 12px; background: rgba(56, 189, 248, 0.12); border-left: 4px solid var(--accent-cyan); border-radius: 8px;">
+                <span class="title" style="font-size: 0.85rem; font-weight: 700; color: #7dd3fc; text-transform: none;">หุ่นยนต์ได้ยินว่า:</span>
+                <span class="content" id="staff-robot-heard-text" style="font-size: 1.05rem; font-weight: 600; color: #e0f2fe; margin-top: 2px;">(ยังไม่มีคำสั่งล่าสุด)</span>
+              </div>
+              <div class="mind-row" style="padding: 10px 12px;">
+                <span class="title" style="font-size: 0.85rem; font-weight: 700; color: var(--text-dim); text-transform: none;">คำบรรยายสถานะล่าสุด</span>
+                <span class="content" id="staff-robot-reason-text" style="font-size: 1.05rem; font-weight: 600; color: #f8fafc; margin-top: 2px;">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="staff-section-card" aria-labelledby="staff-intent-title">
+            <h3 class="section-title" id="staff-intent-title">🧠 ผล Intent และการส่ง Action</h3>
+            <div class="staff-action-result" aria-live="polite" aria-atomic="true">
+              <p class="staff-action-status" id="staff-intent-status">ยังไม่มีคำสั่งให้ตรวจสอบ</p>
+              <p id="staff-intent-destination">ปลายทางจาก Intent: —</p>
+              <p id="staff-intent-message">รายละเอียด: —</p>
+              <p id="staff-intent-dispatch">การส่ง Action: —</p>
+              <p id="staff-intent-request" class="staff-inspection-request">รหัสคำสั่ง: —</p>
+            </div>
+            <p class="staff-action-note">“ส่งแล้ว” หมายถึง Intent เรียกส่ง Action แล้ว ยังไม่ยืนยันว่าหุ่นรับงานหรือเริ่มเดิน</p>
+          </section>
+
+          <!-- 5. Direct Action Outcomes -->
+          <section class="staff-section-card">
+            <h3 class="section-title">🚦 ผลคำสั่ง Action จาก Staff / Auto-return</h3>
+            <div class="staff-action-result" aria-live="polite" aria-atomic="true">
+              <p class="staff-action-status" id="staff-action-status">ยังไม่มีผล Action</p>
+              <p id="staff-action-source">ผู้ส่ง: —</p>
+              <p id="staff-action-destination">ปลายทาง: —</p>
+              <p id="staff-action-error-code">รหัสข้อผิดพลาด: —</p>
+              <p id="staff-action-ros-status">สถานะ ROS: —</p>
+              <p id="staff-action-error-message">รายละเอียด: —</p>
+            </div>
+            <p class="staff-action-note">แสดงคำสั่งตรงจากหน้า Staff และ Auto-return เท่านั้น ไม่ใช่สถานะคำสั่งนำทางจาก intent.</p>
+          </section>
+
+          <!-- 6. Real-Time Raw State Inspection -->
+          <section class="staff-section-card">
+            <h3 class="section-title">📡 สถานะดิบล่าสุด (Live State Inspection)</h3>
+            <pre id="raw-state-dump" class="staff-raw-state">
+    กำลังดึงข้อมูล...
+            </pre>
+          </section>
         </div>
+        <div class="staff-column staff-control-column">
+          <h2 class="staff-column-title">ควบคุมและตั้งค่า</h2>
+          <!-- 2. Recovery & Reset Actions -->
+          <section class="staff-section-card">
+            <h3 class="section-title">⚡ การกู้คืนระบบด่วน (Quick Demo Recovery)</h3>
+            <div class="staff-action-grid">
+              <button type="button" class="btn-staff-action" id="btn-return-start">
+                <span style="font-size: 24px;">🏠</span>
+                <span>RETURN TO START</span>
+                <small style="color: var(--text-dim);">สั่งเดินกลับจุดเริ่มต้นทันที</small>
+              </button>
 
-        <div class="mind-section" style="margin-top: 10px;">
-          <div class="mind-row heard" style="padding: 10px 12px; background: rgba(56, 189, 248, 0.12); border-left: 4px solid var(--accent-cyan); border-radius: 8px;">
-            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: #7dd3fc; text-transform: none;">หุ่นยนต์ได้ยินว่า:</span>
-            <span class="content" id="staff-robot-heard-text" style="font-size: 1.05rem; font-weight: 600; color: #e0f2fe; margin-top: 2px;">(ยังไม่มีคำสั่งล่าสุด)</span>
-          </div>
-          <div class="mind-row" style="padding: 10px 12px;">
-            <span class="title" style="font-size: 0.85rem; font-weight: 700; color: var(--text-dim); text-transform: none;">คำบรรยายสถานะล่าสุด</span>
-            <span class="content" id="staff-robot-reason-text" style="font-size: 1.05rem; font-weight: 600; color: #f8fafc; margin-top: 2px;">พร้อมรับคำสั่งจากผู้เข้าชมบูธ</span>
-          </div>
+              <button type="button" class="btn-staff-action" id="btn-force-unlock">
+                <span style="font-size: 24px;">🔓</span>
+                <span>FORCE UNLOCK</span>
+                <small style="color: var(--text-dim);">ปลดล็อกคิวรับผู้ชมคนใหม่</small>
+              </button>
+            </div>
+          </section>
+
+          <!-- 3. Auto-Return & Timing Configuration -->
+          <form class="staff-section-card" id="staff-config-form">
+            <h3 class="section-title">⚙️ ตั้งค่าระบบกลับจุดเริ่มต้น & เวลาคิว (Settings)</h3>
+
+            <div class="form-group-row">
+              <div>
+                <label for="cfg-auto-return" style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
+                <p style="font-size: 0.75rem; color: var(--text-dim);">เมื่อจบ Session ให้หุ่นยนต์เดินกลับมารอที่บูธเอง</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="cfg-auto-return" aria-label="เปิดหรือปิดเดินกลับจุดเริ่มต้นอัตโนมัติ" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="form-group-row">
+              <label for="cfg-timeout">เวลา Inactivity สูงสุด (วินาที):</label>
+              <input type="number" id="cfg-timeout" class="number-input" value="120" min="10" max="600" step="1" required>
+            </div>
+
+            <div class="form-group-row">
+              <label for="cfg-delay">ระยะเวลาหน่วงก่อนเดินกลับ (วินาที):</label>
+              <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="120" step="1" required>
+            </div>
+
+            <button type="submit" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
+              💾 บันทึกการตั้งค่า (Save Settings)
+            </button>
+          </form>
+
+          <section class="staff-section-card" aria-labelledby="subtitle-mode-title">
+            <h3 class="section-title" id="subtitle-mode-title">รูปแบบการตอบของหุ่น</h3>
+            <p id="subtitle-mode-current" role="status" aria-live="polite">ยังไม่ได้อ่านโหมด</p>
+            <form id="subtitle-mode-form">
+              <div class="form-group-row">
+                <label for="subtitle-mode-select">โหมดคำบรรยาย:</label>
+                <select id="subtitle-mode-select" class="number-input" style="width: 100%; text-align: left;" disabled>
+                  <option value="standard">Standard — แจ้งสถานะและตอบตามคำสั่ง</option>
+                  <option value="friendly">Friendly — คุยเป็นมิตรและชวนเลือกจุด</option>
+                </select>
+              </div>
+              <button type="submit" class="start-session-btn" id="btn-subtitle-mode-save" disabled>ใช้โหมดนี้</button>
+              <button type="button" class="btn-staff-action" id="btn-subtitle-mode-refresh">อ่านโหมดปัจจุบัน</button>
+            </form>
+            <p id="subtitle-mode-feedback" class="session-feedback" role="status" aria-live="polite"></p>
+            <p style="font-size: 0.78rem; color: var(--text-dim);">มีผลกับคำตอบถัดไป ไม่เปลี่ยนการสั่งเดิน เมื่อเปิดระบบคำบรรยายใหม่จะกลับค่าเริ่มต้น</p>
+          </section>
+
+          <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
+          <section class="staff-section-card">
+            <h3 class="section-title">🧪 จำลองสถานการณ์หุ่นยนต์ (Mock Perception Triggers)</h3>
+            <p style="font-size: 0.78rem; color: var(--text-dim);">
+              เปลี่ยนเฉพาะสถานะจำลองที่ Backend แสดงบนหน้าเว็บ ไม่ได้รับประกันว่ามีการสั่ง Robot หรือ Unity จริง
+            </p>
+
+            <div class="staff-action-grid">
+              <button type="button" class="btn-staff-action" id="btn-mock-nav">
+                <span>🚀 Navigating</span>
+                <small>กำลังเดินทาง</small>
+              </button>
+
+              <button type="button" class="btn-staff-action" id="btn-mock-obstacle" style="border-color: rgba(245, 158, 11, 0.4);">
+                <span>⚠️ Obstacle</span>
+                <small>เจอสิ่งกีดขวาง (Replan)</small>
+              </button>
+
+              <button type="button" class="btn-staff-action" id="btn-mock-reached" style="border-color: rgba(139, 92, 246, 0.4);">
+                <span>🎯 Reached</span>
+                <small>ถึงจุดหมายแล้ว</small>
+              </button>
+
+              <button type="button" class="btn-staff-action" id="btn-mock-idle">
+                <span>🟢 Idle</span>
+                <small>จอดพร้อมรับงาน</small>
+              </button>
+            </div>
+          </section>
+
+
         </div>
-      </section>
-
-      <!-- 2. Recovery & Reset Actions -->
-      <section class="staff-section-card">
-        <h3 class="section-title">⚡ การกู้คืนระบบด่วน (Quick Demo Recovery)</h3>
-        <div class="staff-action-grid">
-          <button type="button" class="btn-staff-action" id="btn-return-start">
-            <span style="font-size: 24px;">🏠</span>
-            <span>RETURN TO START</span>
-            <small style="color: var(--text-dim);">สั่งเดินกลับจุดเริ่มต้นทันที</small>
-          </button>
-          
-          <button type="button" class="btn-staff-action" id="btn-force-unlock">
-            <span style="font-size: 24px;">🔓</span>
-            <span>FORCE UNLOCK</span>
-            <small style="color: var(--text-dim);">ปลดล็อกคิวรับผู้ชมคนใหม่</small>
-          </button>
-        </div>
-      </section>
-
-      <!-- 3. Auto-Return & Timing Configuration -->
-      <form class="staff-section-card" id="staff-config-form">
-        <h3 class="section-title">⚙️ ตั้งค่าระบบกลับจุดเริ่มต้น & เวลาคิว (Settings)</h3>
-        
-        <div class="form-group-row">
-          <div>
-            <label for="cfg-auto-return" style="font-weight: 600;">เดินกลับจุดเริ่มต้นอัตโนมัติ (Auto-Return)</label>
-            <p style="font-size: 0.75rem; color: var(--text-dim);">เมื่อจบ Session ให้หุ่นยนต์เดินกลับมารอที่บูธเอง</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="cfg-auto-return" aria-label="เปิดหรือปิดเดินกลับจุดเริ่มต้นอัตโนมัติ" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="form-group-row">
-          <label for="cfg-timeout">เวลา Inactivity สูงสุด (วินาที):</label>
-          <input type="number" id="cfg-timeout" class="number-input" value="120" min="10" max="600" step="1" required>
-        </div>
-
-        <div class="form-group-row">
-          <label for="cfg-delay">ระยะเวลาหน่วงก่อนเดินกลับ (วินาที):</label>
-          <input type="number" id="cfg-delay" class="number-input" value="5" min="1" max="120" step="1" required>
-        </div>
-
-        <button type="submit" class="start-session-btn" id="btn-save-config" style="padding: 10px; font-size: 0.88rem; width: 100%;">
-          💾 บันทึกการตั้งค่า (Save Settings)
-        </button>
-      </form>
-
-      <section class="staff-section-card" aria-labelledby="subtitle-mode-title">
-        <h3 class="section-title" id="subtitle-mode-title">รูปแบบการตอบของหุ่น</h3>
-        <p id="subtitle-mode-current" role="status" aria-live="polite">ยังไม่ได้อ่านโหมด</p>
-        <form id="subtitle-mode-form">
-          <div class="form-group-row">
-            <label for="subtitle-mode-select">โหมดคำบรรยาย:</label>
-            <select id="subtitle-mode-select" class="number-input" style="width: 100%; text-align: left;" disabled>
-              <option value="standard">Standard — แจ้งสถานะและตอบตามคำสั่ง</option>
-              <option value="friendly">Friendly — คุยเป็นมิตรและชวนเลือกจุด</option>
-            </select>
-          </div>
-          <button type="submit" class="start-session-btn" id="btn-subtitle-mode-save" disabled>ใช้โหมดนี้</button>
-          <button type="button" class="btn-staff-action" id="btn-subtitle-mode-refresh">อ่านโหมดปัจจุบัน</button>
-        </form>
-        <p id="subtitle-mode-feedback" class="session-feedback" role="status" aria-live="polite"></p>
-        <p style="font-size: 0.78rem; color: var(--text-dim);">มีผลกับคำตอบถัดไป ไม่เปลี่ยนการสั่งเดิน เมื่อเปิดระบบคำบรรยายใหม่จะกลับค่าเริ่มต้น</p>
-      </section>
-
-      <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
-      <section class="staff-section-card">
-        <h3 class="section-title">🧪 จำลองสถานการณ์หุ่นยนต์ (Mock Perception Triggers)</h3>
-        <p style="font-size: 0.78rem; color: var(--text-dim);">
-          เปลี่ยนเฉพาะสถานะจำลองที่ Backend แสดงบนหน้าเว็บ ไม่ได้รับประกันว่ามีการสั่ง Robot หรือ Unity จริง
-        </p>
-
-        <div class="staff-action-grid" style="grid-template-columns: 1fr 1fr;">
-          <button type="button" class="btn-staff-action" id="btn-mock-nav">
-            <span>🚀 Navigating</span>
-            <small>กำลังเดินทาง</small>
-          </button>
-
-          <button type="button" class="btn-staff-action" id="btn-mock-obstacle" style="border-color: rgba(245, 158, 11, 0.4);">
-            <span>⚠️ Obstacle</span>
-            <small>เจอสิ่งกีดขวาง (Replan)</small>
-          </button>
-
-          <button type="button" class="btn-staff-action" id="btn-mock-reached" style="border-color: rgba(139, 92, 246, 0.4);">
-            <span>🎯 Reached</span>
-            <small>ถึงจุดหมายแล้ว</small>
-          </button>
-
-          <button type="button" class="btn-staff-action" id="btn-mock-idle">
-            <span>🟢 Idle</span>
-            <small>จอดพร้อมรับงาน</small>
-          </button>
-        </div>
-      </section>
-
-      <!-- 5. Direct Action Outcomes -->
-      <section class="staff-section-card">
-        <h3 class="section-title">🚦 ผลคำสั่ง Action จาก Staff / Auto-return</h3>
-        <div class="staff-action-result" aria-live="polite" aria-atomic="true">
-          <p class="staff-action-status" id="staff-action-status">ยังไม่มีผล Action</p>
-          <p id="staff-action-source">ผู้ส่ง: —</p>
-          <p id="staff-action-destination">ปลายทาง: —</p>
-          <p id="staff-action-error-code">รหัสข้อผิดพลาด: —</p>
-          <p id="staff-action-ros-status">สถานะ ROS: —</p>
-          <p id="staff-action-error-message">รายละเอียด: —</p>
-        </div>
-        <p class="staff-action-note">แสดงคำสั่งตรงจากหน้า Staff และ Auto-return เท่านั้น ไม่ใช่สถานะคำสั่งนำทางจาก intent.</p>
-      </section>
-
-      <!-- 6. Real-Time Raw State Inspection -->
-      <section class="staff-section-card">
-        <h3 class="section-title">📡 สถานะดิบล่าสุด (Live State Inspection)</h3>
-        <pre id="raw-state-dump" style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #38bdf8; overflow-x: auto;">
-กำลังดึงข้อมูล...
-        </pre>
-      </section>
-
+      </div>
     </div>
 
   </div>
@@ -485,6 +505,7 @@
       function renderLiveState(data) {
         rawStateDump.textContent = JSON.stringify(data, null, 2);
         renderActionOutcome(data);
+        renderIntentInspection(data);
         renderRobotMind(data);
         setDataStatus('connected');
       }
@@ -603,6 +624,36 @@
         setTextIfChanged(actionErrorMessage, `รายละเอียด: ${action.error_msg || '—'}`);
       }
 
+
+      function renderIntentInspection(state) {
+        const requestId = state.latest_request_id;
+        const intent = requestId && state.latest_intent?.request_id === requestId ? state.latest_intent : null;
+        const dispatch = requestId && state.latest_intent_dispatch?.request_id === requestId ? state.latest_intent_dispatch : null;
+        const labels = {
+          NAVIGATE: 'นำทาง (NAVIGATE)', CLARIFY: 'ขอข้อมูลเพิ่ม (CLARIFY)',
+          UNSUPPORTED: 'สนทนา / คำขอที่ไม่รองรับ (UNSUPPORTED)', FAILED: 'ประมวลผลหรือส่งต่อไม่ได้ (FAILED)'
+        };
+        const status = !requestId ? 'ยังไม่มีคำสั่งให้ตรวจสอบ'
+          : intent ? (labels[intent.status] || `ไม่รู้จักผล Intent (${intent.status})`) : 'กำลังรอผล Intent';
+        let dispatchText = requestId ? 'รอผล Intent ก่อนตรวจการส่ง' : '—';
+        if (dispatch) {
+          dispatchText = {
+            sent: 'ส่งแล้ว', unknown: 'ยังยืนยันการส่งไม่ได้ — เกิดข้อผิดพลาดระหว่างส่ง',
+            simulated: 'จำลองการส่ง (Mock)'
+          }[dispatch.status] || 'ยังยืนยันการส่งไม่ได้';
+        } else if (intent?.status === 'NAVIGATE') {
+          dispatchText = 'ยังไม่ได้รับข้อมูลยืนยันการส่ง';
+        } else if (intent && ['CLARIFY', 'UNSUPPORTED', 'FAILED'].includes(intent.status)) {
+          dispatchText = 'ไม่ได้ส่ง';
+        }
+        setTextIfChanged(document.getElementById('staff-intent-status'), status);
+        setTextIfChanged(document.getElementById('staff-intent-destination'),
+          `ปลายทางจาก Intent: ${formatGoalTarget(intent?.destination_id || dispatch?.destination_id, state.locations)}`);
+        const detail = [intent?.message, intent?.error_code].filter(Boolean).join(' · ');
+        setTextIfChanged(document.getElementById('staff-intent-message'), `รายละเอียด: ${detail || '—'}`);
+        setTextIfChanged(document.getElementById('staff-intent-dispatch'), `การส่ง Action: ${dispatchText}`);
+        setTextIfChanged(document.getElementById('staff-intent-request'), `รหัสคำสั่ง: ${requestId || '—'}`);
+      }
 
       function renderRobotMind(state) {
         if (!staffRobotStateText) return;

@@ -61,6 +61,30 @@ cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
 bash booth_web_controller/run_tailscale.sh
 ```
 
+### ตรวจ Intent และการส่ง Action จากหน้า Staff
+
+การ์ด **ผล Intent และการส่ง Action** แสดงผลคำสั่งล่าสุด ปลายทาง รายละเอียด และรหัสคำสั่งเดียวกันกับ Backend:
+
+- **ส่งแล้ว**: Intent เรียก `send_goal_async` และได้รับ future กลับมา ยังไม่ยืนยันว่า Robot รับงานหรือเริ่มเดิน
+- **ไม่ได้ส่ง**: Intent จบด้วย `CLARIFY`, `UNSUPPORTED` หรือ `FAILED` ก่อนส่ง Action ดูเหตุผลในรายละเอียด
+- **ยังไม่ได้รับข้อมูลยืนยันการส่ง**: ได้ผล `NAVIGATE` แต่ยังไม่ได้รับ `IntentDispatch` ห้ามใช้สถานะนี้สรุปว่าไม่ได้ส่ง
+- **ยังยืนยันการส่งไม่ได้**: การเรียกส่งเกิด exception อาจส่งถึง Robot แล้ว ระบบไม่ลองส่งซ้ำอัตโนมัติ
+- **จำลองการส่ง (Mock)**: Backend กำลังจำลองการนำทาง ไม่ได้ส่ง Action จริง
+
+Backend รับ `ai_interfaces/msg/IntentDispatch` จาก `/guide/intent_dispatch` และจับคู่ `request_id` กับ `session_id` ข้อมูลเก่าไม่แทนคำสั่งใหม่ การ์ดเริ่มรอผลใหม่เมื่อส่งคำสั่งถัดไป และล้างเมื่อจบ session ช่อง Live State Inspection เดิมยังแสดง JSON ทั้งหมด
+
+ก่อนใช้ Backend รุ่นนี้กับ ROS จริง ให้อัปเดต repo LLM เป็นรุ่นที่มี `IntentDispatch.msg` แล้ว build บนเครื่อง Backend/LLM หนึ่งครั้ง:
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+source /opt/ros/jazzy/setup.bash
+source .venv/bin/activate
+colcon --log-base log-colcon build --build-base build-colcon \
+  --install-base install-colcon --packages-select ai_interfaces agent_pkg
+```
+
+เปิด Intent และ Backend ใหม่ด้วยสคริปต์เดิม แล้วกด Ctrl+Shift+R ที่หน้า Staff ข้อมูลตรวจการส่งเพิ่ม message ใหม่โดยไม่เปลี่ยน Action หรือ message เดิมของ Robot และ VR
+
 ### เลือกโหมด subtitle จากหน้า Staff
 
 หน้า Staff รับคำบรรยายสดผ่าน `/ws/status` เดิมและค้างข้อความล่าสุดจนมีข้อความใหม่แทน เพื่อไม่พลาดซับสั้นระหว่างรอบอ่านสถานะ มี polling สำรองเมื่อการเชื่อมต่อสดหลุด และเชื่อม WebSocket ใหม่อัตโนมัติ หลังอัปเดตหน้า Staff ให้กด Ctrl+Shift+R

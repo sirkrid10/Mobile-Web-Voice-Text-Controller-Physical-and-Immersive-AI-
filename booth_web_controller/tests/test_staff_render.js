@@ -362,3 +362,49 @@ test('staff stops the live stream when PIN authorization is cleared', async () =
   ui.intervals[0]();
   assert.equal(ui.sockets.length, 1);
 });
+
+test('staff distinguishes Intent decision from actual dispatch and clears old results', async () => {
+  const ui = createStaffUI();
+  await new Promise(resolve => setImmediate(resolve));
+  const get = id => ui.elements.get(id).textContent;
+  assert.equal(get('staff-intent-status'), 'ยังไม่มีคำสั่งให้ตรวจสอบ');
+  ui.sendSocketState({ latest_request_id: 'req-1', latest_intent: {
+    request_id: 'req-1', status: 'NAVIGATE', destination_id: 'B'
+  } });
+  assert.match(get('staff-intent-status'), /นำทาง/);
+  assert.equal(get('staff-intent-destination'), 'ปลายทางจาก Intent: จุด B');
+  assert.equal(get('staff-intent-dispatch'), 'การส่ง Action: ยังไม่ได้รับข้อมูลยืนยันการส่ง');
+  ui.sendSocketState({ latest_request_id: 'req-1', latest_intent_dispatch: { request_id: 'req-1', status: 'sent' } });
+  assert.equal(get('staff-intent-dispatch'), 'การส่ง Action: ส่งแล้ว');
+  ui.sendSocketState({ latest_request_id: 'req-2', latest_intent: null, latest_intent_dispatch: null });
+  assert.equal(get('staff-intent-status'), 'กำลังรอผล Intent');
+  assert.doesNotMatch(get('staff-intent-dispatch'), /ส่งแล้ว/);
+  assert.equal(get('staff-intent-destination'), 'ปลายทางจาก Intent: —');
+  ui.sendSocketState({ latest_request_id: 'req-2', latest_intent: { request_id: 'req-1', status: 'NAVIGATE' },
+    latest_intent_dispatch: { request_id: 'req-1', status: 'sent' } });
+  assert.equal(get('staff-intent-status'), 'กำลังรอผล Intent');
+  assert.doesNotMatch(get('staff-intent-dispatch'), /ส่งแล้ว/);
+});
+
+for (const status of ['CLARIFY', 'UNSUPPORTED', 'FAILED']) {
+  test(`staff shows no Action dispatch for ${status} with the reason as text`, async () => {
+    const ui = createStaffUI();
+    await new Promise(resolve => setImmediate(resolve));
+    ui.sendSocketState({ latest_request_id: 'req-1', latest_intent: {
+      request_id: 'req-1', status, message: '<script>unsafe()</script>', error_code: 'robot_not_ready'
+    } });
+    assert.equal(ui.elements.get('staff-intent-dispatch').textContent, 'การส่ง Action: ไม่ได้ส่ง');
+    assert.equal(ui.elements.get('staff-intent-message').textContent,
+      'รายละเอียด: <script>unsafe()</script> · robot_not_ready');
+  });
+}
+
+test('dispatch arriving before Intent is visible, and unknown and mock are distinct from sent', async () => {
+  const ui = createStaffUI();
+  await new Promise(resolve => setImmediate(resolve));
+  ui.sendSocketState({ latest_request_id: 'req-1', latest_intent: null,
+    latest_intent_dispatch: { request_id: 'req-1', status: 'unknown', destination_id: 'A' } });
+  assert.match(ui.elements.get('staff-intent-dispatch').textContent, /ยังยืนยันการส่งไม่ได้/);
+  ui.sendSocketState({ latest_request_id: 'req-1', latest_intent_dispatch: { request_id: 'req-1', status: 'simulated' } });
+  assert.equal(ui.elements.get('staff-intent-dispatch').textContent, 'การส่ง Action: จำลองการส่ง (Mock)');
+});

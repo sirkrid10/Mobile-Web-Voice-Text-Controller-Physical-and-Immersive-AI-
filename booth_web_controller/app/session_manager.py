@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, Callable
 from fastapi import HTTPException
 
 from app.config import settings
-from app.models import DirectActionOutcome, IntentOutcome, StateBroadcast
+from app.models import DirectActionOutcome, IntentDispatchOutcome, IntentOutcome, StateBroadcast
 
 
 class SessionManager:
@@ -37,6 +37,7 @@ class SessionManager:
         self.robot_pose: Dict[str, float] = {"x": 0.0, "y": 0.0}
         self.latest_request_identity: Optional[tuple[str, str]] = None
         self.latest_intent: Optional[IntentOutcome] = None
+        self.latest_intent_dispatch: Optional[IntentDispatchOutcome] = None
         self.latest_action: Optional[DirectActionOutcome] = None
 
         # External hooks
@@ -71,6 +72,7 @@ class SessionManager:
                 self.last_activity_ts = time.time()
                 self.latest_request_identity = None
                 self.latest_intent = None
+                self.latest_intent_dispatch = None
 
                 # Cancel any pending auto-return task since a new visitor arrived
                 if self.auto_return_task and not self.auto_return_task.done():
@@ -114,6 +116,7 @@ class SessionManager:
                 self.last_activity_ts = time.time()
                 self.latest_request_identity = None
                 self.latest_intent = None
+                self.latest_intent_dispatch = None
                 if self.auto_return_task and not self.auto_return_task.done():
                     self.auto_return_task.cancel()
                     self.auto_return_task = None
@@ -137,6 +140,7 @@ class SessionManager:
             identity = (f"req-{secrets.token_hex(8)}", session_id)
             self.latest_request_identity = identity
             self.latest_intent = None
+            self.latest_intent_dispatch = None
             self._trigger_broadcast()
             return identity
 
@@ -165,6 +169,16 @@ class SessionManager:
         ):
             return False
         self.latest_action = result
+        self._trigger_broadcast()
+        return True
+
+    def record_intent_dispatch(self, result: IntentDispatchOutcome) -> bool:
+        """Correlate sender evidence even when it arrives before IntentResult."""
+        if self.latest_request_identity != (result.request_id, result.session_id):
+            return False
+        if self.active_session_id != result.session_id or self.latest_intent_dispatch is not None:
+            return False
+        self.latest_intent_dispatch = result
         self._trigger_broadcast()
         return True
 
@@ -234,6 +248,7 @@ class SessionManager:
             self.active_session_token = None
             self.latest_request_identity = None
             self.latest_intent = None
+            self.latest_intent_dispatch = None
             print(f"[SessionManager] Released session {released_session} (reason: {reason})")
 
             # Check Auto-Return criteria
@@ -369,6 +384,8 @@ class SessionManager:
             obstacle_detected=self.obstacle_detected,
             locations=settings.LOCATIONS,
             latest_intent=self.latest_intent,
+            latest_request_id=self.latest_request_identity[0] if self.latest_request_identity else None,
+            latest_intent_dispatch=self.latest_intent_dispatch,
             latest_action=self.latest_action
         )
 

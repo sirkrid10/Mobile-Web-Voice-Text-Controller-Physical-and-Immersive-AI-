@@ -76,6 +76,14 @@ class DirectActionOutcome(BaseModel):
     error_msg: str = ""
 
 
+class IntentDispatchOutcome(BaseModel):
+    request_id: str
+    session_id: str
+    stamp: RosStamp
+    destination_id: str
+    status: Literal["sent", "unknown", "simulated"]
+
+
 # ---------------------------------------------------------------------------
 # Staff Models
 # ---------------------------------------------------------------------------
@@ -129,4 +137,6 @@ class StateBroadcast(BaseModel):
     obstacle_detected: bool
     locations: List[Dict[str, Any]]
     latest_intent: Optional[IntentOutcome] = None
+    latest_request_id: Optional[str] = None
+    latest_intent_dispatch: Optional[IntentDispatchOutcome] = None
     latest_action: Optional[DirectActionOutcome] = None

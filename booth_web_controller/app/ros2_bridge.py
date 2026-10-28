@@ -20,7 +20,7 @@ import math
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 
-from app.models import DirectActionOutcome, IntentOutcome, RosStamp
+from app.models import DirectActionOutcome, IntentDispatchOutcome, IntentOutcome, RosStamp
 
 from app.config import settings
 from app.subtitle_mode import SubtitleModeControl, SubtitleModeError
@@ -208,6 +208,11 @@ class MockROS2Bridge(BaseROS2Bridge):
                 destination_id=target
             ))
             self._start_navigation_simulation(target)
+            self.session_manager.record_intent_dispatch(IntentDispatchOutcome(
+                request_id=req_id, session_id=session_id,
+                stamp=RosStamp(sec=int(time.time()), nanosec=0),
+                destination_id=target, status="simulated",
+            ))
 
     @staticmethod
     def _normalize_mock_text(text: str) -> str:
@@ -341,7 +346,7 @@ class RealROS2Bridge(BaseROS2Bridge):
             from rclpy.node import Node
             from rclpy.action import ActionClient
             from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
-            from ai_interfaces.msg import UserRequest, NavigationState, Subtitle, IntentResult
+            from ai_interfaces.msg import UserRequest, NavigationState, Subtitle, IntentResult, IntentDispatch
             from ai_interfaces.action import GuideToDestination
             from action_msgs.msg import GoalStatus
             from rclpy.duration import Duration
@@ -429,6 +434,21 @@ class RealROS2Bridge(BaseROS2Bridge):
                     self._on_intent_result,
                     qos_profile
                 )
+                self.sub_intent_dispatch = self.create_subscription(
+                    IntentDispatch, '/guide/intent_dispatch',
+                    self._on_intent_dispatch, qos_profile,
+                )
+
+            def _on_intent_dispatch(self, msg: IntentDispatch):
+                statuses = {IntentDispatch.SENT: "sent", IntentDispatch.UNKNOWN: "unknown"}
+                if msg.status not in statuses or msg.stamp.sec <= 0 or not 0 <= msg.stamp.nanosec < 1_000_000_000:
+                    return
+                outcome = IntentDispatchOutcome(
+                    request_id=msg.request_id, session_id=msg.session_id,
+                    stamp=RosStamp(sec=msg.stamp.sec, nanosec=msg.stamp.nanosec),
+                    destination_id=msg.destination_id, status=statuses[msg.status],
+                )
+                outer.loop.call_soon_threadsafe(outer.session_manager.record_intent_dispatch, outcome)
 
             def _on_navigation_state(self, msg: NavigationState):
                 """Handle /robot/navigation_state updates directly from NavigationState."""
