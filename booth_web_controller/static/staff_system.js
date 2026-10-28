@@ -13,6 +13,7 @@
 
     function render(data) {
       latest = data;
+      window.StaffGuide?.setPaths(data);
       const manager = data.processes, ros = data.ros || {}, tail = data.tailscale || {}, vr = data.vr || {};
       set('staff-system-mode', `${data.mock ? 'Mock · ' : ''}${manager.mode === 'manual' ? 'Manual — เปิด node เองใน terminal' : 'Automatic — Backend ดูแล node'}`);
       set('staff-system-note', manager.problem || data.error || (manager.enabled

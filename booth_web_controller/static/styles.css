@@ -2230,3 +2230,141 @@ body.visitor-page {
 .staff-health-status[data-level="ok"] { color: #6ee7b7; }
 .staff-health-status[data-level="error"] { color: #fca5a5; }
 .staff-health-status[data-level="unknown"] { color: #fcd34d; }
+
+.staff-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.8);
+}
+
+.staff-tabs [role="tab"] {
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.staff-tabs [aria-selected="true"] {
+  color: #e0f2fe;
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.staff-guide-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.staff-page [role="tabpanel"][hidden] {
+  display: none;
+}
+
+.staff-guide-panel .staff-section-card {
+  scroll-margin-top: 20px;
+  color: #cbd5e1;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.staff-guide-panel h2,
+.staff-guide-panel h3,
+.staff-guide-panel h4 {
+  color: var(--text-main);
+}
+
+.staff-guide-panel h2 { font-size: 1.25rem; }
+.staff-guide-panel h3 { font-size: 1.08rem; }
+.staff-guide-panel h4 { font-size: 0.9rem; }
+
+.staff-guide-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.staff-guide-links a {
+  padding: 10px 14px;
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  color: #7dd3fc;
+  text-decoration: none;
+}
+
+.staff-guide-steps {
+  padding-left: 24px;
+}
+
+.staff-guide-steps li + li {
+  margin-top: 8px;
+}
+
+.staff-guide-command {
+  min-width: 0;
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  background: #080d16;
+}
+
+.staff-command-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.staff-command-toolbar button {
+  min-height: 44px;
+  padding: 8px 16px;
+}
+
+.staff-guide-command pre {
+  max-width: 100%;
+  padding: 16px;
+  color: #bae6fd;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.staff-guide-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.staff-guide-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.staff-guide-table th,
+.staff-guide-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-glass);
+  vertical-align: top;
+}
+
+.staff-guide-table th {
+  color: #e2e8f0;
+}
+
+.staff-guide-table th:first-child { width: 30%; }
+.staff-guide-details summary { min-height: 44px; padding: 10px 0; cursor: pointer; color: #7dd3fc; }
+.staff-guide-details p { margin: 10px 0; }
+.staff-guide-intro .staff-action-note { overflow-wrap: anywhere; }

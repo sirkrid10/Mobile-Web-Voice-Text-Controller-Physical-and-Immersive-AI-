@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 
 
 async def run_probe(*argv, timeout=3):
@@ -72,7 +73,7 @@ class SystemHealth:
             await asyncio.sleep(5)
 
     def snapshot(self):
-        result = {**self.latest, 'processes': self.processes.snapshot(), 'vr': self.hub.inspection()}
+        result = {**self.latest, 'backend_directory': str(Path(__file__).resolve().parents[2]), 'processes': self.processes.snapshot(), 'vr': self.hub.inspection()}
         ros = dict(result.get('ros', {}))
         ros.update(self.bridge.robot_observation())
         received_at = ros.get('robot_received_at')

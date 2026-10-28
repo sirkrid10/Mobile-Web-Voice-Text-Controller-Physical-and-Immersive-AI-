@@ -60,6 +60,12 @@
         </p>
       </section>
 
+      <div class="staff-tabs" role="tablist" aria-label="หน้าเจ้าหน้าที่">
+        <button type="button" id="staff-tab-control" role="tab" aria-selected="true" aria-controls="staff-control-panel" tabindex="0">ควบคุมและตรวจสถานะ</button>
+        <button type="button" id="staff-tab-guide" role="tab" aria-selected="false" aria-controls="staff-guide-panel" tabindex="-1">คู่มือและ Fallback</button>
+      </div>
+
+      <section id="staff-control-panel" role="tabpanel" aria-labelledby="staff-tab-control" tabindex="0">
       <div class="staff-workspace">
         <div class="staff-column staff-monitor-column">
           <h2 class="staff-column-title">ติดตามสถานะและคำสั่ง</h2>
@@ -299,10 +305,146 @@
 
         </div>
       </div>
+      </section>
+      <section id="staff-guide-panel" class="staff-guide-panel" role="tabpanel" aria-labelledby="staff-tab-guide" tabindex="0" hidden>
+        <div class="staff-section-card staff-guide-intro">
+          <h2>คู่มือเปิดระบบและรับมือปัญหา</h2>
+          <p>เริ่มจากสถานะที่แท็บควบคุม แล้วเลือกขั้นตอนด้านล่าง คำสั่งชุด Tailscale ในคู่มือนี้คัดลอกไปใช้ใน Ubuntu WSL เท่านั้น ปุ่มคัดลอกไม่สั่งรันให้</p>
+          <p id="staff-guide-path-note" class="staff-action-note">กำลังอ่านตำแหน่งโฟลเดอร์จาก Backend ระหว่างนี้ใช้ตัวอย่างตำแหน่งติดตั้งมาตรฐาน</p>
+          <p id="staff-guide-feedback" role="status" aria-live="polite"></p>
+          <nav class="staff-guide-links" aria-label="หัวข้อคู่มือ">
+            <a href="#guide-startup">เปิดระบบ</a>
+            <a href="#guide-problems">แก้ปัญหา</a>
+            <a href="#guide-terminal">กลับไปใช้ terminal</a>
+            <a href="#guide-automatic">กลับ Automatic</a>
+            <a href="#guide-checks">คำสั่งตรวจเพิ่มเติม</a>
+          </nav>
+        </div>
+
+        <section class="staff-section-card" id="guide-startup" aria-labelledby="guide-startup-title">
+          <h3 id="guide-startup-title">เปิดระบบตามปกติ</h3>
+          <ol class="staff-guide-steps">
+            <li>ให้ฝั่งหุ่นเปิด VM, Tailscale, Discovery Server, Robot Bridge และ Nav2 ก่อน</li>
+            <li>เปิด Tailscale ภายใน Ubuntu WSL ตามการตั้งค่าชุดนี้ แล้วใช้คำสั่ง Backend ด้านล่างเพียง terminal เดียว</li>
+            <li>เข้า Staff แล้วตรวจ Process, ROS และอายุข้อมูล Robot แยกกัน Backend จะเปิด Intent/Subtitle ให้ หากไม่ได้ค้างอยู่ใน Manual หรือเคยสั่งปิด node ไว้</li>
+            <li>หากต้องการโหมดคุย ให้กดอ่านโหมด Subtitle แล้วเลือก Friendly หลังเปิดหรือ Restart Subtitle</li>
+          </ol>
+          <div class="staff-guide-command" data-command-key="startup">
+            <div class="staff-command-toolbar"><h4>Terminal Backend</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-startup">คัดลอก</button></div>
+            <pre id="guide-command-startup" tabindex="0">cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh</pre>
+          </div>
+          <p class="staff-action-note">คำสั่งนี้ใช้กับรุ่นที่มีตัวดูแล process และ LLM ที่ build แล้ว ไม่ต้องเปิด Intent/Subtitle ซ้ำ หากยังไม่ได้ build หลังอัปเดต ให้ดูหัวข้อคำสั่งตรวจเพิ่มเติมท้ายคู่มือ</p>
+        </section>
+
+        <section class="staff-section-card" id="guide-problems" aria-labelledby="guide-problems-title">
+          <h3 id="guide-problems-title">เห็นอาการนี้ ควรตรวจตรงไหน</h3>
+          <div class="staff-guide-table-wrap" tabindex="0" role="region" aria-label="ตารางรับมือปัญหา เลื่อนแนวนอนได้">
+            <table class="staff-guide-table">
+              <thead><tr><th scope="col">อาการ</th><th scope="col">ตรวจและทำต่อ</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Tailscale ไม่เชื่อม / VM ping ไม่ได้</th><td>ดูสถานะ local กับ VM แยกกัน ให้ฝั่ง VM ตรวจว่าเครื่องและ Tailscale เปิดอยู่ Online ที่ peer รายงานยังไม่ยืนยันว่า ping หรือ DDS ติดต่อได้</td></tr>
+                <tr><th scope="row">Process ล้มเหลว</th><td>เปิด Log ของ node นั้น ดู exit code และข้อผิดพลาด เช่น key ไม่พร้อม, venv หาย หรือยังไม่ได้ build แก้ต้นเหตุก่อนกดเปิดใหม่ ไม่ต้องแสดง API key ให้ผู้อื่นดู</td></tr>
+                <tr><th scope="row">Process อยู่ แต่ ROS ไม่ตอบ</th><td>ตรวจ domain และ Discovery Server ให้ตรงกัน ตรวจ VM/Discovery ก่อน หากเพิ่งกลับจาก VM ออฟไลน์ ให้ Restart node ที่ไม่ตอบแล้วตรวจใหม่ การเห็นชื่อใน graph อย่างเดียวไม่ยืนยันว่าติดต่อได้</td></tr>
+                <tr><th scope="row">Robot NOT_READY / ไม่มีสถานะสด</th><td>ดูอายุ stamp ต้นทางและเวลารับล่าสุด ถ้าข้อมูลสดแต่ไม่พร้อม ให้ฝั่งหุ่นตรวจ Robot Bridge/Nav2 การ Restart Intent ไม่ทำให้หุ่นพร้อมโดยอัตโนมัติ</td></tr>
+                <tr><th scope="row">ซับเก่าค้าง / ซับไม่เปลี่ยน</th><td>เว็บกับ VR ตั้งใจเก็บซับล่าสุดไว้ ดูรหัสคำสั่ง ผล Intent และเวลา/ลำดับซับใหม่ประกอบ ตรวจ ROS ของ Subtitle, log และนาฬิกาต้นทางก่อน Restart</td></tr>
+                <tr><th scope="row">VR เชื่อมต่อ 0 ตัว</th><td>ตรวจ URL และเส้นทางจากอุปกรณ์ VR ไป Backend ใช้ /ws/vr/subtitle บน Backend ที่ถูกตัว 127.0.0.1 บน Quest หมายถึง Quest เอง ต้องใช้ IP Backend ที่อุปกรณ์เข้าถึงได้</td></tr>
+                <tr><th scope="row">VR เชื่อมแล้ว แต่ไม่เห็นซับ</th><td>เทียบเวลาส่งและลำดับล่าสุดกับข้อความใหม่ การส่งสำเร็จยังไม่ยืนยันการแสดงบนจอ ให้ตรวจ receiver, Target และฟอนต์ฝั่ง Unity ร่วมด้วย</td></tr>
+                <tr><th scope="row">ปุ่มเปิด node ถูกปิดไว้</th><td>ถ้าเป็น Mock ระบบจะไม่เปิด ROS จริง ถ้าเป็น Manual ให้ใช้ terminal หรือกลับ Automatic ถ้าปิดตัวดูแลด้วย MANAGE_AGENT_NODES=false ต้องเปิด Backend ใหม่แบบปกติก่อนใช้ปุ่ม</td></tr>
+                <tr><th scope="row">พบ process ภายนอก</th><td>ตัวดูแลไม่ปิด process ที่เปิดเอง ให้กลับไปกด Ctrl+C ใน terminal เจ้าของตัวนั้นก่อนใช้ Automatic อย่าใช้ pkill python เพื่อแก้ปัญหา</td></tr>
+                <tr><th scope="row">หน้าเว็บค้าง / Backend ตาย</th><td>ใช้ stop-all หรือ kill-all ด้านล่างได้โดยไม่ใช้ HTTP/ROS แล้วกลับไปเปิด node ทีละ terminal หากเปิดหน้าเว็บไม่ได้เลย ให้เปิด README หลักของ branch นี้แทน</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="staff-section-card" id="guide-terminal" aria-labelledby="guide-terminal-title">
+          <h3 id="guide-terminal-title">Fallback กลับไปเปิดเองใน terminal</h3>
+          <p>ปิด node ไม่ใช่ Emergency Stop และไม่ยืนยันว่าหุ่นหยุดเดิน หากต้องการหยุดการเคลื่อนที่ ให้ใช้ปุ่มหยุดฉุกเฉินด้านบนหรือประสานฝั่งหุ่นก่อน</p>
+          <ol class="staff-guide-steps">
+            <li>ถ้าหน้า Staff ยังทำงาน กด Manual เพื่อปิด process ที่ Backend ดูแลและจำว่าไม่ให้เปิดกลับเอง</li>
+            <li>หาก UI ใช้ไม่ได้ ใช้ stop-all ด้านล่างจากบัญชี Linux เดียวกับ Backend ระบุ workspace เดียวกัน คำสั่งจะบันทึก Manual ก่อนปิด และบังคับปิดเมื่อรอแล้วไม่จบ</li>
+            <li>เปิด Intent กับ Subtitle ในคนละ terminal ด้วยคำสั่งเดิม เปิด Backend แบบไม่ดูแล node ตามคำสั่งด้านล่างหากต้องเปิดเว็บใหม่</li>
+          </ol>
+          <div class="staff-guide-command" data-command-key="status">
+            <div class="staff-command-toolbar"><h4>ดู process ที่ตัวดูแลเปิด</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-status">คัดลอก</button></div>
+            <pre id="guide-command-status" tabindex="0">python3 booth_web_controller/tools/agent_nodes.py status --workspace ~/ros2_ws/turtlebot-llm</pre>
+          </div>
+          <div class="staff-guide-command" data-command-key="stop">
+            <div class="staff-command-toolbar"><h4>ปิดทั้งหมดและเข้า Manual</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-stop">คัดลอก</button></div>
+            <pre id="guide-command-stop" tabindex="0">python3 booth_web_controller/tools/agent_nodes.py stop-all --workspace ~/ros2_ws/turtlebot-llm</pre>
+          </div>
+          <details class="staff-guide-details">
+            <summary>ต้องการบังคับปิดทันที (Kill)</summary>
+            <div class="staff-guide-command" data-command-key="kill">
+              <div class="staff-command-toolbar"><h4>Kill เฉพาะ process ที่ตัวดูแลเปิด</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-kill">คัดลอก</button></div>
+              <pre id="guide-command-kill" tabindex="0">python3 booth_web_controller/tools/agent_nodes.py kill-all --workspace ~/ros2_ws/turtlebot-llm</pre>
+            </div>
+          </details>
+          <p class="staff-action-note">คำสั่ง fallback ตรวจตัวตน process ก่อนปิด ไม่แตะตัวที่เปิดจาก terminal เอง และไม่เปิด node กลับจนสั่งเปิดหรือออกจาก Manual</p>
+          <div class="staff-guide-command" data-command-key="intent">
+            <div class="staff-command-toolbar"><h4>Terminal 1 · Intent</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-intent">คัดลอก</button></div>
+            <pre id="guide-command-intent" tabindex="0">cd ~/ros2_ws/turtlebot-llm
+bash ./run_tailscale.sh intent</pre>
+          </div>
+          <div class="staff-guide-command" data-command-key="subtitle">
+            <div class="staff-command-toolbar"><h4>Terminal 2 · Subtitle</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-subtitle">คัดลอก</button></div>
+            <pre id="guide-command-subtitle" tabindex="0">cd ~/ros2_ws/turtlebot-llm
+bash ./run_tailscale.sh subtitle</pre>
+          </div>
+          <div class="staff-guide-command" data-command-key="manual-backend">
+            <div class="staff-command-toolbar"><h4>Terminal 3 · Backend แบบเปิด node เอง</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-manual-backend">คัดลอก</button></div>
+            <pre id="guide-command-manual-backend" tabindex="0">MANAGE_AGENT_NODES=false bash booth_web_controller/run_tailscale.sh</pre>
+          </div>
+        </section>
+
+        <section class="staff-section-card" id="guide-automatic" aria-labelledby="guide-automatic-title">
+          <h3 id="guide-automatic-title">กลับมาใช้ Automatic</h3>
+          <ol class="staff-guide-steps">
+            <li>กด Ctrl+C ใน terminal ที่เปิด Intent และ Subtitle เองให้ปิดก่อน เพื่อไม่ให้มีตัวซ้ำ</li>
+            <li>ถ้า Backend เปิดตัวดูแลไว้ กด Automatic ในแท็บควบคุม แล้วตรวจ Process กับ ROS อีกครั้ง</li>
+            <li>ถ้าเปิด Backend แบบ MANAGE_AGENT_NODES=false ให้หยุด Backend ตัวนั้น จากนั้นใช้คำสั่งเตรียมโหมดและเปิดใหม่ด้านล่าง</li>
+          </ol>
+          <div class="staff-guide-command" data-command-key="automatic">
+            <div class="staff-command-toolbar"><h4>เตรียม Automatic แล้วเปิด Backend ใหม่</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-automatic">คัดลอก</button></div>
+            <pre id="guide-command-automatic" tabindex="0">python3 booth_web_controller/tools/agent_nodes.py automatic --workspace ~/ros2_ws/turtlebot-llm
+bash booth_web_controller/run_tailscale.sh</pre>
+          </div>
+        </section>
+
+        <section class="staff-section-card" id="guide-checks" aria-labelledby="guide-checks-title">
+          <h3 id="guide-checks-title">คำสั่งตรวจเพิ่มเติมและอัปเดตครั้งแรก</h3>
+          <p>ใช้เมื่อข้อมูลในแท็บควบคุมยังไม่พอ คำสั่งตรวจด้านล่างไม่ส่ง Goal ไปหุ่น ค่า VM ต้องตรงกับเครื่องที่ใช้งานจริง</p>
+          <div class="staff-guide-command" data-command-key="network">
+            <div class="staff-command-toolbar"><h4>ตรวจ Tailscale</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-network">คัดลอก</button></div>
+            <pre id="guide-command-network" tabindex="0">tailscale status
+tailscale ip -4</pre>
+          </div>
+          <div class="staff-guide-command" data-command-key="profile">
+            <div class="staff-command-toolbar"><h4>โหลด ROS profile และดูรายชื่อ node</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-profile">คัดลอก</button></div>
+            <pre id="guide-command-profile" tabindex="0">cd ~/ros2_ws/turtlebot-llm
+source ./setup_tailscale_ros.sh
+ros2 node list --no-daemon</pre>
+          </div>
+          <p class="staff-action-note">รายชื่อใน graph เป็นข้อมูลประกอบ หากไม่พบชื่อ ยังสรุปไม่ได้ว่า process หาย อย่า source profile LAN ทับชุด Tailscale ที่กำลังใช้งาน</p>
+          <details class="staff-guide-details">
+            <summary>Build หลังอัปเดต LLM / IntentDispatch ครั้งแรก</summary>
+            <p>หยุด Intent/Subtitle ก่อน build และใช้ checkout LLM ที่มี IntentDispatch แล้ว หลัง build ให้เปิด Backend ใหม่ ส่วน Action และ message เดิมของ Robot ไม่เปลี่ยน</p>
+            <div class="staff-guide-command" data-command-key="build">
+              <div class="staff-command-toolbar"><h4>Build บนเครื่อง Backend/LLM</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-build">คัดลอก</button></div>
+              <pre id="guide-command-build" tabindex="0">cd ~/ros2_ws/turtlebot-llm
+source /opt/ros/jazzy/setup.bash
+source .venv/bin/activate
+colcon --log-base log-colcon build --build-base build-colcon --install-base install-colcon --packages-select ai_interfaces agent_pkg</pre>
+            </div>
+          </details>
+        </section>
+      </section>
     </div>
 
   </div>
 
+  <script src="/static/staff_guide.js"></script>
   <script src="/static/staff_system.js"></script>
   <script>
     (function() {
@@ -379,6 +521,7 @@
       function clearStaffAuth(message) {
         stopLiveSocket();
         systemPanel?.stop();
+        window.StaffGuide?.reset();
         subtitleModeVersion += 1;
         subtitleModeBusy = false;
         subtitleModeKnown = false;
