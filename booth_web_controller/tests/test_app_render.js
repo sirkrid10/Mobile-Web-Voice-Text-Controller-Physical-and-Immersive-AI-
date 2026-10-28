@@ -155,6 +155,12 @@ async function main() {
   assert.equal(get('robot-status-card').style.display, 'flex');
   assert.equal(get('view-active').style.display, 'flex');
   assert.equal(get('robot-heard-text').textContent, '(ยังไม่มีคำสั่งล่าสุด)');
+  ui.sendState({ llm_reason: 'หิวแล้วเหรอครับ จะให้ผมไปจุดไหนดีครับ' });
+  assert.equal(get('robot-reason-text').textContent, 'หิวแล้วเหรอครับ จะให้ผมไปจุดไหนดีครับ');
+  ui.sendState({ llm_reason: '' });
+  assert.equal(get('robot-reason-text').textContent, 'หิวแล้วเหรอครับ จะให้ผมไปจุดไหนดีครับ');
+  ui.sendState({ llm_reason: 'ถึงจุด B แล้วครับ' });
+  assert.equal(get('robot-reason-text').textContent, 'ถึงจุด B แล้วครับ');
   ui.sendState({ heard_text: 'พาไปจุด A' });
   assert.equal(get('robot-heard-text').textContent, '"พาไปจุด A"');
   ui.sendState({ heard_text: '' });
@@ -273,7 +279,7 @@ async function main() {
     status: 'FAILED', request_id: 'thought-separate', session_id: 'visitor-1',
     error_code: 'robot_busy', message: 'หุ่นยังไม่ว่าง'
   } });
-  assert.equal(get('robot-reason-text').textContent, '');
+  assert.equal(get('robot-reason-text').textContent, 'หุ่นยังไม่ว่าง กำลังทำงานเดิม');
   assert.equal(get('intent-result-status').textContent, 'หุ่นยังไม่ว่าง');
 
   ui.sendState({ latest_intent: {

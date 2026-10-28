@@ -317,7 +317,10 @@
     }
 
     if (robotReasonText) {
-      robotReasonText.textContent = state.llm_reason || '';
+      // Keep the latest caption visible when the ROS subtitle TTL expires.
+      if (typeof state.llm_reason === 'string' && state.llm_reason.trim()) {
+        robotReasonText.textContent = state.llm_reason;
+      }
     }
   }
 
