@@ -136,6 +136,24 @@
         </button>
       </form>
 
+      <section class="staff-section-card" aria-labelledby="subtitle-mode-title">
+        <h3 class="section-title" id="subtitle-mode-title">รูปแบบการตอบของหุ่น</h3>
+        <p id="subtitle-mode-current" role="status" aria-live="polite">ยังไม่ได้อ่านโหมด</p>
+        <form id="subtitle-mode-form">
+          <div class="form-group-row">
+            <label for="subtitle-mode-select">โหมดคำบรรยาย:</label>
+            <select id="subtitle-mode-select" class="number-input" style="width: 100%; text-align: left;" disabled>
+              <option value="standard">Standard — แจ้งสถานะและตอบตามคำสั่ง</option>
+              <option value="friendly">Friendly — คุยเป็นมิตรและชวนเลือกจุด</option>
+            </select>
+          </div>
+          <button type="submit" class="start-session-btn" id="btn-subtitle-mode-save" disabled>ใช้โหมดนี้</button>
+          <button type="button" class="btn-staff-action" id="btn-subtitle-mode-refresh">อ่านโหมดปัจจุบัน</button>
+        </form>
+        <p id="subtitle-mode-feedback" class="session-feedback" role="status" aria-live="polite"></p>
+        <p style="font-size: 0.78rem; color: var(--text-dim);">มีผลกับคำตอบถัดไป ไม่เปลี่ยนการสั่งเดิน เมื่อเปิดระบบคำบรรยายใหม่จะกลับค่าเริ่มต้น</p>
+      </section>
+
       <!-- 4. Simulation & Perception Mock Triggers (For testing & backup) -->
       <section class="staff-section-card">
         <h3 class="section-title">🧪 จำลองสถานการณ์หุ่นยนต์ (Mock Perception Triggers)</h3>
@@ -230,6 +248,18 @@
       const staffRobotHeardText = document.getElementById('staff-robot-heard-text');
       const staffRobotReasonText = document.getElementById('staff-robot-reason-text');
 
+      const subtitleModeForm = document.getElementById('subtitle-mode-form');
+      const subtitleModeSelect = document.getElementById('subtitle-mode-select');
+      const subtitleModeSave = document.getElementById('btn-subtitle-mode-save');
+      const subtitleModeRefresh = document.getElementById('btn-subtitle-mode-refresh');
+      const subtitleModeCurrent = document.getElementById('subtitle-mode-current');
+      const subtitleModeFeedback = document.getElementById('subtitle-mode-feedback');
+      let subtitleModeBusy = false;
+      let subtitleModeKnown = false;
+      let subtitleModeVersion = 0;
+
+      let staffSocket = null;
+      let liveStateVersion = 0;
       let currentPin = '';
       let authInProgress = false;
 
@@ -240,6 +270,13 @@
       }
 
       function clearStaffAuth(message) {
+        stopLiveSocket();
+        subtitleModeVersion += 1;
+        subtitleModeBusy = false;
+        subtitleModeKnown = false;
+        subtitleModeSelect.disabled = true;
+        subtitleModeSave.disabled = true;
+        subtitleModeCurrent.textContent = 'ยังไม่ได้อ่านโหมด';
         sessionStorage.removeItem('staff_pin');
         currentPin = '';
         pinSection.style.display = 'flex';
@@ -283,7 +320,9 @@
           staffFeedback.textContent = '';
           pinSection.style.display = 'none';
           staffDashboard.style.display = 'flex';
+          connectLiveSocket();
           loadLiveState();
+          requestSubtitleMode('GET');
         } catch (e) {
           console.error('Staff PIN verification failed:', e);
           authFeedback.textContent = 'ติดต่อระบบไม่ได้ จึงยังตรวจสอบ PIN ไม่สำเร็จ';
@@ -378,25 +417,133 @@
         }
       });
 
+      async function requestSubtitleMode(method, mode) {
+        if (!currentPin || subtitleModeBusy) return;
+        const pin = currentPin;
+        const version = ++subtitleModeVersion;
+        subtitleModeBusy = true;
+        subtitleModeSelect.disabled = true;
+        subtitleModeSave.disabled = true;
+        subtitleModeRefresh.disabled = true;
+        subtitleModeFeedback.textContent = method === 'GET' ? 'กำลังอ่านโหมด...' : 'กำลังเปลี่ยนโหมด...';
+        try {
+          const options = { method, headers: { 'X-Staff-Pin': pin } };
+          if (method === 'POST') {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify({ mode });
+          }
+          const res = await fetch('/api/v1/staff/subtitle-mode', options);
+          if (version !== subtitleModeVersion || pin !== currentPin) return;
+          if (res.status === 401) {
+            clearStaffAuth('กรุณายืนยัน PIN อีกครั้ง');
+            return;
+          }
+          if (!res.ok) {
+            const messages = {
+              503: 'ติดต่อระบบคำบรรยายไม่ได้ ตรวจว่าเปิดระบบแล้ว จากนั้นกดอ่านโหมดใหม่',
+              504: 'ยังยืนยันโหมดไม่ได้ กดอ่านโหมดปัจจุบันก่อนลองอีกครั้ง',
+              409: 'ยังยืนยันการเปลี่ยนโหมดไม่ได้ กดอ่านโหมดปัจจุบันอีกครั้ง'
+            };
+            throw new Error(messages[res.status] || 'เปลี่ยนหรืออ่านโหมดไม่สำเร็จ');
+          }
+          const data = await res.json();
+          if (version !== subtitleModeVersion || pin !== currentPin) return;
+          if (!['standard', 'friendly'].includes(data.mode)) throw new Error('ได้รับข้อมูลโหมดไม่ถูกต้อง');
+          subtitleModeKnown = true;
+          subtitleModeSelect.value = data.mode;
+          subtitleModeCurrent.textContent = `โหมดที่อ่านล่าสุด: ${data.mode === 'friendly' ? 'Friendly' : 'Standard'}`;
+          subtitleModeFeedback.textContent = method === 'POST' ? 'ยืนยันการเปลี่ยนโหมดแล้ว' : '';
+        } catch (error) {
+          if (version !== subtitleModeVersion || pin !== currentPin) return;
+          subtitleModeKnown = false;
+          subtitleModeCurrent.textContent = 'ยังยืนยันโหมดปัจจุบันไม่ได้';
+          subtitleModeFeedback.textContent = error.message || 'ติดต่อระบบไม่ได้';
+        } finally {
+          if (version === subtitleModeVersion) {
+            subtitleModeBusy = false;
+            subtitleModeSelect.disabled = !subtitleModeKnown;
+            subtitleModeSave.disabled = !subtitleModeKnown;
+            subtitleModeRefresh.disabled = false;
+          }
+        }
+      }
+
+      subtitleModeForm.addEventListener('submit', event => {
+        event.preventDefault();
+        if (subtitleModeKnown && ['standard', 'friendly'].includes(subtitleModeSelect.value)) {
+          return requestSubtitleMode('POST', subtitleModeSelect.value);
+        }
+      });
+      subtitleModeRefresh.addEventListener('click', () => requestSubtitleMode('GET'));
+
       // Mock perception
       btnMockNav.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'NAVIGATING', goal: 'B' }).then(loadLiveState));
       btnMockObstacle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REPLANNING', goal: 'B', obstacle_detected: true }).then(loadLiveState));
       btnMockReached.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'REACHED', goal: 'B' }).then(loadLiveState));
       btnMockIdle.addEventListener('click', () => staffApi('/api/v1/staff/mock-event', { state: 'IDLE' }).then(loadLiveState));
 
+      function renderLiveState(data) {
+        rawStateDump.textContent = JSON.stringify(data, null, 2);
+        renderActionOutcome(data);
+        renderRobotMind(data);
+        setDataStatus('connected');
+      }
+
+      function stopLiveSocket() {
+        const socket = staffSocket;
+        staffSocket = null;
+        liveStateVersion += 1;
+        if (socket) socket.close();
+      }
+
+      function connectLiveSocket() {
+        if (!currentPin || (staffSocket && staffSocket.readyState < 2)) return;
+        const pin = currentPin;
+        try {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const socket = new WebSocket(`${protocol}//${window.location.host}/ws/status`);
+          staffSocket = socket;
+          socket.onmessage = event => {
+            if (socket !== staffSocket || !currentPin || pin !== currentPin) return;
+            try {
+              const data = JSON.parse(event.data);
+              if (!data || typeof data.robot_state !== 'string') return;
+              liveStateVersion += 1;
+              renderLiveState(data);
+            } catch (error) {
+              console.error('Invalid Staff live state:', error);
+            }
+          };
+          socket.onclose = () => {
+            if (socket !== staffSocket) return;
+            staffSocket = null;
+            setDataStatus('disconnected');
+          };
+          socket.onerror = () => {
+            if (socket === staffSocket) setDataStatus('disconnected');
+          };
+        } catch (error) {
+          staffSocket = null;
+          console.error('Staff live connection failed:', error);
+        }
+      }
+
       async function loadLiveState() {
+        if (!currentPin) return;
+        const pin = currentPin;
+        const version = liveStateVersion;
         try {
           const res = await fetch('/api/v1/state');
+          if (version !== liveStateVersion || pin !== currentPin) return;
           if (!res.ok) {
             setDataStatus('disconnected');
             return;
           }
           const data = await res.json();
-          rawStateDump.textContent = JSON.stringify(data, null, 2);
-          renderActionOutcome(data);
-          renderRobotMind(data);
-          setDataStatus('connected');
+          if (version !== liveStateVersion || pin !== currentPin) return;
+          renderLiveState(data);
         } catch (e) {
+          if (version !== liveStateVersion || pin !== currentPin) return;
           console.error(e);
           setDataStatus('disconnected');
         }
@@ -486,8 +633,8 @@
           setTextIfChanged(staffRobotHeardText, state.heard_text ? `"${state.heard_text}"` : '(ยังไม่มีคำสั่งล่าสุด)');
         }
 
-        if (staffRobotReasonText) {
-          setTextIfChanged(staffRobotReasonText, state.llm_reason || 'พร้อมรับคำสั่งจากผู้เข้าชมบูธ');
+        if (staffRobotReasonText && typeof state.llm_reason === 'string' && state.llm_reason.trim()) {
+          setTextIfChanged(staffRobotReasonText, state.llm_reason);
         }
       }
 
@@ -501,7 +648,10 @@
       }
 
       setInterval(() => {
-        if (currentPin && staffDashboard.style.display !== 'none') loadLiveState();
+        if (currentPin && staffDashboard.style.display !== 'none') {
+          connectLiveSocket();
+          loadLiveState();
+        }
       }, 2000);
 
       checkAuth();

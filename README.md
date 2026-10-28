@@ -52,9 +52,21 @@ cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
 bash booth_web_controller/run_tailscale.sh
 ```
 
-### เลือกโหมด subtitle โดยไม่แก้สคริปต์
+### เลือกโหมด subtitle จากหน้า Staff
 
-สคริปต์เดิมเริ่มที่ `standard` หากต้องการให้ตอบคำคุยทั่วไปอย่างเป็นมิตร เปิด Terminal เพิ่มแล้วสลับเป็น `friendly`:
+หน้า Staff รับคำบรรยายสดผ่าน `/ws/status` เดิมและค้างข้อความล่าสุดจนมีข้อความใหม่แทน เพื่อไม่พลาดซับสั้นระหว่างรอบอ่านสถานะ มี polling สำรองเมื่อการเชื่อมต่อสดหลุด และเชื่อม WebSocket ใหม่อัตโนมัติ หลังอัปเดตหน้า Staff ให้กด Ctrl+Shift+R
+
+เปิด <http://localhost:8000/staff> (หรือพอร์ต/HTTPS URL ที่ใช้งานจริง) ยืนยัน PIN เดิม แล้วใช้ส่วน **รูปแบบการตอบของหุ่น**:
+
+1. รอหน้าเว็บอ่านโหมดปัจจุบันจาก `subtitle_node`
+2. เลือก **Standard** หรือ **Friendly** แล้วกด **ใช้โหมดนี้**
+3. รอข้อความยืนยัน หากเปลี่ยนจาก Terminal อื่นหรือเปิด node ใหม่ ให้กด **อ่านโหมดปัจจุบัน**
+
+Backend อ่าน/ตั้งเฉพาะ ROS parameter `subtitle_mode` ของ `/subtitle_node` ผ่าน services มาตรฐาน ไม่ส่ง Goal ไม่เปลี่ยน intent หรือ provider และไม่ต้อง rebuild LLM เพื่อเพิ่มเมนูนี้ แต่ต้องใช้ subtitle รุ่นที่รองรับโหมดแล้ว ทั้ง Backend และ subtitle ต้องอยู่ใน ROS profile เดียวกัน (local กับ local หรือ Tailscale กับ Tailscale)
+
+หาก node ไม่พร้อมหรือ timeout จะไม่แจ้งว่าสำเร็จ กรณี timeout การเปลี่ยนอาจถึง node แล้ว จึงควรอ่านโหมดปัจจุบันก่อนลองซ้ำ ไม่สั่งซ้ำอัตโนมัติ โหมดนี้เป็น runtime ไม่เก็บข้าม restart ของ subtitle และหน้า Staff แบบ Backend standalone mock (`USE_MOCK_ROS2=true`) ไม่จำลองผลสำเร็จของการเปลี่ยนโหมด; local demo ที่เปิด subtitle จริงใช้ได้
+
+หลังอัปเดต Backend ให้เปิดใหม่ด้วยสคริปต์เดิมและกด Ctrl+Shift+R ที่หน้า Staff หากตัวรันเดิมเปิด reload อยู่ อาจโหลด Python ที่เปลี่ยนให้แล้ว ไม่ต้องเปลี่ยน `.env` หรือสคริปต์ คำสั่ง Terminal ยังใช้แทนเมนูได้:
 
 ```bash
 cd ~/ros2_ws/turtlebot-llm

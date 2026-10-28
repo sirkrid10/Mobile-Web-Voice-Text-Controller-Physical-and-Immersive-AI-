@@ -23,11 +23,12 @@ from app.models import (
     HeartbeatResponse, DisconnectResponse,
     TextCommandRequest, CommandResponse,
     StaffConfigUpdate, StaffConfigSnapshot, StaffMockEvent,
-    StateBroadcast
+    StateBroadcast, SubtitleModeUpdate, SubtitleModeSnapshot
 )
 from app.session_manager import session_manager
 from app.stt_service import STTUnavailableError, stt_service
 from app.ros2_bridge import create_ros2_bridge, BaseROS2Bridge
+from app.subtitle_mode import SubtitleModeError
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +320,31 @@ async def staff_read_config(_: bool = Depends(verify_staff_pin)):
         inactivity_timeout_sec=session_manager.inactivity_timeout_sec,
         auto_return_delay_sec=session_manager.auto_return_delay_sec,
     )
+
+
+async def verify_subtitle_staff_pin(x_staff_pin: Optional[str] = Header(None, alias="X-Staff-Pin")):
+    # Reuse the same PIN check without a thread hop for these async-only routes.
+    return verify_staff_pin(x_staff_pin)
+
+
+@app.get("/api/v1/staff/subtitle-mode", response_model=SubtitleModeSnapshot)
+async def staff_read_subtitle_mode(_: bool = Depends(verify_subtitle_staff_pin)):
+    if ros_bridge_instance is None:
+        raise HTTPException(status_code=503, detail="ROS bridge is not running")
+    try:
+        return SubtitleModeSnapshot(mode=await ros_bridge_instance.read_subtitle_mode())
+    except SubtitleModeError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+
+
+@app.post("/api/v1/staff/subtitle-mode", response_model=SubtitleModeSnapshot)
+async def staff_set_subtitle_mode(req: SubtitleModeUpdate, _: bool = Depends(verify_subtitle_staff_pin)):
+    if ros_bridge_instance is None:
+        raise HTTPException(status_code=503, detail="ROS bridge is not running")
+    try:
+        return SubtitleModeSnapshot(mode=await ros_bridge_instance.set_subtitle_mode(req.mode))
+    except SubtitleModeError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
 
 
 @app.post("/api/v1/staff/force-release", summary="Force unlock active session lock")

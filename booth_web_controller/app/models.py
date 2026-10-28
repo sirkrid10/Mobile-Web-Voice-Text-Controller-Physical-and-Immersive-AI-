@@ -92,6 +92,16 @@ class StaffConfigSnapshot(BaseModel):
     auto_return_delay_sec: int
 
 
+class SubtitleModeUpdate(BaseModel):
+    model_config = {'extra': 'forbid'}
+
+    mode: Literal["standard", "friendly"]
+
+
+class SubtitleModeSnapshot(BaseModel):
+    mode: Literal["standard", "friendly"]
+
+
 class StaffMockEvent(BaseModel):
     state: Literal["IDLE", "NAVIGATING", "REPLANNING", "REACHED", "STOPPED", "FAILED"]
     goal: Optional[str] = None

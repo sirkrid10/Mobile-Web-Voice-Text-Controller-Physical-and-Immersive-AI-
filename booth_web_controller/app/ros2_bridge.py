@@ -23,6 +23,7 @@ from typing import Optional, Dict, Any
 from app.models import DirectActionOutcome, IntentOutcome, RosStamp
 
 from app.config import settings
+from app.subtitle_mode import SubtitleModeControl, SubtitleModeError
 
 
 def map_navigation_state(phase: str, ready_for_goal: bool, error_code: int) -> str:
@@ -125,6 +126,12 @@ class BaseROS2Bridge(ABC):
                             obstacle_detected: bool = False, pose: Optional[Dict[str, float]] = None):
         """Manually inject robot state (used by staff test panel)."""
         pass
+
+    async def read_subtitle_mode(self):
+        raise SubtitleModeError(503, 'Subtitle mode requires a running subtitle node and real ROS bridge')
+
+    async def set_subtitle_mode(self, mode):
+        raise SubtitleModeError(503, 'Subtitle mode requires a running subtitle node and real ROS bridge')
 
     @abstractmethod
     def shutdown(self):
@@ -486,11 +493,23 @@ class RealROS2Bridge(BaseROS2Bridge):
 
         from rclpy.executors import SingleThreadedExecutor
         self.node = BoothWebBridgeNode()
+        from rclpy.parameter import Parameter
+        from rclpy.parameter_client import AsyncParameterClient
+        self._subtitle_mode_control = SubtitleModeControl(
+            AsyncParameterClient(self.node, '/subtitle_node'),
+            lambda mode: Parameter('subtitle_mode', value=mode),
+        )
         self.executor = SingleThreadedExecutor()
         self.executor.add_node(self.node)
         self.thread = threading.Thread(target=self.executor.spin, daemon=True)
         self.thread.start()
         print("[ROS2Bridge] Real ROS 2 Jazzy Node running in daemon background thread.")
+
+    async def read_subtitle_mode(self):
+        return await self._subtitle_mode_control.read()
+
+    async def set_subtitle_mode(self, mode):
+        return await self._subtitle_mode_control.write(mode)
 
     def _subtitle_now(self) -> float:
         return self.node.get_clock().now().nanoseconds / 1_000_000_000
