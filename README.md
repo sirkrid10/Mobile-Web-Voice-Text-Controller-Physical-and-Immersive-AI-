@@ -12,6 +12,10 @@ Mobile Web Application controller designed for exhibition booth visitors to inte
 
 ---
 
+## Subtitle สำหรับ Unity VR
+
+Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม ดู [วิธีตั้งค่า VR และ contract](VR-SUBTITLE-INTEGRATION.md)
+
 ## รัน Backend ผ่าน Tailscale กับ Robot จริง (วิธีใช้งานปัจจุบัน)
 
 ติดตั้ง Tailscale ภายใน Ubuntu WSL ที่รัน ROS ปิด Tailscale ฝั่ง Windows และให้ VM/Pi อนุญาตการติดต่อผ่าน tailnet ติดตั้งชุดล่าสุดของ repo `turtlebot-llm` ไว้เป็นโฟลเดอร์ข้าง repo นี้ และ build `ai_interfaces` กับ `agent_pkg` ตามคู่มือ LLM ก่อน

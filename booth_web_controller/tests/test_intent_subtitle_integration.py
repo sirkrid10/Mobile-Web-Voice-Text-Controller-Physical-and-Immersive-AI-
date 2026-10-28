@@ -180,6 +180,14 @@ async def _run_integration(monkeypatch):
             lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
             description="auto-return ARRIVED at A",
         )
+        await wait_for(
+            lambda: session_manager.latest_action.outcome == "succeeded",
+            description="auto-return terminal Action result",
+        )
+        await wait_for(
+            intent.controller._robot_ready,
+            description="fresh Robot readiness after auto-return",
+        )
 
         claim = await session_manager.claim("integration-visitor")
         token = claim["session_token"]
@@ -259,6 +267,10 @@ async def _run_integration(monkeypatch):
         await wait_for(
             lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
             description="staff return ARRIVED at A",
+        )
+        await wait_for(
+            intent.controller._robot_ready,
+            description="fresh Robot readiness after staff return",
         )
 
         # A successful voice transcript follows the same UserRequest and Action flow.

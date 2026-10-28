@@ -1,78 +1,92 @@
-# เพิ่ม subtitle ใน Quest โดยให้งานฝั่ง VR น้อยที่สุด
+# เชื่อม Subtitle จาก Backend ไป Unity VR
 
-แผนส่งต่องาน ณ 28 ตุลาคม 2026 อ้างอิง Unity 6000.3.26f1 ใน repo นี้
-เอกสารนี้เป็นข้อตกลงงานที่เสนอ ตัวรับ Unity ยังไม่ได้สร้าง และ Backend ยังเป็น WIP ที่ต้องตรวจและทดสอบก่อนส่งมอบ
+Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม ไม่ต้องเพิ่ม ROS node สำหรับ VR
+คู่มือผูกฉากและ receiver อยู่ใน [repo Unity](https://github.com/charkpongpaksa/Open-House-Project/blob/main/VR-SUBTITLE-INTEGRATION.md)
+ตัวรับและไฟล์ `.meta` มีแล้วที่ [SubtitleWebSocketReceiver.cs](https://github.com/charkpongpaksa/Open-House-Project/blob/main/Assets/Scripts/Sources/SubtitleWebSocketReceiver.cs)
 
-## สิ่งที่ฝั่ง VR ต้องทำ
+## เปิด Backend
 
-1. รับ component subtitle ที่ฝั่ง Backend จะเตรียมให้ แล้วเพิ่มลงในฉาก `Assets/Scenes/ArenaQuest.unity` ใช้ใน `Arena3D.unity` ได้ด้วยสำหรับทดสอบบนคอม
-2. ผูกช่องแสดงข้อความกับ `UnityEngine.UI.Text` บน world-space Canvas ที่มองเห็นในแว่น ใช้ `Assets/Resources/Fonts/NotoSansThai-Regular.ttf` ที่มีอยู่ และปิด rich text ถ้าแผงเดิมเหมาะสมให้เพิ่ม Text ในแผงเดิมได้เลย ไม่ต้องสร้างระบบ UI ใหม่
-3. ตั้ง Subtitle URL ที่ฝั่ง Backend ส่งให้ใน Inspector แล้ว build และลองบน Quest จริง ตรวจภาษาไทย การตัดบรรทัด และ reconnect
+เตรียม ROS interfaces และ environment ตาม [README](README.md) แล้วเปิด launcher เดิม:
 
-ฝั่ง VR ไม่ต้องเขียน JSON parser หรือ reconnect เอง ไม่ต้องเพิ่ม package ไม่ต้องต่อ ROS และไม่ต้องเปลี่ยน Robot Bridge
-ใช้ NativeWebSocket 2.x ที่อยู่ใน repo แล้ว ไม่ต้องเพิ่ม ClientWebSocket หรือ TextMeshPro เพื่อทำงานนี้
-
-## สิ่งที่ฝั่ง Backend จะเตรียมให้
-
-- Endpoint อ่านอย่างเดียว `/ws/vr/subtitle` บน Backend เดิม
-- Component C# ที่ใช้ NativeWebSocket พร้อมช่อง URL และ Text ใน Inspector รวมการตรวจข้อมูล การอัปเดต UI บน main thread และการปิด connection เมื่อ component ถูก disable
-- Reconnect อัตโนมัติ และจัดการ stream/sequence เมื่อ Backend เริ่มใหม่ โดยไม่ให้ callback ของ connection เก่าทับข้อความใหม่
-- ตัวรับมีขอบเขตขนาดข้อความ เก็บเฉพาะ caption ล่าสุด และแสดง plain text
-- URL ที่ใช้จริง คู่มือเริ่ม Backend และวิธีตรวจว่า endpoint ส่งข้อความได้
-- ผลทดสอบ Backend และรายการที่ยังต้องตรวจใน Unity หรือบนแว่น
-
-## การเชื่อมต่อ
-
-```text
-Robot Bridge เดิม : ws://<Robot-Bridge-IP>:8765
-Subtitle เพิ่ม   : ws://<Backend-IP>:8000/ws/vr/subtitle
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh
 ```
 
-พอร์ต Backend เริ่มต้นคือ `8000` และเปลี่ยนได้ด้วย `PORT` ให้ใช้ค่าที่ Backend รันจริง
-Subtitle ใช้ IP ของเครื่อง Backend ไม่ใช่ IP ของ Robot VM โดยอัตโนมัติ
-Quest ต้องเข้าถึง URL นี้ได้เอง ใช้ Tailscale IP เมื่อแว่นมีเส้นทางถึงเครือข่ายนั้น หรือใช้ LAN IP ที่เข้าถึงกันได้
-การต่อ Tailscale บนคอมเพียงเครื่องเดียวไม่ทำให้ Quest เข้าถึง Backend ได้
+ใช้พอร์ตที่ launcher แสดงใน log ค่าเริ่มต้นคือ `8000` และเปลี่ยนผ่าน `PORT` ได้
+เมื่อ Backend เปิดอยู่แล้ว ไม่ต้องเปิด instance ซ้ำเพื่อรับ VR
+Intent และ Subtitle ใช้ชุดเดิมตาม README
 
-คง connection เดิมไว้สำหรับสนาม หุ่น LiDAR และสถานะกิจกรรม
-`WebSocketContractSource` เดิมตรวจ `v=1` และ hello/Arena protocol จึงใช้รับ subtitle schema ด้านล่างตรง ๆ ไม่ได้
-Component ใหม่รับ subtitle แยก โดยไม่แก้ protocol ของช่องเดิม
+## ตั้งค่าฝั่ง VR
 
-## รูปแบบข้อความจาก Backend WIP
+1. เพิ่ม `SubtitleWebSocketReceiver` ในฉาก Unity
+2. ลาก `UnityEngine.UI.Text` ของแผงซับเข้า **Target** ใช้ฟอนต์ไทยเดิม
+3. ใส่ `ws://<Backend-IP>:8000/ws/vr/subtitle` ใน **Subtitle Url**
+4. ทดสอบการเชื่อมต่อ ภาษาไทย ข้อความใหม่ และ reconnect บนเครื่องเป้าหมาย
 
-ตัวอย่างตาม `VRSubtitleHub._encode()` ปัจจุบัน ค่าข้อความและ metadata เป็นตัวอย่าง:
+ใช้ IP ของ Backend ไม่ใช่ IP ของ Robot Bridge
+ค่า `127.0.0.1` หมายถึงอุปกรณ์ที่รัน receiver จึงใช้ต่อกลับ Backend จาก Quest ไม่ได้
+ถ้าใช้ Tailscale IP ต้องมีเส้นทางจาก Quest ถึง IP นั้นเอง การเปิด Tailscale บนคอมอย่างเดียวไม่พอ
+เก็บ connection หุ่นเดิมไว้สำหรับสนาม LiDAR และสถานะหุ่น
+
+## Contract
+
+VR อ่านซับที่ ROS2Bridge ยอมรับแล้ว ไม่มีช่องส่งคำสั่งหุ่นผ่าน endpoint นี้
+Backend ตรวจ timestamp, TTL และลำดับก่อนส่งข้อความเข้า hub
 
 ```json
 {
   "type": "subtitle",
   "version": 1,
-  "stream_id": "example-backend-stream",
+  "stream_id": "example-stream",
   "sequence": 1,
-  "text": "กำลังเดินทางไปจุด A ครับ",
-  "source_stamp_unix_ms": 1793145600000,
+  "text": "กำลังพาไปจุด Aครับ",
+  "source_stamp_unix_ms": 1793177958394,
   "request_id": "example-request",
-  "observation_id": "example-observation"
+  "observation_id": ""
 }
 ```
 
-UI แสดงเฉพาะ `text` ส่วน metadata ใช้ใน receiver และการตรวจปัญหา
-ตรวจ `type` และ `version` ก่อนใช้ข้อความ และใช้ `sequence` เปรียบเทียบภายใน `stream_id` เดียวกัน
-เมื่อ stream เปลี่ยนให้รับ sequence ชุดใหม่ได้
-ขนาด packet สูงสุดปัจจุบันคือ 16,384 bytes ของ UTF-8
+- `sequence` เพิ่มภายใน `stream_id` เดียวกัน Backend restart สร้าง stream ใหม่
+- เมื่อเชื่อมต่อหรือ reconnect จะได้ caption ล่าสุดทันที ถ้ายังไม่มี caption จะได้ข้อความว่างและ sequence ศูนย์
+- VR เก็บซับล่าสุดจนมีข้อความใหม่ ROS TTL-clear ล้าง state ของเว็บ แต่ไม่ถอน caption ล่าสุดของ VR
+- ซับที่ค้างไม่ใช่การยืนยันว่าสถานะหุ่นยังสด ถ้าต้องการถอนข้อความผิด ต้องตกลง clear contract เพิ่มก่อน
+- Packet จำกัด 16,384 bytes UTF-8; client ที่ช้ารับข้อความล่าสุดแทนประวัติย้อนหลัง
 
-เมื่อเชื่อมต่อ Backend ส่ง caption ล่าสุดทันที ถ้ายังไม่มี caption จะส่ง `text: ""` และ `sequence: 0`
-หลังได้รับ caption ให้แสดงค้างจนมีข้อความใหม่ ROS TTL-clear จะไม่ล้าง caption ใน VR
-เมื่อ disconnect ให้คง caption ล่าสุดไว้ แต่แยกสถานะการเชื่อมต่อออกจากข้อความ
-ข้อความที่ค้างอยู่ไม่ได้ยืนยันว่าหุ่นยังอยู่ในสถานะนั้น
-ไม่มีประวัติย้อนหลัง และ client ที่ช้าอาจข้ามข้อความระหว่างทางเพื่อรับข้อความล่าสุด
+## อ่าน stream โดยไม่ส่งคำสั่ง
 
-## ตรวจรับร่วมกัน
+ใช้ Python environment ที่มี package `websockets` แล้วรันจาก repo นี้:
 
-- ส่งข้อความภาษาไทยจาก ROS ผ่าน Backend แล้วเห็นข้อความเดียวกันใน Unity
-- Robot Bridge และข้อมูลสนามเดิมยังทำงานระหว่างรับ subtitle
-- ตัด connection แล้วต่อใหม่ได้ และได้รับ caption ล่าสุด
-- เริ่ม Backend ใหม่แล้ว receiver รับ stream ใหม่ได้
-- Disable component แล้ว connection หยุดและไม่มี callback เก่ามาแก้ UI
-- ตรวจบน Quest จริงว่าอ่านภาษาไทยได้และข้อความอยู่ในตำแหน่งที่มองเห็น
+```bash
+python tools/watch_vr_subtitles.py ws://127.0.0.1:8000/ws/vr/subtitle
+```
 
-Backend WIP เคยผ่าน VR tests 7 รายการตาม handoff แต่ยังต้องรันกับงานสุดท้ายอีกครั้ง
-ยังไม่มีผลทดสอบ subtitle ผ่าน TCP/Tailscale, Unity หรือ Quest จริง
+เปลี่ยน URL เป็น Backend IP เมื่อรันจากเครื่อง VR ใช้ `--once` เพื่ออ่าน snapshot เดียวแล้วออก
+การเห็น snapshot ว่างยืนยัน handshake เท่านั้น ให้รอ caption จากการใช้งานปกติเพื่อตรวจการอัปเดต
+
+## ตรวจ regression
+
+รันบน ROS domain ทดสอบเท่านั้น ตัวอย่างนี้สมมติว่าติดตั้ง test dependencies ใน LLM `.venv` แล้ว:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+source /opt/ros/jazzy/setup.bash
+source ../turtlebot-llm/install-colcon/setup.bash
+source ../turtlebot-llm/.venv/bin/activate
+unset ROS_DISCOVERY_SERVER ROS_STATIC_PEERS ROS_SUPER_CLIENT
+unset FASTRTPS_DEFAULT_PROFILES_FILE FASTDDS_DEFAULT_PROFILES_FILE FASTDDS_BUILTIN_TRANSPORTS
+export ROS_DOMAIN_ID=174 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ROS_LOCALHOST_ONLY=1
+export ROS_LOG_DIR=/tmp/vr-subtitle-test-logs
+export PYTHONPATH="$PWD/booth_web_controller:$PWD/../turtlebot-llm/src/agent_pkg:${PYTHONPATH:-}"
+export GROQ_API_KEY= GROQ_SUBTITLE_API_KEY= GOOGLE_API_KEY= GOOGLE_FALLBACK_ENABLED=false
+python -m pytest -q booth_web_controller/tests/test_vr_subtitle.py
+node --test booth_web_controller/tests/*.js
+bash booth_web_controller/tests/test_run_booth.sh
+```
+
+VR tests ตรวจ schema, validation, metadata, clear, reconnect และ ROS → ASGI WebSocket
+ได้ทดสอบ local TCP WebSocket และซับจากหุ่นจริงมาถึง endpoint นี้แล้วระหว่าง debug
+การ compile Unity และการแสดงบน Quest จริงยังต้องตรวจจากเครื่องฝั่ง VR
+
+ผลตรวจชุดรวมก่อน push `main` วันที่ 28 ตุลาคม 2026: Python **101 passed** (รวม VR 7 tests), JavaScript **27 passed** และ launcher smoke tests ผ่าน
+Python มี warnings ของ pytest asyncio config 2 รายการและ FastAPI TestClient deprecation 1 รายการ

@@ -21,7 +21,7 @@ from ai_interfaces.msg import UserRequest, NavigationState, Subtitle
 from ai_interfaces.action import GuideToDestination
 from app.main import app
 from app.config import settings
-from app.session_manager import session_manager
+from app.session_manager import SessionManager, session_manager
 
 
 # Shared contract QoS: Reliable, Volatile, Depth 10
@@ -34,8 +34,11 @@ qos_profile = QoSProfile(
 
 
 @pytest.fixture(autouse=True)
-def ensure_ros_initialized():
+def ensure_ros_initialized(monkeypatch):
     """Ensure rclpy is initialized for all contract tests."""
+    fresh_session = SessionManager()
+    monkeypatch.setattr('app.main.session_manager', fresh_session)
+    monkeypatch.setitem(globals(), 'session_manager', fresh_session)
     if not rclpy.ok():
         rclpy.init()
 
@@ -217,6 +220,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
             message.stamp = ros_bridge_instance.node.get_clock().now().to_msg()
 
         # Reject source timestamps that are malformed or later than the ROS clock.
+        initial_reason = session_manager.get_state_broadcast().llm_reason
         invalid_msg = Subtitle()
         set_current_source_stamp(invalid_msg)
         invalid_msg.stamp.nanosec = 1_000_000_000
@@ -231,7 +235,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
         mock_node.pub_subtitle.publish(future_msg)
         spin_executor(executor, duration_sec=0.4)
         time.sleep(0.1)
-        assert session_manager.get_state_broadcast().llm_reason == ""
+        assert session_manager.get_state_broadcast().llm_reason == initial_reason
 
         # 1. Send subtitle with 1s TTL
         sub_msg = Subtitle()

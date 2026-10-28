@@ -156,6 +156,7 @@ def test_real_ros_parameter_roundtrip_from_authenticated_http(monkeypatch):
     from rclpy.executors import SingleThreadedExecutor
     from agent_pkg.subtitle_node import SubtitleNode
     from app.ros2_bridge import RealROS2Bridge
+    from app.session_manager import SessionManager
     import httpx
     import threading
     class OfflineModel:
@@ -164,6 +165,7 @@ def test_real_ros_parameter_roundtrip_from_authenticated_http(monkeypatch):
         def close(self):
             pass
     async def run():
+        monkeypatch.setattr(backend, 'session_manager', SessionManager())
         bridge = RealROS2Bridge(backend.session_manager, asyncio.get_running_loop())
         monkeypatch.setattr(backend, 'ros_bridge_instance', bridge)
         subtitle = SubtitleNode(subtitle_model=OfflineModel())
