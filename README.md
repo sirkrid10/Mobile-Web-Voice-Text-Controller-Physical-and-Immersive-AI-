@@ -3,6 +3,11 @@
 
 การเชื่อมหุ่นจริงปัจจุบันใช้ **Tailscale** คำสั่ง intent, subtitle และ Backend อยู่ด้านบนของเอกสารนี้ คำสั่ง LAN เป็นทางเลือกสำหรับเครือข่ายภายใน
 
+ชุดวันงานใช้ `main` หรือ tag `release-2026-10-28` ให้ตรงกันใน repo LLM, Backend และ Unity
+ดู [รายการ release และลำดับเปิดวันงาน](https://github.com/Lilieay/turtlebot-llm/blob/main/docs/releases/2026-10-28.md)
+คำสั่งเปิดยังเป็น Intent → Subtitle → Backend เดิม VR เปิดช่องรับซับพร้อม Backend ไม่ต้องมี node เพิ่ม
+ให้ฝั่งหุ่นเปิด VM, Discovery Server และ Robot Bridge ก่อน แล้วเลือก Friendly ผ่าน Staff หลัง restart Subtitle ทุกครั้งหากต้องการโหมดคุยแบบวันทดสอบ
+
 [![Target OS](https://img.shields.io/badge/OS-WSL2_Ubuntu_24.04_LTS-orange.svg)](https://ubuntu.com/)
 [![ROS 2](https://img.shields.io/badge/ROS2-Jazzy_Jalisco-blue.svg)](https://docs.ros.org/en/jazzy/)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI_Python_3.12-green.svg)](https://fastapi.tiangolo.com/)
@@ -33,7 +38,7 @@ colcon --log-base log-colcon build --build-base build-colcon \
   --install-base install-colcon --packages-select agent_pkg
 ```
 
-ใช้ `.env` และ `GROQ_API_KEY` เดิม ไม่ต้อง rebuild ฝั่งหุ่น เพราะ interfaces ไม่เปลี่ยน หลัง build เปิด subtitle ใหม่เพื่อโหลดโค้ดล่าสุด เครื่องใหม่ให้ติดตั้งและ build interfaces ตามหัวข้อติดตั้งด้านล่างก่อน
+ใช้ `.env` เดิม โดย Intent ใช้ `GROQ_API_KEY` และ Subtitle ใช้ `GROQ_SUBTITLE_API_KEY` แยกกัน ไม่ต้อง rebuild ฝั่งหุ่นสำหรับงานแก้ซับ เพราะ interfaces ไม่เปลี่ยน หลัง build เปิด subtitle ใหม่เพื่อโหลดโค้ดล่าสุด เครื่องใหม่ให้ติดตั้งและ build interfaces ตามหัวข้อติดตั้งด้านล่างก่อน
 
 ### Terminal 1: Intent
 

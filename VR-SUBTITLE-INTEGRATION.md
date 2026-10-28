@@ -1,6 +1,7 @@
 # เชื่อม Subtitle จาก Backend ไป Unity VR
 
 Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม ไม่ต้องเพิ่ม ROS node สำหรับ VR
+ชุดวันงานอ้างอิง tag `release-2026-10-28` ของ Backend, LLM และ Unity ผู้ใช้ยืนยันว่าซับ VR แสดงและเปลี่ยนถูกจังหวะแล้ว
 คู่มือผูกฉากและ receiver อยู่ใน [repo Unity](https://github.com/charkpongpaksa/Open-House-Project/blob/main/VR-SUBTITLE-INTEGRATION.md)
 ตัวรับและไฟล์ `.meta` มีแล้วที่ [SubtitleWebSocketReceiver.cs](https://github.com/charkpongpaksa/Open-House-Project/blob/main/Assets/Scripts/Sources/SubtitleWebSocketReceiver.cs)
 
@@ -86,7 +87,7 @@ bash booth_web_controller/tests/test_run_booth.sh
 
 VR tests ตรวจ schema, validation, metadata, clear, reconnect และ ROS → ASGI WebSocket
 ได้ทดสอบ local TCP WebSocket และซับจากหุ่นจริงมาถึง endpoint นี้แล้วระหว่าง debug
-การ compile Unity และการแสดงบน Quest จริงยังต้องตรวจจากเครื่องฝั่ง VR
+ผู้ใช้ยืนยันการแสดงซับและจังหวะอัปเดตใน VR แล้ว ส่วน agent ไม่ได้ compile Unity เอง และยังไม่มีรายละเอียดอุปกรณ์/รุ่น Quest ที่ใช้ยืนยัน ให้ตรวจกับชุดอุปกรณ์วันงานอีกครั้ง
 
 ผลตรวจชุดรวมก่อน push `main` วันที่ 28 ตุลาคม 2026: Python **101 passed** (รวม VR 7 tests), JavaScript **27 passed** และ launcher smoke tests ผ่าน
 Python มี warnings ของ pytest asyncio config 2 รายการและ FastAPI TestClient deprecation 1 รายการ
