@@ -48,7 +48,12 @@ def map_navigation_state(phase: str, ready_for_goal: bool, error_code: int) -> s
 # ---------------------------------------------------------------------------
 
 class BaseROS2Bridge(ABC):
-    def _accept_subtitle(self, stamp: float, deadline: float, text: str):
+    def set_subtitle_callback(self, callback):
+        """Observe accepted captions without changing ROS or web state contracts."""
+        self._subtitle_callback = callback
+
+    def _accept_subtitle(self, stamp: float, deadline: float, text: str,
+                         request_id: str = '', observation_id: str = ''):
         """Apply the newest source subtitle on the asyncio owner loop."""
         now = self._subtitle_now()
         if stamp <= 0 or stamp > now or stamp < self._latest_subtitle_stamp:
@@ -71,6 +76,9 @@ class BaseROS2Bridge(ABC):
             explanation=text,
         )
         self._schedule_subtitle_clear(deadline, generation)
+        callback = getattr(self, '_subtitle_callback', None)
+        if callback is not None:
+            callback(text, stamp, request_id, observation_id)
 
     def _subtitle_now(self) -> float:
         return time.time()
@@ -462,7 +470,8 @@ class RealROS2Bridge(BaseROS2Bridge):
                     deadline = stamp_sec + ttl_sec
                     if not math.isfinite(deadline):
                         return
-                    outer.loop.call_soon_threadsafe(outer._accept_subtitle, stamp_sec, deadline, text)
+                    outer.loop.call_soon_threadsafe(outer._accept_subtitle, stamp_sec, deadline, text,
+                                                    msg.request_id, msg.observation_id)
                 except Exception as e:
                     self.get_logger().error(f"Error handling /vr/subtitle: {e}")
 

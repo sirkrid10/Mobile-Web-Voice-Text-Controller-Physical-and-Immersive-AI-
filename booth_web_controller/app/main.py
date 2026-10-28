@@ -29,6 +29,7 @@ from app.session_manager import session_manager
 from app.stt_service import STTUnavailableError, stt_service
 from app.ros2_bridge import create_ros2_bridge, BaseROS2Bridge
 from app.subtitle_mode import SubtitleModeError
+from app.vr_subtitle import VRSubtitleHub
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ class ConnectionManager:
 
 
 ws_manager = ConnectionManager()
+vr_subtitles = VRSubtitleHub()
 ros_bridge_instance: Optional[BaseROS2Bridge] = None
 watchdog_task: Optional[asyncio.Task] = None
 
@@ -99,6 +101,8 @@ async def lifespan(app: FastAPI):
 
     # 1. Initialize ROS 2 Bridge (Real or Mock)
     ros_bridge_instance = create_ros2_bridge(session_manager, loop)
+    vr_subtitles.reset()
+    ros_bridge_instance.set_subtitle_callback(vr_subtitles.publish)
     session_manager.set_ros_bridge(ros_bridge_instance)
     session_manager.set_broadcast_callback(ws_manager.broadcast_state)
 
@@ -388,6 +392,11 @@ async def websocket_status(websocket: WebSocket):
         await ws_manager.disconnect(websocket)
     except Exception:
         await ws_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/vr/subtitle")
+async def websocket_vr_subtitle(websocket: WebSocket):
+    await vr_subtitles.serve(websocket)
 
 
 # Mount static assets directory
