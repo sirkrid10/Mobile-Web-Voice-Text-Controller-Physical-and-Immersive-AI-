@@ -4,6 +4,7 @@ local faster-whisper on WSL 2, and graceful fallback for offline booth testing.
 """
 
 import os
+import shutil
 import tempfile
 import asyncio
 from fastapi import UploadFile
@@ -48,6 +49,62 @@ class STTService:
             self._local_model = WhisperModel("small", device="cpu", compute_type="int8")
         return self._local_model
 
+    async def _preprocess_audio(self, input_path: str) -> str:
+        """Pre-process audio using ffmpeg:
+        - High-pass filter (cuts low-frequency rumble < STT_HIGHPASS_FREQ)
+        - Low-pass filter (cuts high-frequency hiss > STT_LOWPASS_FREQ)
+        - Dynamic audio normalization (equalizes volume without clipping across phone mics)
+        - Resamples to 16kHz mono 16-bit PCM WAV (Whisper's optimal format)
+
+        Returns path to processed WAV file, or input_path if ffmpeg is unavailable or fails.
+        """
+        if not getattr(settings, "STT_PREPROCESS_AUDIO", True):
+            return input_path
+
+        ffmpeg_bin = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        if not ffmpeg_bin:
+            return input_path
+
+        filters = []
+        if getattr(settings, "STT_HIGHPASS_FREQ", 0) > 0:
+            filters.append(f"highpass=f={settings.STT_HIGHPASS_FREQ}")
+        if getattr(settings, "STT_LOWPASS_FREQ", 0) > 0:
+            filters.append(f"lowpass=f={settings.STT_LOWPASS_FREQ}")
+        if getattr(settings, "STT_NORMALIZE_AUDIO", False):
+            # Dynamic audio normalization: 75ms frame, 15dB max gain, 0.95 peak (-0.5 dBFS)
+            filters.append("dynaudnorm=f=75:g=15:p=0.95")
+
+        filter_arg = ",".join(filters) if filters else "anull"
+        output_path = input_path + ".processed.wav"
+        cmd = [
+            ffmpeg_bin,
+            "-y",
+            "-i", input_path,
+            "-af", filter_arg,
+            "-ar", "16000",
+            "-ac", "1",
+            "-c:a", "pcm_s16le",
+            output_path
+        ]
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            _, stderr = await process.communicate()
+            if process.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                print(f"[STTService] Audio successfully preprocessed -> {output_path} ({os.path.getsize(output_path)} bytes)")
+                return output_path
+            else:
+                err_msg = stderr.decode("utf-8", errors="ignore") if stderr else "unknown"
+                print(f"[STTService] ffmpeg audio processing returned code {process.returncode}: {err_msg[:200]}")
+                return input_path
+        except Exception as e:
+            print(f"[STTService] Audio preprocessing encountered an error, falling back to original: {e}")
+            return input_path
+
     async def transcribe_audio(self, audio_file: UploadFile) -> str:
         """Save uploaded audio (WebM/MP4/WAV) to a temporary file and transcribe with domain prompt."""
         suffix = ".webm"
@@ -64,6 +121,7 @@ class STTService:
                 suffix = ext
 
         temp_path = None
+        processed_path = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                 temp_path = temp_file.name
@@ -73,13 +131,19 @@ class STTService:
             file_size = os.path.getsize(temp_path)
             print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type}, provider={self.provider}, language={settings.STT_LANGUAGE})")
 
+            # Pre-process audio if enabled and valid
+            audio_to_transcribe = temp_path
+            processed_path = await self._preprocess_audio(temp_path)
+            if processed_path and processed_path != temp_path:
+                audio_to_transcribe = processed_path
+
             # Route to configured provider
             if self.provider == "groq":
-                return await self._transcribe_groq(temp_path)
+                return await self._transcribe_groq(audio_to_transcribe)
             elif self.provider == "openai":
-                return await self._transcribe_openai(temp_path)
+                return await self._transcribe_openai(audio_to_transcribe)
             elif self.provider == "faster_whisper":
-                return await self._transcribe_faster_whisper(temp_path)
+                return await self._transcribe_faster_whisper(audio_to_transcribe)
             else:
                 raise STTUnavailableError("Unsupported transcription provider")
 
@@ -92,6 +156,11 @@ class STTService:
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
+                except Exception:
+                    pass
+            if processed_path and processed_path != temp_path and os.path.exists(processed_path):
+                try:
+                    os.remove(processed_path)
                 except Exception:
                     pass
 

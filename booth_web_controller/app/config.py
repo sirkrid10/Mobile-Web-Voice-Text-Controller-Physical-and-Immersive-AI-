@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
+    # STT Audio Preprocessing (Noise Filtering & Dynamic Normalization)
+    STT_PREPROCESS_AUDIO: bool = True
+    STT_HIGHPASS_FREQ: int = 100
+    STT_LOWPASS_FREQ: int = 7500
+    STT_NORMALIZE_AUDIO: bool = True
+
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (
         "บทสนทนาสั่งงานหุ่นยนต์ TurtleBot3 ภาษาไทยผสมอังกฤษ (Code-Switching): "

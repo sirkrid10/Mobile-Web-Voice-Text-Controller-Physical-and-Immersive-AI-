@@ -1,5 +1,6 @@
 """Check that the installed SDK can initialize the real Groq STT adapter."""
 
+import os
 import asyncio
 from types import SimpleNamespace
 
@@ -80,3 +81,100 @@ def test_local_transcription_sends_configured_language(monkeypatch, language):
     service._local_model = SimpleNamespace(transcribe=transcribe)
     assert asyncio.run(service.transcribe_audio(FakeThaiAudio())) == "พาไปจุด A"
     assert calls[0].get("language") == language
+
+
+def test_preprocess_audio_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", False)
+    service = STTService()
+    res = asyncio.run(service._preprocess_audio("sample_test.webm"))
+    assert res == "sample_test.webm"
+
+
+def test_preprocess_audio_fallback_when_ffmpeg_missing(monkeypatch):
+    import shutil
+    monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", True)
+    monkeypatch.setattr(shutil, "which", lambda _cmd: None)
+    service = STTService()
+    res = asyncio.run(service._preprocess_audio("sample_test.webm"))
+    assert res == "sample_test.webm"
+
+
+def test_preprocess_audio_filters_configuration(monkeypatch):
+    import tempfile
+    monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", True)
+    monkeypatch.setattr(settings, "STT_HIGHPASS_FREQ", 120)
+    monkeypatch.setattr(settings, "STT_LOWPASS_FREQ", 7000)
+    monkeypatch.setattr(settings, "STT_NORMALIZE_AUDIO", True)
+
+    executed_cmds = []
+
+    async def fake_subprocess(*cmd, **_kwargs):
+        executed_cmds.append(cmd)
+        class FakeProcess:
+            returncode = 0
+            async def communicate(self):
+                # write fake output file so os.path.exists passes
+                with open(cmd[-1], "wb") as f:
+                    f.write(b"RIFF....WAVEfmt ")
+                return b"", b""
+        return FakeProcess()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_subprocess)
+    service = STTService()
+
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
+        temp_input = f.name
+        f.write(b"fake data")
+
+    try:
+        out = asyncio.run(service._preprocess_audio(temp_input))
+        assert out == temp_input + ".processed.wav"
+        assert len(executed_cmds) == 1
+        cmd = executed_cmds[0]
+        # Verify audio filters
+        af_idx = cmd.index("-af")
+        filter_str = cmd[af_idx + 1]
+        assert "highpass=f=120" in filter_str
+        assert "lowpass=f=7000" in filter_str
+        assert "dynaudnorm" in filter_str
+        # Verify 16kHz mono format
+        assert "-ar" in cmd and cmd[cmd.index("-ar") + 1] == "16000"
+        assert "-ac" in cmd and cmd[cmd.index("-ac") + 1] == "1"
+        assert "-c:a" in cmd and cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
+    finally:
+        if os.path.exists(temp_input):
+            os.remove(temp_input)
+        if os.path.exists(temp_input + ".processed.wav"):
+            os.remove(temp_input + ".processed.wav")
+
+
+def test_preprocess_audio_real_ffmpeg_execution():
+    import shutil
+    import subprocess
+    import tempfile
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg not available")
+
+    service = STTService()
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        tone_path = f.name
+
+    # Generate 1-second 440Hz test audio tone with ffmpeg
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", tone_path],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
+    try:
+        processed = asyncio.run(service._preprocess_audio(tone_path))
+        assert processed != tone_path
+        assert os.path.exists(processed)
+        assert os.path.getsize(processed) > 0
+        assert processed.endswith(".processed.wav")
+    finally:
+        if os.path.exists(tone_path):
+            os.remove(tone_path)
+        if os.path.exists(tone_path + ".processed.wav"):
+            os.remove(tone_path + ".processed.wav")
