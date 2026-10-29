@@ -936,7 +936,7 @@ header.app-header {
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 900px) {
   .staff-workspace {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     gap: 24px;
