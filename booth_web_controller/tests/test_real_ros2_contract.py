@@ -300,7 +300,7 @@ def test_real_ros2_action_navigation_goal():
 
         assert len(mock_node.received_goals) >= 1
         goal = mock_node.received_goals[-1]
-        assert goal.destination_id == "A"
+        assert goal.destination_id == "D"
         assert goal.request_id.startswith("req-")
 
     executor.shutdown()

@@ -46,13 +46,13 @@ def reset_session_state():
     session_manager.set_broadcast_callback(None)
 
 
-@pytest.mark.parametrize("target", ["A", "B", "C", "start"])
-def test_robot_return_config_accepts_only_abc(target):
+@pytest.mark.parametrize("target", ["A", "B", "C", "D", "start"])
+def test_robot_return_config_accepts_only_abcd(target):
     from app.config import Settings
     from pydantic import ValidationError
 
     if target == "start":
-        with pytest.raises(ValidationError, match="Robot A/B/C contract"):
+        with pytest.raises(ValidationError, match="Robot A/B/C/D contract"):
             Settings(START_BOOTH_ID=target)
     else:
         assert Settings(START_BOOTH_ID=target).START_BOOTH_ID == target
@@ -168,17 +168,17 @@ def test_quick_chip_command_keeps_original_flow_and_correlates_result():
     assert session_manager.latest_request_identity == (payload["request_id"], "chip-visitor")
 
 
-def test_locations_use_visitor_a_b_c_and_start_chip_remains_a_request():
-    assert [(item["id"], item["prompt"]) for item in settings.LOCATIONS[:3]] == [
-        ("A", "ไปจุด A"), ("B", "ไปจุด B"), ("C", "ไปจุด C")
+def test_locations_use_named_abcd_and_start_chip_remains_a_request():
+    assert [(item["id"], item["prompt"]) for item in settings.LOCATIONS[:4]] == [
+        ("A", "ไปโซนกู้ภัย"), ("B", "ไปโซนการแพทย์"), ("C", "ไปโซนส่งเสบียง"), ("D", "ไปศูนย์บัญชาการ")
     ]
     start = next(item for item in settings.LOCATIONS if item["id"] == "start")
     assert start["prompt"] == "กลับจุดเริ่มต้น"
-    assert "จุด A" in start["label"]
+    assert "จุด D" in start["label"]
 
 
 @pytest.mark.parametrize(("text", "destination"), [
-    ("ไปจุด A", "A"), ("พาไปจุด บี", "B"), ("ไปจุด C", "C"), ("กลับ start", "A")
+    ("ไปจุด A", "A"), ("พาไปจุด บี", "B"), ("ไปจุด C", "C"), ("กลับ start", "D")
 ])
 def test_mock_visitor_requests_map_to_a_b_c_and_start_alias(text, destination):
     from app.ros2_bridge import MockROS2Bridge
@@ -451,13 +451,13 @@ def test_staff_return_home_replaces_active_mock_visitor_navigation():
         staff_task = bridge._sim_task
 
         assert staff_task is not visitor_task
-        assert session_manager.current_goal == "A"
-        assert session_manager.latest_action.destination_id == "A"
+        assert session_manager.current_goal == "D"
+        assert session_manager.latest_action.destination_id == "D"
         assert session_manager.latest_action.source == "staff_override"
         assert session_manager.latest_action.outcome == "accepted"
 
         await asyncio.wrap_future(staff_task)
-        assert session_manager.current_goal == "A"
+        assert session_manager.current_goal == "D"
         assert session_manager.latest_action.request_id == staff_action_id
         assert session_manager.latest_action.outcome == "succeeded"
         assert session_manager.robot_state == "REACHED"
@@ -647,14 +647,14 @@ def test_auto_return_on_disconnect():
 
         # Wait for delayed auto-return task to trigger
         time.sleep(1.3)
-        assert session_manager.current_goal == settings.START_BOOTH_ID == "A"
+        assert session_manager.current_goal == settings.START_BOOTH_ID == "D"
 
 
-def test_disconnect_at_a_does_not_schedule_redundant_return():
+def test_disconnect_at_d_does_not_schedule_redundant_return():
     with TestClient(app) as client:
-        claim = client.post("/api/v1/session/claim", json={"session_id": "at-a"})
+        claim = client.post("/api/v1/session/claim", json={"session_id": "at-d"})
         token = claim.json()["session_token"]
-        session_manager.current_goal = "A"
+        session_manager.current_goal = "D"
         session_manager.robot_state = "REACHED"
         response = client.post(
             "/api/v1/session/disconnect", headers={"X-Session-Token": token}

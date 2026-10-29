@@ -1769,7 +1769,7 @@ body.visitor-page {
   .visitor-page .brand-titles h1 { font-size: 1rem; }
   .visitor-page .robot-card,
   .visitor-page .command-panel { padding: 13px; }
-  .visitor-page .robot-card-header { flex-direction: column; }
+  .visitor-page .robot-card-header { flex-direction: column; flex-wrap: nowrap; }
   .visitor-page .goal-tag { width: 100%; max-width: 100%; }
   .visitor-page .mind-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .visitor-page .chips-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

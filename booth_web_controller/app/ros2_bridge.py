@@ -23,6 +23,7 @@ from typing import Optional, Dict, Any
 from app.models import DirectActionOutcome, IntentDispatchOutcome, IntentOutcome, RosStamp
 
 from app.config import settings
+from app.destinations import STATIONS
 from app.subtitle_mode import SubtitleModeControl, SubtitleModeError
 
 
@@ -227,25 +228,30 @@ class MockROS2Bridge(BaseROS2Bridge):
     def _normalize_mock_text(text: str) -> str:
         import re
         normalized = text.strip().lower()
-        normalized = normalized.replace("จุดเอ", "จุด a").replace("จุดบี", "จุด b").replace("จุดซี", "จุด c")
-        normalized = normalized.replace("เอ", " a ").replace("บี", " b ").replace("ซี", " c ")
         normalized = re.sub(r"[^a-z0-9ก-๙]+", " ", normalized)
         return " ".join(normalized.split())
 
     @classmethod
     def _mock_intent(cls, text: str):
+        import re
         normalized = cls._normalize_mock_text(text)
-        if normalized in {"กลับจุดเริ่มต้น", "กลับ start", "กลับ จุดเริ่มต้น", "กลับ จุดเริ่มต้น start"}:
-            return "A", "NAVIGATE", ""
-
-        found = [point for point in ("A", "B", "C") if __import__("re").search(rf"\b{point.lower()}\b", normalized)]
-        if len(found) > 1:
+        if re.fullmatch(r'(?:ช่วย\s*)?(?:พา\s*)?กลับ\s*(?:ไป\s*)?(?:จุดเริ่มต้น|start)(?:\s*(?:ครับ|ค่ะ|หน่อย|ด้วย))*|(?:return|go back) to start(?: please)?', normalized):
+            return "D", "NAVIGATE", ""
+        found = set(re.findall(r'(?<![a-z0-9])[abcd](?![a-z0-9])', normalized))
+        for name, letter in (('เอ', 'a'), ('บี', 'b'), ('ซี', 'c'), ('ดี', 'd')):
+            if re.search(r'(?:จุด|สถานี)\s*' + name, normalized):
+                found.add(letter)
+        for station in STATIONS:
+            if any(cls._normalize_mock_text(alias) in normalized for alias in station['aliases']):
+                found.add(station['id'].lower())
+        if len(found) > 1 or re.search(r'ไม่\s*(?:ไป|พา)|อย่า|ไม่เอา|\bnot\b', normalized):
             return "", "CLARIFY", "ระบุปลายทางเพียงจุดเดียว"
-        if len(found) == 1 and any(word in normalized for word in ("ไป", "พา", "navigate", "go", "take me")):
-            return found[0], "NAVIGATE", ""
+        movement = any(word in normalized for word in ('ไป', 'พา', 'กลับ')) or re.search(r'\b(?:navigate|go|take me|return)\b', normalized)
+        if len(found) == 1 and movement:
+            return next(iter(found)).upper(), "NAVIGATE", ""
         if any(word in normalized for word in ("wait", "รอ", "หยุด", "stop", "cancel")):
             return "", "UNSUPPORTED", "คำสั่งนี้ยังไม่รองรับ"
-        return "", "CLARIFY", "กรุณาระบุจุด A, B หรือ C"
+        return "", "CLARIFY", "กรุณาระบุจุด A, B, C หรือ D"
 
     @staticmethod
     def _location_name(target: str) -> str:
@@ -312,7 +318,7 @@ class MockROS2Bridge(BaseROS2Bridge):
                 print(f"[ROS2Bridge Mock] Navigating towards {target}...")
                 await asyncio.sleep(4.0)
 
-                # A/B/C, including return to A, all finish at ARRIVED.
+                # A/B/C/D, including return to D, all finish at ARRIVED.
                 self.session_manager.update_from_ros_state(state="REACHED", goal=target)
                 self.session_manager.update_from_llm_mind(
                     heard_text=self.session_manager.heard_text,

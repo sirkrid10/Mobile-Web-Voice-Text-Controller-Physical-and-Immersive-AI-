@@ -17,6 +17,34 @@ Mobile Web Application controller designed for exhibition booth visitors to inte
 
 ---
 
+## จุดหมาย ABCD และชื่อบนป้าย (29 ตุลาคม 2026)
+
+| ID | ชื่อบนป้าย | ภาษาอังกฤษ | ตำแหน่งตาม handoff |
+| --- | --- | --- | --- |
+| A | โซนกู้ภัย | RESCUE ZONE / SEARCH & RESCUE | มุมล่างซ้าย |
+| B | โซนการแพทย์ | MEDICAL ZONE / MEDICAL AID | มุมบนซ้าย |
+| C | โซนส่งเสบียง | SUPPLY ZONE / SUPPLY DROP-OFF | มุมบนขวา |
+| D | ศูนย์บัญชาการ | COMMAND CENTER / MISSION CONTROL | มุมล่างขวา |
+
+สั่งได้ด้วย ID, เสียงอ่านตัวอักษร และชื่อโซน เช่น "ไปจุดดี", "พาไปโซนการแพทย์", "go to mission control" คำคุย "สวัสดี" และ "ดีมาก" ไม่ใช่คำสั่งไป D
+
+`start`, "กลับจุดเริ่มต้น", Staff Return และ Auto-return หมายถึง **D ศูนย์บัญชาการมุมล่างขวา** ส่วน "ไปจุด A" ยังหมายถึงโซนกู้ภัย พิกัด A/B/C เปลี่ยนจากชุดเดิมด้วย ห้ามเก็บพิกัดใน LLM ให้ Robot Bridge แปลง ID เป็นพิกัดตาม handoff
+
+Action `/guide/navigate`, `GuideToDestination` และ message เดิมไม่เปลี่ยน schema เพิ่ม D เป็นค่าของ string `destination_id` จึง build เฉพาะ `agent_pkg` สำหรับการเปลี่ยน ABCD นี้ แล้วเปิด Backend/Intent/Subtitle ใหม่เพื่อโหลดรายการและ prompt ใหม่ หากยังไม่เคย build `IntentDispatch` ให้ทำตามขั้นตอนติดตั้ง interface ของ Staff ก่อน
+
+ก่อนเดินจริง ให้ทีม Robot ยืนยันว่า deploy/build บน Pi สำเร็จแล้ว และตรวจแบบอ่านอย่างเดียว:
+
+```bash
+ros2 param get /robot_bridge_node valid_destinations
+```
+
+ต้องมี A B C D การแก้ source ใน VM ไม่ยืนยันว่า Pi ใช้แล้ว Handoff ระบุว่ายังไม่ได้ทดลองหุ่นเดินจริง ชุดสนามจริงมีขนาด 2×2 เมตร ส่วน `size_m=[3.2,3.5]` เป็นขอบ grid ของภาพ map ห้ามใช้ย่อ/ขยายพิกัดหุ่นหรือเป้าหมาย
+
+อ้างอิง `README_LLM_ABCD_TH.md`, `arena_metadata.json` ใน `vr_handoff_20261029_abcd` และภาพป้าย `S__22085635_0.jpg` ถึง `S__22085638_0.jpg` ในโฟลเดอร์ `pic`
+
+ชื่อบนปุ่มเว็บ, ชื่อเป้าหมายใน Staff และ mock ใช้ mapping เดียวกันภายใน Backend ส่วน hint สำหรับ STT จะเสริมชื่อใหม่ให้แม้ `.env` เดิมยังเป็นข้อความ A/B/C ไม่ต้องแก้หรือแสดง API key
+
+
 ## Subtitle สำหรับ Unity VR
 
 Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม ดู [วิธีตั้งค่า VR และ contract](VR-SUBTITLE-INTEGRATION.md)
@@ -287,9 +315,9 @@ ros2 topic echo /vr/subtitle ai_interfaces/msg/Subtitle --no-daemon
 During exhibition demos (Milestone 4 — Stable Integrated Demo), ambient hall noise and robot-mounted microphone hardware failures can hinder voice interaction. This project replaces the robot-mounted mic with an **Audio Input Gateway** on visitor smartphones:
 
 * **High Signal-to-Noise Ratio (SNR):** Visitors speak directly into their smartphone microphones close to their mouth.
-* **Hybrid Voice & Text Pipeline:** MediaRecorder Push-to-Talk audio sent to Whisper STT (Groq API, OpenAI API, or Local Faster-Whisper), supplemented by Quick Scenario Chips (`A`, `B`, `C`, visitor return to A, and unsupported Wait request) and a fallback Text input box.
+* **Hybrid Voice & Text Pipeline:** MediaRecorder Push-to-Talk audio sent to Whisper STT (Groq API, OpenAI API, or Local Faster-Whisper), supplemented by Quick Scenario Chips (`A`, `B`, `C`, `D`, visitor return to D, and unsupported Wait request) and a fallback Text input box.
 * **Exclusive Session Lock & Smart Watchdog:** Grants exclusive control to one smartphone at a time. The inactivity timeout defaults to 120 seconds and pauses while the web state is NAVIGATING or REPLANNING. Existing `.env` settings override this default.
-* **Configurable Auto-Return to Start Booth:** Automatically commands TurtleBot3 to return to the QR Code starting booth (`destination_id="A"`) after a session finishes or times out.
+* **Configurable Auto-Return to Start Booth:** Automatically commands TurtleBot3 to return to the QR Code starting booth (`destination_id="D"`) after a session finishes or times out.
 * **In-Process rclpy + FastAPI:** Web server and ROS 2 Jazzy Node execute in the same process on WSL 2 Ubuntu 24.04 for ultra-low latency. Standalone simulation requires explicit `USE_MOCK_ROS2=true`; real ROS mode fails startup if ROS imports are missing.
 
 ```mermaid
@@ -307,9 +335,36 @@ graph TD
 
 ---
 
-Robot Bridge A/B/C ใช้ `READY` → `NAVIGATING` → `ARRIVED` และ `ready_for_goal=true` ก่อนรับงานถัดไป การกลับจุดเริ่มต้นส่ง `A` และเว็บแสดง `REACHED` เมื่อถึง ไม่ต้องรอ `HOME` ตั้ง `START_BOOTH_ID=A` ใน `.env` ของเครื่องที่รัน Backend คำว่า `start` ในปุ่มลัดเป็นข้อความที่ intent ตีความเป็น A ไม่ใช่ Robot destination ID
+Robot Bridge A/B/C/D ใช้ `READY` → `NAVIGATING` → `ARRIVED` และ `ready_for_goal=true` ก่อนรับงานถัดไป การกลับจุดเริ่มต้นส่ง `D` และเว็บแสดง `REACHED` เมื่อถึง ไม่ต้องรอ `HOME` ตั้ง `START_BOOTH_ID=D` ใน `.env` ของเครื่องที่รัน Backend คำว่า `start` ในปุ่มลัดเป็นข้อความที่ intent ตีความเป็น D ไม่ใช่ Robot destination ID
 
 หน้าเว็บรับผลผ่าน `/ws/status` แสดง transcript, intent, Robot state และ subtitle แยกกัน Backend ล้างข้อมูล subtitle ตาม `stamp + ttl` แต่หน้าเว็บค้างข้อความล่าสุดไว้จนมีข้อความใหม่มาแทน ไม่เก็บข้อความข้ามการรีเฟรชหน้า
+
+### หน้าเว็บขึ้น READY แต่สั่งไม่ได้
+
+เปิดหน้า Staff แล้วดูสถานะ Robot พร้อม log ของ Intent เพราะ Backend กับ Intent รับ heartbeat คนละ subscription
+
+| อาการ | วิธีตรวจและแก้ |
+| --- | --- |
+| `robot_state_unknown` พร้อม `source_age_sec` หรือ `receive_age_sec` สูง | รอ Intent สร้าง reader ใหม่ประมาณ 10–20 วินาที แล้วตรวจว่าสถานะสดก่อนสั่งอีกครั้ง |
+| Backend รับข้อมูลสด แต่ Intent ยังไม่ได้ข้อมูล | หากยังค้าง ให้ตรวจว่าหุ่นหยุดและไม่มีงานนำทางค้าง แล้วกด Restart Intent ใน Staff การรีสตาร์ทระหว่างนำทางทำให้สูญเสียการติดตาม Action เดิม |
+| ทั้ง Backend และ Intent ไม่มี heartbeat ใหม่ | ตรวจ `robot_bridge`, หุ่น, VM, Tailscale และ ROS discovery |
+| `robot_busy` | รอ Action เดิมจบและได้รับ heartbeat พร้อมรับงานใหม่ |
+| timestamp ของหุ่นล้ำหน้าเกิน tolerance | เทียบเวลากับ NTP แล้วซิงก์เครื่องที่คลาดเคลื่อน รวมถึง Windows host เมื่อใช้ WSL |
+
+หาก Windows คลาดเคลื่อน เปิด PowerShell แบบ Administrator แล้วรัน:
+
+```powershell
+w32tm /resync /rediscover
+w32tm /query /status
+```
+
+ตรวจเวลา WSL ด้วย `timedatectl status` ด้วย หากใช้ NTP ใน WSL ให้ดู offset จาก `timedatectl timesync-status`
+ข้อความ READY บนเว็บอาจเป็นข้อมูลเก่า ต้องตรวจอายุ heartbeat ด้วย อย่าเพิ่ม freshness หรือ clock skew เพื่อข้ามการตรวจสถานะ
+
+Intent รุ่นที่แก้จะสร้าง reader ใหม่เมื่อไม่มีข้อมูลเข้า 5 วินาที โดยเว้นการลองใหม่อย่างน้อย 10 วินาที
+การกู้นี้ไม่รีสตาร์ท process ไม่ล้าง Action และไม่ส่ง Goal เอง ต้อง build `agent_pkg` รุ่นใหม่แล้วเปิด Intent ใหม่จึงจะใช้ได้
+log `Navigation subscription receiving again` หมายถึงข้อมูลกลับเข้า reader ส่วน source timestamp ยังต้องผ่านเกณฑ์ freshness
+รอบตรวจ 29 ตุลาคม 2026 ยืนยัน A และ B จบสำเร็จ และส่ง D ต่อได้ใน process เดิม ส่วนสาเหตุลึกของ reader ค้างใน ROS/DDS ยังยืนยันไม่ได้
 
 ## โครงสร้างโปรเจกต์
 
@@ -321,7 +376,7 @@ booth_web_controller/
 ├── pytest.ini                   # Pytest configuration
 ├── app/
 │   ├── __init__.py
-│   ├── config.py                # Pydantic BaseSettings & visitor destinations A/B/C and return to A
+│   ├── config.py                # Pydantic BaseSettings & visitor destinations A/B/C/D and return to D
 │   ├── models.py                # Pydantic schemas for REST payloads & WebSocket broadcasts
 │   ├── session_manager.py       # Exclusive session lock, configurable inactivity watchdog, auto-return task
 │   ├── stt_service.py           # Whisper STT engine (Groq API / OpenAI API / faster-whisper)
@@ -372,7 +427,7 @@ nano .env
 | `INACTIVITY_TIMEOUT_SEC` | `120` | Inactivity countdown seconds before session unlock |
 | `AUTO_RETURN_ENABLED` | `true` | Automatically return to Start Booth upon session end |
 | `AUTO_RETURN_DELAY_SEC` | `5` | Grace period (seconds) before triggering Auto-Return |
-| `START_BOOTH_ID` | `A` | Robot destination for staff and automatic return; use A/B/C contract |
+| `START_BOOTH_ID` | `D` | Robot destination for staff and automatic return; use A/B/C/D contract |
 | `STT_PROVIDER` | `groq` | `groq` \| `openai` \| `faster_whisper` |
 | `STT_LANGUAGE` | `th` | Default transcription language |
 | `STT_GROQ_MODEL` | `whisper-large-v3` | Groq transcription model for Thai commands |
@@ -495,7 +550,7 @@ ros2 topic info /guide/user_request --verbose --no-daemon
 
 ### Backend ยังส่งกลับด้วย destination start
 
-ตั้ง `START_BOOTH_ID=A` ใน `.env` แล้ว restart Backend ค่า start ไม่ผ่าน config validation เพื่อไม่ให้ส่ง goal ที่ Robot ปฏิเสธ ปุ่ม "กลับ start" บนเว็บยังใช้ได้เพราะส่งเป็นข้อความให้ intent แปลเป็น A
+ตั้ง `START_BOOTH_ID=D` ใน `.env` แล้ว restart Backend ค่า start ไม่ผ่าน config validation เพื่อไม่ให้ส่ง goal ที่ Robot ปฏิเสธ ปุ่ม "กลับ start" บนเว็บยังใช้ได้เพราะส่งเป็นข้อความให้ intent แปลเป็น D
 
 ### Timeout ไม่เปลี่ยนเป็น 120 วินาที
 
@@ -570,7 +625,7 @@ ROS_PROFILE=local USE_MOCK_ROS2=false HOST=0.0.0.0 PORT=8000 bash ./run_booth.sh
 
 แตะไมค์หนึ่งครั้งเพื่อเริ่ม แตะอีกครั้งเพื่อหยุดและส่ง หรือกดค้างแล้วปล่อยเพื่อส่ง หากต้องฟังไฟล์เสียงที่ส่งจริง ใช้ `?debug_audio=1` เช่น <http://localhost:8000/?debug_audio=1>
 
-visitor "กลับจุดเริ่มต้น" หรือ "กลับ start" ตีความเป็น A ส่วน Staff/Auto-return ส่ง destination `A` พิกัด A/B/C ให้ทีม Robot map จริง
+visitor "กลับจุดเริ่มต้น" หรือ "กลับ start" ตีความเป็น D ส่วน Staff/Auto-return ส่ง destination `D` พิกัด A/B/C/D ให้ทีม Robot map จริง
 
 ### Terminal 5: VLM พร้อมกล้อง (เลือกเปิด)
 

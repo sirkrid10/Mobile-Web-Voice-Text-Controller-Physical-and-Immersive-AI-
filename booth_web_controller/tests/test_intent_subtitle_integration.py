@@ -24,6 +24,8 @@ from app.models import TextCommandRequest
 from app.ros2_bridge import RealROS2Bridge
 from app.session_manager import session_manager
 from app.stt_service import STTUnavailableError
+from app.vr_subtitle import VRSubtitleHub
+from app.destinations import STATIONS
 
 
 class FakeModel:
@@ -110,6 +112,14 @@ async def _run_integration(monkeypatch):
 
     loop = asyncio.get_running_loop()
     bridge = RealROS2Bridge(session_manager, loop)
+    hub = VRSubtitleHub()
+    accepted_captions = []
+
+    def record_caption(text, stamp, request_id='', observation_id=''):
+        accepted_captions.append((request_id, text))
+        hub.publish(text, stamp, request_id, observation_id)
+
+    bridge.set_subtitle_callback(record_caption)
     backend.ros_bridge_instance = bridge
     session_manager.set_ros_bridge(bridge)
     executor_thread.start()
@@ -151,10 +161,11 @@ async def _run_integration(monkeypatch):
         assert bridge.robot_observation()['robot_source_at'] > 0
 
         for text, destination, input_mode in (
-            ("ไปจุด A", "A", "text"),
-            ("พาไปจุด บี", "B", "chip"),
-            ("ไปจุด C", "C", "chip"),
-            ("กลับ start", "A", "chip"),
+            ("ไปโซนกู้ภัย", "A", "text"),
+            ("พาไปโซนการแพทย์", "B", "chip"),
+            ("ไปโซนส่งเสบียง", "C", "chip"),
+            ("ไปศูนย์บัญชาการ", "D", "chip"),
+            ("กลับ start", "D", "chip"),
             ("ไปจุด B อีกครั้ง", "B", "text"),
         ):
             response = await submit_text(text, destination, input_mode)
@@ -178,6 +189,15 @@ async def _run_integration(monkeypatch):
                 and session_manager.robot_state == "REACHED",
                 description=f"Robot arrival at {destination}",
             )
+            zone = next(station['name'] for station in STATIONS if station['id'] == destination)
+            await wait_for(
+                lambda: any(rid == response['request_id'] and zone in text and 'ถึง' in text
+                            for rid, text in accepted_captions),
+                description=f'ARRIVED caption for named station {destination}',
+            )
+            assert any(rid == response['request_id'] and zone in text and 'พาไป' in text
+                       for rid, text in accepted_captions)
+            assert json.loads(hub.latest)['request_id'] == response['request_id']
             await wait_for(
                 lambda: intent.controller._active is None,
                 description=f"terminal Action result for {destination}",
@@ -187,17 +207,17 @@ async def _run_integration(monkeypatch):
                 description=f"new Robot readiness heartbeat after {destination}",
             )
 
-        # Auto-return uses the same A/B/C Action contract, targeting A.
+        # Auto-return uses the same A/B/C/D Action contract, targeting D.
         assert await session_manager.release_session(reason="user_disconnect")
         await wait_for(
             lambda: session_manager.latest_action is not None
             and session_manager.latest_action.source == "auto_return"
-            and session_manager.latest_action.destination_id == "A",
-            description="auto-return direct A Action",
+            and session_manager.latest_action.destination_id == "D",
+            description="auto-return direct D Action",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
-            description="auto-return ARRIVED at A",
+            lambda: session_manager.current_goal == "D" and session_manager.robot_state == "REACHED",
+            description="auto-return ARRIVED at D",
         )
         await wait_for(
             lambda: session_manager.latest_action.outcome == "succeeded",
@@ -251,7 +271,7 @@ async def _run_integration(monkeypatch):
         await session_manager.return_to_start_now()
         staff_action_id = session_manager.latest_action.request_id
         assert session_manager.latest_action.source == "staff_override"
-        assert session_manager.latest_action.destination_id == "A"
+        assert session_manager.latest_action.destination_id == "D"
         await wait_for(
             lambda: session_manager.robot_state == "NAVIGATING",
             description="staff Return Home Robot motion",
@@ -270,7 +290,7 @@ async def _run_integration(monkeypatch):
         assert busy.request_id != staff_action_id
         assert busy.session_id == "integration-visitor"
         assert session_manager.latest_action.request_id == staff_action_id
-        assert session_manager.latest_action.destination_id == "A"
+        assert session_manager.latest_action.destination_id == "D"
         assert visitor_request_id not in {
             state.request_id for state in observer.navigation
         }
@@ -284,8 +304,8 @@ async def _run_integration(monkeypatch):
             description="busy subtitle expires without replaying consumed navigation",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "A" and session_manager.robot_state == "REACHED",
-            description="staff return ARRIVED at A",
+            lambda: session_manager.current_goal == "D" and session_manager.robot_state == "REACHED",
+            description="staff return ARRIVED at D",
         )
         await wait_for(
             intent.controller._robot_ready,
