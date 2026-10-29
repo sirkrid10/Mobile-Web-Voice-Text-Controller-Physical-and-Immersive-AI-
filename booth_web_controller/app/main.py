@@ -193,6 +193,8 @@ async def heartbeat_session(x_session_token: Optional[str] = Header(None, alias=
 @app.post("/api/v1/session/disconnect", response_model=DisconnectResponse, summary="Release session & trigger auto-return")
 async def disconnect_session(x_session_token: Optional[str] = Header(None, alias="X-Session-Token")):
     if not x_session_token or x_session_token != session_manager.active_session_token:
+        if session_manager.active_session_id is None:
+            return {"status": "disconnected", "auto_return_scheduled": False}
         raise HTTPException(status_code=403, detail="Invalid session token for active controller")
     auto_return_scheduled = await session_manager.release_session(reason="user_disconnect")
     await ws_manager.broadcast_state()

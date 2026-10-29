@@ -609,6 +609,14 @@
         }
       });
       if (!res.ok) {
+        if (res.status === 403) {
+          mySessionToken = null;
+          sessionStorage.removeItem('booth_visitor_session_token');
+          resetSubmissionState();
+          setSessionFeedback('จบการใช้งานแล้ว');
+          renderIntentResult(currentState);
+          return;
+        }
         setSessionFeedback(`จบการใช้งานไม่สำเร็จ (HTTP ${res.status})`);
         return;
       }
