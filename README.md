@@ -46,7 +46,18 @@ ros2 param get /robot_bridge_node valid_destinations
 
 ## Visitor UI ใน release candidate
 
-หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รอบ release นี้รวม UI จาก `origin/main` กับ Static QR/TunnelManager จาก `origin/feat/static-qr-cloudflare`; ยังไม่รวม `feat/stt` และไม่มีการเปลี่ยน audio pipeline
+หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รอบ release นี้รวม UI จาก `origin/main`, Static QR/TunnelManager และ backend audio preprocessing แบบเลือกเปิดได้ ไม่ได้ merge `feat/stt` ทั้ง branch จึงคง frontend ไมค์, prompt, session และ ROS contract เดิม
+
+คำสั่งเปิดใช้งานยังเหมือนเดิม จาก workspace หลัก:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh
+```
+
+ใช้ private `booth_web_controller/.env` เดิม อย่าคัดลอก `.env.example` ทับ หากรันจาก worktree แยกต้องจัดเตรียม private config ของ worktree นั้นเอง Git ไม่คัดลอก `.env` ให้
+ค่าเริ่มต้น `STT_PREPROCESS_AUDIO=false` ส่งเสียงต้นฉบับเหมือนชุดเดิมและไม่ต้องติดตั้ง ffmpeg เพื่อรันระบบปกติ ดูวิธีเปิดทดสอบและย้อนปิดในหัวข้อ Optional STT audio preprocessing ด้านล่าง
+หลังสลับ branch หรืออัปเดตโค้ด ให้ปิด Backend เดิมด้วย Ctrl+C แล้วเปิดคำสั่งเดิมใหม่เมื่อหุ่นไม่มีงานนำทางค้าง ห้ามเปิด Backend ซ้อน การสลับ Git ไม่ restart process ที่กำลังรันอยู่
 
 
 ## QR คงที่ด้วย Cloudflare Worker (Static QR Code)
@@ -455,8 +466,36 @@ nano .env
 | `STT_PROVIDER` | `groq` | `groq` \| `openai` \| `faster_whisper` |
 | `STT_LANGUAGE` | `th` | Default transcription language |
 | `STT_GROQ_MODEL` | `whisper-large-v3` | Groq transcription model for Thai commands |
+| `STT_PREPROCESS_AUDIO` | `false` | Enable optional Linux ffmpeg filtering; leave off until real-audio A/B comparison passes |
+| `STT_HIGHPASS_FREQ` | `100` | High-pass cutoff in Hz; `0` disables it, supported range is 0–7999 |
+| `STT_LOWPASS_FREQ` | `7500` | Low-pass cutoff in Hz; `0` disables it, supported range is 0–7999 |
+| `STT_NORMALIZE_AUDIO` | `false` | Independently enable dynamic audio normalization |
+| `STT_PREPROCESS_TIMEOUT_SEC` | `8.0` | Per-upload ffmpeg deadline, greater than 0 and at most 30 seconds |
 | `GROQ_API_KEY` | - | Groq API Key |
 | `USE_MOCK_ROS2` | `false` | Explicit standalone simulation; false uses ROS 2 |
+
+### Optional STT audio preprocessing
+
+The release default sends the original microphone upload to the configured STT provider. Preprocessing is opt-in and stays off until the same authorized real recordings have been compared with the flag off and on. When enabled, Linux `ffmpeg` applies the configured high-pass and low-pass filters and writes mono, 16 kHz, signed 16-bit PCM WAV. Normalization is a separate option. These filters do not separate the visitor from other nearby speakers.
+
+Install and verify Linux ffmpeg in the Backend environment (for WSL Ubuntu):
+
+```bash
+sudo apt update
+sudo apt install ffmpeg
+ffmpeg -version
+ffmpeg -hide_banner -filters | grep -E 'highpass|lowpass|dynaudnorm'
+```
+
+Use `STT_PREPROCESS_AUDIO=true` only in an isolated test config. `STT_PREPROCESS_TIMEOUT_SEC` defaults to 8 seconds (maximum 30): this bounds extra preprocessing wait; on timeout the owned ffmpeg process is stopped and the original upload is sent instead. If ffmpeg is missing, exits unsuccessfully, or creates invalid output, the backend logs a short fallback reason and uses the original upload. It never logs ffmpeg stderr or provider credentials. Each request gets its own temporary raw and processed files, which are removed after transcription or failure.
+
+When normalization is enabled, the filter uses `dynaudnorm` with `gausssize=15` and `maxgain=10`; `gausssize` controls the smoothing window while `maxgain` is a linear gain factor, not decibels. See the [FFmpeg filter documentation](https://ffmpeg.org/ffmpeg-filters.html#dynaudnorm). The selected filter values are starting settings, not a claim that recognition quality improves.
+
+To roll back, set `STT_PREPROCESS_AUDIO=false` and restart the Backend only when no Robot navigation is active. The existing launcher remains unchanged:
+
+```bash
+bash booth_web_controller/run_tailscale.sh
+```
 
 ---
 

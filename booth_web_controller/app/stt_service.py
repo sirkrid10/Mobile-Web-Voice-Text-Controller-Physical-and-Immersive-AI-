@@ -8,6 +8,7 @@ import tempfile
 import asyncio
 from fastapi import UploadFile
 
+from app.audio_preprocessing import preprocess_audio
 from app.config import settings
 
 
@@ -64,6 +65,7 @@ class STTService:
                 suffix = ext
 
         temp_path = None
+        processed_path = None
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                 temp_path = temp_file.name
@@ -73,13 +75,40 @@ class STTService:
             file_size = os.path.getsize(temp_path)
             print(f"[STTService] Processing audio file: {temp_path} ({file_size} bytes, type={audio_file.content_type}, provider={self.provider}, language={settings.STT_LANGUAGE})")
 
+            try:
+                preprocessing = await preprocess_audio(
+                    temp_path,
+                    enabled=settings.STT_PREPROCESS_AUDIO,
+                    highpass_freq=settings.STT_HIGHPASS_FREQ,
+                    lowpass_freq=settings.STT_LOWPASS_FREQ,
+                    normalize=settings.STT_NORMALIZE_AUDIO,
+                    timeout_sec=settings.STT_PREPROCESS_TIMEOUT_SEC,
+                )
+                processed_path = preprocessing.processed_path
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                print("[STTService] Audio preprocessing failed unexpectedly; using original upload")
+                preprocessing = None
+
+            if processed_path:
+                audio_to_transcribe = processed_path
+                print("[STTService] Audio preprocessing completed; sending 16 kHz mono WAV")
+            else:
+                audio_to_transcribe = temp_path
+                reason = preprocessing.reason if preprocessing else "preprocessing_error"
+                if reason == "disabled":
+                    print("[STTService] Audio preprocessing disabled; sending original upload")
+                else:
+                    print(f"[STTService] Audio preprocessing fallback ({reason}); sending original upload")
+
             # Route to configured provider
             if self.provider == "groq":
-                return await self._transcribe_groq(temp_path)
+                return await self._transcribe_groq(audio_to_transcribe)
             elif self.provider == "openai":
-                return await self._transcribe_openai(temp_path)
+                return await self._transcribe_openai(audio_to_transcribe)
             elif self.provider == "faster_whisper":
-                return await self._transcribe_faster_whisper(temp_path)
+                return await self._transcribe_faster_whisper(audio_to_transcribe)
             else:
                 raise STTUnavailableError("Unsupported transcription provider")
 
@@ -92,6 +121,11 @@ class STTService:
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
+                except Exception:
+                    pass
+            if processed_path and processed_path != temp_path and os.path.exists(processed_path):
+                try:
+                    os.remove(processed_path)
                 except Exception:
                     pass
 

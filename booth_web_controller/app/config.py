@@ -6,7 +6,7 @@ Aligned with TurtleBot3 LLM Subtitle Architecture (intent_node & subtitle_node).
 
 from typing import List, Dict, Any
 from pathlib import Path
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.destinations import DESTINATION_IDS, STATION_SPEECH_HINT, visitor_locations
 
@@ -65,6 +65,23 @@ class Settings(BaseSettings):
     STT_GROQ_MODEL: str = "whisper-large-v3"
     GROQ_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+
+    # Optional Linux ffmpeg preprocessing; keep disabled until real-audio A/B testing.
+    STT_PREPROCESS_AUDIO: bool = False
+    STT_HIGHPASS_FREQ: int = Field(100, ge=0, lt=8000)
+    STT_LOWPASS_FREQ: int = Field(7500, ge=0, lt=8000)
+    STT_NORMALIZE_AUDIO: bool = False
+    STT_PREPROCESS_TIMEOUT_SEC: float = Field(8.0, gt=0, le=30, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_stt_preprocessing(self):
+        if (
+            self.STT_HIGHPASS_FREQ > 0
+            and self.STT_LOWPASS_FREQ > 0
+            and self.STT_HIGHPASS_FREQ >= self.STT_LOWPASS_FREQ
+        ):
+            raise ValueError("STT_HIGHPASS_FREQ must be lower than STT_LOWPASS_FREQ when both filters are enabled")
+        return self
 
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = STATION_SPEECH_HINT

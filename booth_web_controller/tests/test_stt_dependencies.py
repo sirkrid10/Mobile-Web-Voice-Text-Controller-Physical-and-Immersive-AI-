@@ -38,6 +38,7 @@ class FakeThaiAudio:
 @pytest.mark.parametrize("language", ["th", "en"])
 def test_cloud_transcription_sends_configured_language(monkeypatch, provider, language):
     monkeypatch.setattr(settings, "STT_LANGUAGE", language)
+    monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", False)
     async def check_request():
         calls = []
 
@@ -45,6 +46,8 @@ def test_cloud_transcription_sends_configured_language(monkeypatch, provider, la
             body = await request.aread()
             calls.append(body)
             assert ('name="language"\r\n\r\n' + language + '\r\n').encode() in body
+            assert ('name="prompt"\r\n\r\n' + settings.STT_INITIAL_PROMPT + '\r\n').encode() in body
+            assert b'\r\noffline audio fixture\r\n' in body
             expected_model = "whisper-large-v3" if provider == "groq" else "whisper-1"
             assert ('name="model"\r\n\r\n' + expected_model + '\r\n').encode() in body
             return httpx.Response(200, json={"text": "พาไปจุด A"})
@@ -69,6 +72,7 @@ def test_cloud_transcription_sends_configured_language(monkeypatch, provider, la
 @pytest.mark.parametrize("language", ["th", "en"])
 def test_local_transcription_sends_configured_language(monkeypatch, language):
     monkeypatch.setattr(settings, "STT_LANGUAGE", language)
+    monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", False)
     calls = []
 
     def transcribe(_path, **kwargs):
@@ -80,3 +84,4 @@ def test_local_transcription_sends_configured_language(monkeypatch, language):
     service._local_model = SimpleNamespace(transcribe=transcribe)
     assert asyncio.run(service.transcribe_audio(FakeThaiAudio())) == "พาไปจุด A"
     assert calls[0].get("language") == language
+    assert calls[0].get("initial_prompt") == settings.STT_INITIAL_PROMPT
