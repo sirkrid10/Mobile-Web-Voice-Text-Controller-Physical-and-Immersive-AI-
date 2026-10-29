@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <title>TurtleBot3 Voice & Text Controller | Physical & Immersive AI</title>
+  <title>Robot Rescue Mission | CSTU Open House</title>
   <meta name="description" content="Mobile Web Voice and Text Controller for TurtleBot3 Navigation and VR Mind View at Exhibition Booth">
   
   <!-- Thai-first type with system fallbacks for offline use. -->
@@ -13,23 +13,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="/static/styles.css?v=abcd-20261029-1">
+  <link rel="stylesheet" href="/static/mission.css?v=20261029-12">
 </head>
-<body class="visitor-page">
+<body class="visitor-page" data-theme="dark">
   <div class="app-container">
     
     <!-- Top Application Header -->
     <header class="app-header">
       <div class="brand-wrapper">
-        <div class="brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v3M8 6h8a4 4 0 0 1 4 4v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a4 4 0 0 1 4-4Z"/>
-            <path d="M8.5 11h.01M15.5 11h.01M9 15h6"/>
-          </svg>
-        </div>
-        <div class="brand-titles">
-          <h1>TurtleBot3 Controller</h1>
-          <p>Physical & Immersive AI Booth</p>
-        </div>
+        <div class="cstu-logo"><img src="/static/images/cstu-logo.png" alt="Computer Science, Thammasat University" width="907" height="383"></div>
+        <div class="brand-titles"><h1>ROBOT RESCUE MISSION</h1><p>THAMMASAT OPEN HOUSE · 2026</p></div>
       </div>
       <div class="header-actions">
         <button type="button" class="theme-toggle-btn" id="btn-theme-toggle" title="สลับโหมด Dark/Light" aria-label="สลับโหมดการแสดงผล มืด/สว่าง">
@@ -48,6 +41,12 @@
       </div>
     </header>
 
+    <section class="mission-hero" aria-label="Physical & Immersive AI">
+      <div class="mission-eyebrow"><span></span> PHYSICAL &amp; IMMERSIVE AI</div>
+      <p>หนึ่งคำสั่งของคุณ เริ่มต้นภารกิจกู้ภัยของหุ่นยนต์</p>
+      <div class="mission-tech" aria-label="เทคโนโลยีในภารกิจ"><span>01 / AI + VOICE</span><span>02 / NAVIGATION</span><span>03 / NETWORK</span><span>04 / VR VIEW</span></div>
+    </section>
+
     <p id="connection-status" class="connection-status" role="status" aria-live="polite" style="display: none;">
       กำลังเชื่อมต่อ รอสถานะล่าสุดก่อนส่งคำสั่ง
     </p>
@@ -62,7 +61,8 @@
     </section>
 
     <section id="view-available" class="view-state-card" style="display: none;">
-      <div class="view-state-icon icon-available" aria-hidden="true">✨</div>
+      <div class="view-state-icon icon-available" aria-hidden="true">⌁</div>
+      <p class="mission-eyebrow">MISSION CONTROL / พร้อมรับคำสั่ง</p>
       <h2 class="view-state-title">เริ่มสั่งงานหุ่นยนต์</h2>
       <p class="view-state-desc">
         แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้
@@ -70,6 +70,7 @@
       <button type="button" class="start-session-btn" id="btn-claim-session">
         ขอสิทธิ์ควบคุม
       </button>
+      <div class="mission-steps"><span><b>01</b> ขอสิทธิ์</span><span><b>02</b> พูดหรือพิมพ์</span><span><b>03</b> ติดตามภารกิจ</span></div>
     </section>
 
     <!-- ====================================================================
@@ -220,6 +221,7 @@
 
   </div>
 
-  <script src="/static/app.js"></script>
+  <footer class="mission-footer"><span>CSTU / ROBOTICS EXPERIENCE</span></footer>
+  <script src="/static/app.js?v=20261029-3"></script>
 </body>
 </html>

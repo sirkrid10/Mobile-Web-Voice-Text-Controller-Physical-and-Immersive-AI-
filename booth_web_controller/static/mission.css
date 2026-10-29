@@ -1,0 +1,296 @@
+/* Visitor mission theme; staff keeps its own existing styles. */
+body.visitor-page[data-theme="dark"] {
+  --visitor-ink: #f2edff; --visitor-muted: #b9aecb; --visitor-accent: #c393ff;
+  --visitor-accent-dark: #dab9ff; --visitor-line: #49345f; --visitor-canvas: #09070f;
+  background: radial-gradient(ellipse at 85% 20%, #26123e 0%, transparent 50%),
+    linear-gradient(135deg, #0b0813, #07060b 80%);
+  color: #f2edff; color-scheme: dark; min-height: 100vh;
+}
+body.visitor-page[data-theme="dark"]::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(#63428c 1px, transparent 1px), linear-gradient(90deg, #63428c 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(transparent, #000); }
+body.visitor-page[data-theme="dark"] .app-container { max-width: 1060px; gap: 22px; min-height: auto; padding-top: 24px; }
+body.visitor-page[data-theme="dark"] .app-header { border-bottom: 1px solid #362744; padding: 0 0 20px; gap: 14px; }
+body.visitor-page[data-theme="dark"] .brand-wrapper { gap: 18px; min-width: 0; }
+.cstu-logo { background: #fff; border-radius: 5px; padding: 8px 10px; width: 174px; flex-shrink: 0; }
+.cstu-logo img { display: block; width: 100%; height: auto; }
+body.visitor-page[data-theme="dark"] .brand-titles h1 { font-size: 16px; color: #c393ff; letter-spacing: .07em; }
+body.visitor-page[data-theme="dark"] .brand-titles p { font-size: 14px; color: #a69ab9; letter-spacing: .08em; }
+body.visitor-page[data-theme="dark"] .staff-link-btn { background: #171020; border: 1px solid #4d365f; color: #d8c7ef; }
+.mission-hero { position: relative; padding: 26px 0 12px; }
+.mission-eyebrow { font-size: 14px; letter-spacing: .16em; font-weight: 800; color: #ac8fcd; }
+.mission-eyebrow > span { display: inline-block; width: 7px; height: 7px; background: #c393ff; margin-right: 8px; box-shadow: 0 0 14px #c393ff; }
+.mission-hero > p { color: #c4b6d5; font-size: 16px; line-height: 1.7; }
+.mission-tech { display: flex; flex-wrap: wrap; gap: 10px 24px; padding-top: 24px; font-size: 14px; font-weight: 800; letter-spacing: .08em; }
+.mission-tech span { padding-left: 9px; border-left: 3px solid #bb88ff; color: #d1b2ff; }
+.mission-tech span:nth-child(2) { border-color: #33d9ed; color: #70eaf4; }
+.mission-tech span:nth-child(3) { border-color: #42df8c; color: #87e9b4; }
+.mission-tech span:nth-child(4) { border-color: #4e9eff; color: #97c6ff; }
+body.visitor-page[data-theme="dark"] .view-state-card, body.visitor-page[data-theme="dark"] .command-panel, body.visitor-page[data-theme="dark"] .robot-card, body.visitor-page[data-theme="dark"] .intent-result-card { background: #110d1a; border: 1px solid #49325e; border-radius: 12px; color: #f2edff; box-shadow: 0 18px 50px #0005, 0 0 26px #a855f70c; }
+body.visitor-page[data-theme="dark"] #view-available { position: relative; border-top: 1px solid #ae74ed; padding: 32px 24px; gap: 16px; }
+body.visitor-page[data-theme="dark"] .view-state-title { color: #fff; }
+body.visitor-page[data-theme="dark"] .view-state-desc { color: #b9aecb; font-size: 16px; }
+body.visitor-page[data-theme="dark"] .icon-available { background: #c393ff12; color: #c393ff; border: 1px solid #c393ff77; font-size: 42px; }
+body.visitor-page[data-theme="dark"] .start-session-btn, body.visitor-page[data-theme="dark"] .send-btn { color: #180c28; background: #c393ff; border-color: #c393ff; box-shadow: 0 0 20px #a855f733, inset 0 1px 0 #ffffff35; }
+body.visitor-page[data-theme="dark"] .start-session-btn:hover, body.visitor-page[data-theme="dark"] .send-btn:hover { background: #dab9ff; color: #180c28; }
+.mission-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 22px; border-top: 1px solid #362744; padding-top: 20px; margin-top: 8px; color: #b9aecb; font-size: 16px; }
+.mission-steps b { color: #c393ff; margin-right: 5px; font-size: 14px; }
+body.visitor-page[data-theme="dark"] .session-bar { background: #150f20; border-color: #335270; }
+body.visitor-page[data-theme="dark"] .session-badge.active { background: #12392f; color: #84edb3; border-color: #2f755a; }
+body.visitor-page[data-theme="dark"] .disconnect-btn { color: #ffb5b5; background: #381d2c; border-color: #754351; }
+body.visitor-page[data-theme="dark"] .command-panel { border-top: 1px solid #ad73ee; }
+body.visitor-page[data-theme="dark"] .robot-card { border-top: 1px solid #8260b1; }
+body.visitor-page[data-theme="dark"] .intent-result-card { border-left: 2px solid #9d70c9; }
+body.visitor-page[data-theme="dark"] .command-panel-heading h2, body.visitor-page[data-theme="dark"] .status-label-group h2, body.visitor-page[data-theme="dark"] .section-title, body.visitor-page[data-theme="dark"] .intent-result-card h2 { color: #f2edff; }
+body.visitor-page[data-theme="dark"] .command-panel-heading p, body.visitor-page[data-theme="dark"] .status-label-group .status-kicker, body.visitor-page[data-theme="dark"] .goal-label, body.visitor-page[data-theme="dark"] .mic-hint, body.visitor-page[data-theme="dark"] .mind-row .title, body.visitor-page[data-theme="dark"] .intent-result-detail { color: #b9aecb; }
+body.visitor-page[data-theme="dark"] .goal-tag { color: #7ce7f3; border-color: #2b6b82; background: #0c2d40; }
+body.visitor-page[data-theme="dark"] .mind-row, body.visitor-page[data-theme="dark"] .mind-row.heard { background: #1b1328; color: #fff; border-color: #a16ae2; }
+body.visitor-page[data-theme="dark"] .mind-row .content { color: #f0e5ff; }
+body.visitor-page[data-theme="dark"] .mic-button { background: radial-gradient(circle at 35% 25%, #d5b4ff, #a76ce5); color: #170d26; border-color: #d4b8ff; box-shadow: 0 0 0 10px #b483ff08, 0 0 38px #a855f72e; }
+body.visitor-page[data-theme="dark"] .mic-button:hover { background: #c9a4ff; }
+body.visitor-page[data-theme="dark"] .mic-button.recording { background: #ff647b; color: #180910; }
+body.visitor-page[data-theme="dark"] .wave-bar { background: #c59bff; }
+body.visitor-page[data-theme="dark"] .chip-btn { background: #191124; color: #d9c2f4; border-color: #50366c; border-left: 2px solid #a77cdb; font-size: 16px; text-align: left; }
+body.visitor-page[data-theme="dark"] .chip-btn:hover { background: #2b1940; border-color: #b784ef; }
+body.visitor-page[data-theme="dark"] .text-input-field { background: #0b0812; color: #fff; border-color: #58416f; }
+body.visitor-page[data-theme="dark"] .text-input-field::placeholder { color: #b8a9cb; }
+body.visitor-page[data-theme="dark"] .chip-btn:disabled, body.visitor-page[data-theme="dark"] .text-input-field:disabled { background: #1a1424; color: #a79ab7; border-color: #46364f; }
+body.visitor-page[data-theme="dark"] .connection-status, body.visitor-page[data-theme="dark"] .session-feedback { background: #1b1328; color: #dccaf4; border-color: #594074; }
+body.visitor-page[data-theme="dark"] #view-queue { background: #2c2716; border-color: #a58b3c; }
+body.visitor-page[data-theme="dark"] #view-queue .view-state-desc { color: #ffe69c; }
+body.visitor-page[data-theme="dark"] :focus-visible { outline: 3px solid #dab9ff; outline-offset: 4px; }
+.mission-footer { width: min(1020px, calc(100% - 40px)); margin: 18px auto 26px; border-top: 1px solid #362744; padding-top: 18px; display: flex; justify-content: space-between; gap: 12px; color: #a18cb9; font-size: 14px; letter-spacing: .1em; }
+@media (max-width: 600px) {
+  body.visitor-page[data-theme="dark"] .app-container { gap: 18px; padding-top: 16px; }
+  .cstu-logo { width: 132px; padding: 6px 8px; }
+  body.visitor-page[data-theme="dark"] .brand-wrapper { gap: 10px; }
+  .mission-hero { padding-top: 12px; }
+  .mission-tech { gap: 12px 18px; font-size: 14px; }
+  body.visitor-page[data-theme="dark"] #view-available { padding: 26px 18px; }
+  .mission-steps { gap: 12px; font-size: 16px; }
+  .mission-footer { flex-direction: column; }
+}
+
+/* Shared layout and light palette; data-theme selects the dark palette above. */
+body.visitor-page .app-container { max-width: 1060px; gap: 22px; min-height: auto; padding-top: 24px; }
+body.visitor-page .app-header { padding: 0 0 20px; gap: 14px; }
+body.visitor-page .brand-wrapper { gap: 18px; min-width: 0; }
+body.visitor-page .brand-titles h1 { font-size: 16px; letter-spacing: .07em; }
+body.visitor-page .brand-titles p { font-size: 14px; letter-spacing: .08em; }
+body.visitor-page .header-actions { flex-shrink: 0; }
+.mission-hero { padding: 12px 0; }
+.mission-hero > p { margin-top: 12px; }
+/* White cyberpunk palette with charcoal controls and soft yellow light. */
+body.visitor-page:not([data-theme="dark"]) {
+  --visitor-ink: #211b10; --visitor-muted: #554326;
+  --visitor-accent: #211c15; --visitor-accent-dark: #3e2c19;
+  --visitor-line: #d6cfb7; --visitor-surface: #ffffff; --visitor-canvas: #ffffff;
+  background: radial-gradient(ellipse at 96% 8%, #ffdc4a26, transparent 42%),
+    radial-gradient(ellipse at 0% 85%, #ffe66b1f, transparent 38%), #ffffff;
+  color: var(--visitor-ink); color-scheme: light;
+}
+body.visitor-page:not([data-theme="dark"])::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .035;
+  background-image: linear-gradient(#805322 1px, transparent 1px), linear-gradient(90deg, #805322 1px, transparent 1px);
+  background-size: 64px 64px; mask-image: linear-gradient(transparent, #000);
+}
+body.visitor-page:not([data-theme="dark"]) .app-header { border-color: #d6cfb7; }
+body.visitor-page:not([data-theme="dark"]) .brand-titles h1 { color: #211b10; }
+body.visitor-page:not([data-theme="dark"]) .brand-titles p,
+body.visitor-page:not([data-theme="dark"]) .mission-eyebrow,
+body.visitor-page:not([data-theme="dark"]) .mission-hero > p { color: #554326; }
+body.visitor-page:not([data-theme="dark"]) .mission-eyebrow > span { background: #d5aa00; box-shadow: 0 0 14px #ffda3da6; }
+body.visitor-page:not([data-theme="dark"]) .mission-tech span { color: #44331d; border-color: #ba5a0e; }
+body.visitor-page:not([data-theme="dark"]) .mission-tech span:nth-child(2) { border-color: #8a6425; }
+body.visitor-page:not([data-theme="dark"]) .mission-tech span:nth-child(3) { border-color: #6c642b; }
+body.visitor-page:not([data-theme="dark"]) .mission-tech span:nth-child(4) { border-color: #d77316; }
+body.visitor-page:not([data-theme="dark"]) .view-state-card,
+body.visitor-page:not([data-theme="dark"]) .robot-card,
+body.visitor-page:not([data-theme="dark"]) .command-panel {
+  background: #ffffff; border: 1px solid #d6cfb7; border-radius: 12px;
+  box-shadow: 0 12px 35px #211b100a, 0 0 24px #ffd42a24;
+}
+body.visitor-page:not([data-theme="dark"]) #view-available {
+  position: relative; border-top: 2px solid #e6c238;
+}
+body.visitor-page:not([data-theme="dark"]) #view-available::after {
+  content: ''; position: absolute; top: -2px; left: 22%; width: 56%; height: 2px;
+  background: #f7d23d; box-shadow: 0 0 14px 3px #ffda3d5c; pointer-events: none;
+}
+body.visitor-page:not([data-theme="dark"]) .icon-available {
+  background: #211c15; color: #ffe278; border: 1px solid #d4ad32;
+  box-shadow: 0 0 22px #ffdb3d40;
+}
+body.visitor-page:not([data-theme="dark"]) .start-session-btn,
+body.visitor-page:not([data-theme="dark"]) .send-btn,
+body.visitor-page:not([data-theme="dark"]) .chip-btn,
+body.visitor-page:not([data-theme="dark"]) .theme-toggle-btn,
+body.visitor-page:not([data-theme="dark"]) .staff-link-btn,
+body.visitor-page:not([data-theme="dark"]) .extend-time-btn {
+  background: #211c15; color: #ffe8a3; border: 1px solid #9b8440;
+  border-radius: 8px; box-shadow: 0 0 18px #ffda3d33;
+}
+body.visitor-page:not([data-theme="dark"]) .start-session-btn:hover,
+body.visitor-page:not([data-theme="dark"]) .send-btn:hover,
+body.visitor-page:not([data-theme="dark"]) .chip-btn:hover,
+body.visitor-page:not([data-theme="dark"]) .theme-toggle-btn:hover,
+body.visitor-page:not([data-theme="dark"]) .staff-link-btn:hover,
+body.visitor-page:not([data-theme="dark"]) .extend-time-btn:hover {
+  background: #3e2c19; color: #fff3c4; border-color: #dfb92d;
+  box-shadow: 0 0 25px #ffd42a52;
+}
+body.visitor-page:not([data-theme="dark"]) .mic-button {
+  background: radial-gradient(circle at 35% 25%, #453322, #17140f);
+  color: #ffe278; border: 2px solid #e0bb38;
+  box-shadow: 0 0 0 10px #ffdf3d0d, 0 0 34px #ffda3d52;
+}
+body.visitor-page:not([data-theme="dark"]) .mic-button:hover { background: #3e2c19; box-shadow: 0 0 38px #ffda3d66; }
+body.visitor-page:not([data-theme="dark"]) .mic-button.recording,
+body.visitor-page:not([data-theme="dark"]) .mic-button.recording:hover { background: #a32132; color: #fff; border-color: #ff9b9b; box-shadow: 0 0 28px #a3213240; }
+body.visitor-page:not([data-theme="dark"]) .wave-bar { background: #a64f09; }
+body.visitor-page:not([data-theme="dark"]) .chip-btn { border-left: 3px solid #e0bb38; font-size: 16px; text-align: left; }
+body.visitor-page:not([data-theme="dark"]) .disconnect-btn { background: #39251d; color: #ffd8b0; border-color: #9b8440; }
+body.visitor-page:not([data-theme="dark"]) .text-input-field { background: #ffffff; color: #211b10; border-color: #b4aa88; }
+body.visitor-page:not([data-theme="dark"]) .text-input-field::placeholder { color: #65502e; }
+body.visitor-page:not([data-theme="dark"]) .text-input-field:focus { border-color: #a64f09; box-shadow: 0 0 0 3px #ffda3d33; }
+body.visitor-page:not([data-theme="dark"]) .start-session-btn:disabled,
+body.visitor-page:not([data-theme="dark"]) .send-btn:disabled,
+body.visitor-page:not([data-theme="dark"]) .chip-btn:disabled,
+body.visitor-page:not([data-theme="dark"]) .mic-button:disabled { background: #665b43; color: #fff2cf; border-color: #8c7850; box-shadow: none; }
+body.visitor-page:not([data-theme="dark"]) .text-input-field:disabled { background: #e8dba9; color: #65502e; border-color: #a6966b; }
+body.visitor-page:not([data-theme="dark"]) .mind-row,
+body.visitor-page:not([data-theme="dark"]) .mind-row.heard { background: #fff9e5; border-color: #b89a25; }
+body.visitor-page:not([data-theme="dark"]) .mind-row .title { color: #65502e; }
+body.visitor-page:not([data-theme="dark"]) .mind-row .content { color: #211b10; }
+body.visitor-page:not([data-theme="dark"]) .goal-tag { background: #fff5d3; color: #5b360d; border-color: #b4aa88; }
+body.visitor-page:not([data-theme="dark"]) .intent-result-card {
+  background: #fff9e5;
+  border: 1px solid #d6c78e;
+  border-radius: 12px;
+  box-shadow: 0 0 24px #ffd42a24;
+}
+body.visitor-page:not([data-theme="dark"]) .session-bar { background: #fffdf5; border-color: #d6cfb7; }
+body.visitor-page:not([data-theme="dark"]) .mission-steps,
+body.visitor-page:not([data-theme="dark"]) .mission-footer { color: #554326; border-color: #d6cfb7; }
+body.visitor-page:not([data-theme="dark"]) .mission-steps b { color: #925016; }
+body.visitor-page:not([data-theme="dark"]) .cstu-logo { box-shadow: 0 0 22px #ffda3d29; }
+body.visitor-page:not([data-theme="dark"]) :focus-visible { outline: 3px solid #873d07; outline-offset: 4px; }
+@media (max-width: 600px) {
+  body.visitor-page .app-container { gap: 18px; padding-top: 16px; }
+  body.visitor-page .brand-wrapper { gap: 10px; }
+}
+@media (max-width: 420px) {
+  body.visitor-page .app-header { flex-wrap: wrap; }
+  body.visitor-page .brand-wrapper { flex: 1; }
+  .cstu-logo { width: 110px; }
+}
+
+/* A little neon at the edges, with a quiet center for reading. */
+body.visitor-page[data-theme="dark"] .app-container { isolation: isolate; }
+body.visitor-page[data-theme="dark"] .app-container::before {
+  content: ''; position: absolute; z-index: -1; top: 105px; right: 0;
+  width: min(65vw, 540px); height: 340px; pointer-events: none;
+  background: radial-gradient(ellipse, #a855f716, transparent 70%);
+}
+body.visitor-page[data-theme="dark"] .brand-titles h1 { text-shadow: 0 0 18px #b56aff40; }
+body.visitor-page[data-theme="dark"] .mission-eyebrow > span { background: #c393ff; box-shadow: 0 0 12px #b56aff88; }
+body.visitor-page[data-theme="dark"] .mission-tech span { color: #c4a5e9; border-color: #aa75df; }
+body.visitor-page[data-theme="dark"] .mission-tech span:nth-child(2) { color: #b0b4e7; border-color: #7776b4; }
+body.visitor-page[data-theme="dark"] .mission-tech span:nth-child(3) { color: #b7a5cf; border-color: #77628d; }
+body.visitor-page[data-theme="dark"] .mission-tech span:nth-child(4) { color: #c1a2e4; border-color: #8b63b5; }
+body.visitor-page[data-theme="dark"] .theme-toggle-btn,
+body.visitor-page[data-theme="dark"] .staff-link-btn { border: 1px solid #4d365f; background: #171020; color: #d8c7ef; border-radius: 10px; }
+body.visitor-page[data-theme="dark"] .theme-toggle-btn:hover,
+body.visitor-page[data-theme="dark"] .staff-link-btn:hover { border-color: #ad73ee; box-shadow: 0 0 16px #a855f71f; }
+body.visitor-page[data-theme="dark"] #view-available::after {
+  content: ''; position: absolute; top: -1px; left: 22%; width: 56%; height: 1px;
+  background: #d8adff; box-shadow: 0 0 12px 2px #a855f752; pointer-events: none;
+}
+body.visitor-page[data-theme="dark"] .start-session-btn,
+body.visitor-page[data-theme="dark"] .send-btn { border-radius: 8px; }
+body.visitor-page[data-theme="dark"] .start-session-btn:hover,
+body.visitor-page[data-theme="dark"] .send-btn:hover { box-shadow: 0 0 26px #b56aff4a; }
+body.visitor-page[data-theme="dark"] .start-session-btn:disabled,
+body.visitor-page[data-theme="dark"] .send-btn:disabled,
+body.visitor-page[data-theme="dark"] .mic-button:disabled { background: #30253c; color: #b9aecb; border-color: #51405f; box-shadow: none; }
+body.visitor-page[data-theme="dark"] .mic-button.recording,
+body.visitor-page[data-theme="dark"] .mic-button.recording:hover { background: #ff647b; border-color: #ff9cac; color: #180910; box-shadow: 0 0 28px #ff647b38; }
+body.visitor-page[data-theme="dark"] .cstu-logo { box-shadow: 0 0 18px #b56aff12; }
+
+/* Phone typography: let content wrap instead of scaling it down to fit. */
+body.visitor-page .intent-result-card {
+  padding: 18px 20px;
+  gap: 10px;
+}
+
+@media (max-width: 767px) {
+  body.visitor-page .app-header {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start; gap: 16px 12px;
+  }
+  body.visitor-page .brand-wrapper { display: contents; }
+  body.visitor-page .cstu-logo { grid-column: 1; grid-row: 1; width: 144px; max-width: 100%; }
+  body.visitor-page .header-actions { grid-column: 2; grid-row: 1; align-self: center; }
+  body.visitor-page .brand-titles { grid-column: 1 / -1; grid-row: 2; }
+  body.visitor-page .brand-titles h1,
+  body.visitor-page[data-theme="dark"] .brand-titles h1 { font-size: 1.125rem; line-height: 1.5; letter-spacing: .035em; }
+  body.visitor-page .brand-titles p,
+  body.visitor-page[data-theme="dark"] .brand-titles p { max-width: none; font-size: .9375rem; line-height: 1.6; letter-spacing: .025em; }
+  .mission-eyebrow { font-size: .9375rem; line-height: 1.7; letter-spacing: .065em; overflow-wrap: anywhere; }
+  .mission-hero > p { font-size: 1.125rem; line-height: 1.8; }
+  .mission-tech { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; font-size: .9375rem; line-height: 1.6; letter-spacing: .025em; }
+  .mission-tech span { min-width: 0; overflow-wrap: anywhere; }
+  .mission-steps { display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%; text-align: left; font-size: 1rem; line-height: 1.6; }
+  .mission-steps b { display: inline-block; min-width: 26px; font-size: .9375rem; }
+  .mission-footer { font-size: .9375rem; line-height: 1.7; letter-spacing: .04em; }
+  body.visitor-page .connection-status,
+  body.visitor-page .session-feedback,
+  body.visitor-page .warning-text,
+  body.visitor-page .extend-time-btn,
+  body.visitor-page .disconnect-btn,
+  body.visitor-page .status-label-group .status-kicker,
+  body.visitor-page .goal-label { font-size: 1rem; line-height: 1.6; }
+  body.visitor-page .robot-card-header { flex-direction: column; gap: 14px; }
+  body.visitor-page .goal-tag { max-width: 100%; width: 100%; font-size: 1.125rem; }
+  body.visitor-page .mind-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  body.visitor-page .mind-row .content,
+  body.visitor-page .mic-hint,
+  body.visitor-page .command-panel-heading p,
+  body.visitor-page .intent-result-message,
+  body.visitor-page .intent-result-detail { font-size: 1.125rem; line-height: 1.75; }
+  body.visitor-page .session-bar { flex-wrap: wrap; gap: 12px; }
+  body.visitor-page .session-info { flex: 1 1 100%; }
+  body.visitor-page .session-badge { white-space: normal; }
+  body.visitor-page .disconnect-btn { width: 100%; }
+  body.visitor-page .text-input-field { font-size: 18px; min-height: 52px; }
+  body.visitor-page .send-btn { min-height: 52px; }
+  body.visitor-page .chip-btn { min-height: 64px; padding: 12px; line-height: 1.65; }
+  body.visitor-page .view-state-desc,
+  body.visitor-page[data-theme="dark"] .view-state-desc,
+  body.visitor-page #view-queue .view-state-desc { font-size: 1.125rem; line-height: 1.8; }
+}
+
+/* Separate the transcript from the live description with a clear type hierarchy. */
+body.visitor-page:not([data-theme="dark"]) .mind-section {
+  --mind-surface: #fff9e5;
+  --mind-line: #d6c78e;
+  --mind-text: #24242b;
+}
+body.visitor-page[data-theme="dark"] .mind-section {
+  --mind-surface: #15111e;
+  --mind-line: #3e304d;
+  --mind-text: #f0e5ff;
+}
+body.visitor-page .mind-section { gap: 12px; }
+body.visitor-page:is([data-theme], :not([data-theme])) .mind-row,
+body.visitor-page:is([data-theme], :not([data-theme])) .mind-row.heard {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px;
+  padding: 14px 16px; border: 1px solid var(--mind-line); border-radius: 10px;
+  background: var(--mind-surface); align-items: start;
+}
+body.visitor-page:is([data-theme], :not([data-theme])) .mind-row .title {
+  color: var(--mind-text); font-size: 1rem; font-weight: 600; line-height: 1.6;
+}
+body.visitor-page:is([data-theme], :not([data-theme])) .mind-row .content,
+body.visitor-page:is([data-theme], :not([data-theme])) .mind-row.heard .content {
+  color: var(--mind-text); font-size: 1.125rem; font-weight: 500;
+  line-height: 1.75; letter-spacing: normal; overflow-wrap: anywhere;
+}

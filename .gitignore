@@ -4,6 +4,7 @@
 .env.*
 !.env.example
 venv/
+.venv/
 booth_web_venv/
 env/
 ENV/

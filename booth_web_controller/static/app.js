@@ -70,8 +70,8 @@
   function initTheme() {
     try {
       const savedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null;
-      // Default to light mode unless explicitly saved, preventing mobile browsers from forcing dark
-      const initialTheme = savedTheme || 'light';
+      // Start in the cyberpunk theme; keep the visitor's saved preference.
+      const initialTheme = savedTheme || 'dark';
       applyTheme(initialTheme);
     } catch (e) {}
 

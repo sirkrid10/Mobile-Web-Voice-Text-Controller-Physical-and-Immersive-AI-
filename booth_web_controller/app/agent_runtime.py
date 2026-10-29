@@ -11,11 +11,17 @@ import tempfile
 import time
 
 NODES = ('intent', 'subtitle')
-BOOT_ID = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+try:
+    BOOT_ID = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+except FileNotFoundError:
+    # Local mock previews also run on macOS, without Linux process control.
+    BOOT_ID = None
 
 
 def identity(pid):
     """Boot ID and Linux start ticks distinguish a process from a reused PID."""
+    if BOOT_ID is None:
+        return None
     try:
         stat = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
         if stat[0] == 'Z':

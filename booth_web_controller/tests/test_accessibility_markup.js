@@ -35,7 +35,7 @@ function colorToken(name) {
 function run() {
   const viewport = visitor.match(/<meta name="viewport" content="([^"]+)"/)[1];
   assert.doesNotMatch(viewport, /user-scalable=no|maximum-scale=1/);
-  assert.match(visitor, /<body class="visitor-page">/);
+  assert.match(visitor, /<body class="visitor-page" data-theme="dark">/);
   assert.doesNotMatch(staff, /class="visitor-page"/);
   assert.match(visitor, /<label class="visually-hidden" for="text-input-field">/);
   assert.match(elementById(visitor, 'mic-button'), /aria-label="[^"]+"/);
@@ -44,7 +44,7 @@ function run() {
   const appIds = [...app.matchAll(/getElementById\('([^']+)'\)/g)].map((match) => match[1]);
   for (const id of appIds) assert.ok(elementById(visitor, id), `missing JavaScript target #${id}`);
   const availableView = visitor.slice(visitor.indexOf('<section id="view-available"'), visitor.indexOf('<section id="view-queue"'));
-  assert.match(availableView, /class="view-state-icon icon-available" aria-hidden="true">\s*✨/);
+  assert.match(availableView, /class="view-state-icon icon-available" aria-hidden="true">\s*⌁/);
   assert.ok(availableView.includes('<h2 class="view-state-title">เริ่มสั่งงานหุ่นยนต์</h2>'));
   assert.match(availableView, /แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้/);
   assert.match(availableView, /<button[^>]+id="btn-claim-session"[^>]*>\s*ขอสิทธิ์ควบคุม\s*<\/button>/);
