@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     AGENT_WORKSPACE: str = str(Path(__file__).resolve().parents[3] / 'turtlebot-llm')
     AGENT_CLOCK_SKEW_SEC: float = Field(0.6, ge=0, le=0.6, allow_inf_nan=False)
 
+    # Cloudflare Quick Tunnel & Static QR Automation (Stage 2)
+    ENABLE_TUNNEL: bool = False
+    WORKER_STATIC_URL: str = ""
+    CLOUDFLARE_API_TOKEN: str = ""
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+    CLOUDFLARE_KV_NAMESPACE_ID: str = ""
+    CLOUDFLARE_KV_KEY: str = "robot_url"
+
     # Session & Auto-Return Timing (Seconds)
     INACTIVITY_TIMEOUT_SEC: int = 120
     WARNING_THRESHOLD_SEC: int = 15

@@ -1,0 +1,14 @@
+name = "robot-link"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Cloudflare Workers KV Namespace Binding
+# แทนที่ id และ preview_id ด้วย KV Namespace ID จริงที่สร้างจาก Cloudflare Dashboard หรือคำสั่ง:
+#   npx wrangler kv namespace create ROBOT_LINKS --config wrangler.toml
+#   npx wrangler kv namespace create ROBOT_LINKS --preview --config wrangler.toml
+#
+# หมายเหตุ: ห้าม commit ID หรือ credentials ส่วนตัว
+[[kv_namespaces]]
+binding = "ROBOT_LINKS"
+id = "<YOUR_KV_NAMESPACE_ID>"
+preview_id = "<YOUR_PREVIEW_KV_NAMESPACE_ID>"

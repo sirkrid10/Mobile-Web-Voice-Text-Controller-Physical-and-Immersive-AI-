@@ -45,6 +45,26 @@ ros2 param get /robot_bridge_node valid_destinations
 ชื่อบนปุ่มเว็บ, ชื่อเป้าหมายใน Staff และ mock ใช้ mapping เดียวกันภายใน Backend ส่วน hint สำหรับ STT จะเสริมชื่อใหม่ให้แม้ `.env` เดิมยังเป็นข้อความ A/B/C ไม่ต้องแก้หรือแสดง API key
 
 
+## QR คงที่ด้วย Cloudflare Worker (Static QR Code)
+
+สำหรับพิมพ์ QR Code ถาวรติดบนหุ่นยนต์ เพื่อให้ผู้เข้าชมสแกนเข้าถึงเว็บควบคุมได้ต่อเนื่องแม้ Quick Tunnel เปลี่ยน URL ดู [คู่มือติดตั้งและการตั้งค่า Cloudflare Worker](cloudflare/robot-link/README.md)
+
+การเปิด Quick Tunnel และอัปเดต Worker KV อัตโนมัติเป็น opt-in: ตั้ง `ENABLE_TUNNEL=true` และ credentials ฝั่งเครื่องใน `booth_web_controller/.env` แล้วเปิด launcher เดิม `run_tailscale.sh` หรือ `run_booth.sh` ได้ตามปกติ เมื่อปิดค่าไว้ launcher ยังมีพฤติกรรมเดิม ดูสถานะและ terminal fallback ในแท็บคู่มือ Staff; KV อาจใช้เวลา 60 วินาทีหรือมากกว่าในการเผยแพร่
+
+URL สำหรับ QR ที่ deploy และทดสอบแล้ว: **https://robot-link.phongsapak-ket.workers.dev/**
+
+หลังตั้งค่า Cloudflare ครั้งแรกแล้ว เปิดระบบกับ Robot ด้วยคำสั่งเดิม:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+bash booth_web_controller/run_tailscale.sh
+```
+
+ไม่ต้องเปิด `cloudflared` อีก terminal หรือ deploy Worker ใหม่ทุกครั้ง Backend เปิด tunnel และอัปเดตปลายทางให้เอง ตรวจ Process, Target reachable และ KV update accepted ในหน้า `/staff` ดู [วิธีตั้งค่าและ fallback](cloudflare/robot-link/README.md#เปิด-backend-พร้อม-tunnel-อัตโนมัติ)
+
+> [!NOTE]
+> คำสั่งรันเดิมยังใช้ได้ เมื่อเปิด tunnel อัตโนมัติ launcher จะปิดโหมด reload เพื่อให้มีเจ้าของ tunnel เพียงตัวเดียว
+
 ## Subtitle สำหรับ Unity VR
 
 Backend เปิด `/ws/vr/subtitle` พร้อมเว็บเดิม ดู [วิธีตั้งค่า VR และ contract](VR-SUBTITLE-INTEGRATION.md)

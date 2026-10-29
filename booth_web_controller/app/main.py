@@ -6,6 +6,7 @@ and static file serving for Mobile Web Voice & Text Controller.
 import os
 import json
 import asyncio
+import uuid
 from typing import List, Optional, Literal
 from contextlib import asynccontextmanager
 
@@ -32,6 +33,7 @@ from app.subtitle_mode import SubtitleModeError
 from app.vr_subtitle import VRSubtitleHub
 from app.agent_processes import AgentProcesses, ProcessControlError
 from app.system_health import SystemHealth
+from app.tunnel_manager import TunnelManager
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +79,8 @@ ros_bridge_instance: Optional[BaseROS2Bridge] = None
 watchdog_task: Optional[asyncio.Task] = None
 agent_processes: Optional[AgentProcesses] = None
 system_health: Optional[SystemHealth] = None
+tunnel_manager: Optional[TunnelManager] = None
+INSTANCE_ID = str(uuid.uuid4())
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +104,7 @@ async def session_watchdog_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ros_bridge_instance, watchdog_task, agent_processes, system_health
+    global ros_bridge_instance, watchdog_task, agent_processes, system_health, tunnel_manager
     loop = asyncio.get_running_loop()
 
     # 1. Initialize ROS 2 Bridge (Real or Mock)
@@ -118,21 +122,39 @@ async def lifespan(app: FastAPI):
     )
     try:
         await agent_processes.open()
-        system_health = SystemHealth(ros_bridge_instance, agent_processes, vr_subtitles, mock=settings.USE_MOCK_ROS2)
+        tunnel_manager = TunnelManager(
+            enabled=settings.ENABLE_TUNNEL, port=settings.PORT, instance_id=INSTANCE_ID,
+            worker_static_url=settings.WORKER_STATIC_URL, cf_api_token=settings.CLOUDFLARE_API_TOKEN,
+            cf_account_id=settings.CLOUDFLARE_ACCOUNT_ID,
+            cf_namespace_id=settings.CLOUDFLARE_KV_NAMESPACE_ID, cf_key=settings.CLOUDFLARE_KV_KEY,
+        )
+        try:
+            await tunnel_manager.start()
+        except Exception as exc:
+            tunnel_manager.last_error = f"Tunnel manager failed to start ({type(exc).__name__})"
+        system_health = SystemHealth(ros_bridge_instance, agent_processes, vr_subtitles,
+                                    mock=settings.USE_MOCK_ROS2, tunnel_manager=tunnel_manager)
         system_health.start()
         watchdog_task = asyncio.create_task(session_watchdog_loop())
         yield
     finally:
+        if tunnel_manager:
+            await tunnel_manager.stop()
         if system_health:
             await system_health.close()
-        await agent_processes.close()
-        if watchdog_task and not watchdog_task.done():
-            watchdog_task.cancel()
-            await asyncio.gather(watchdog_task, return_exceptions=True)
-        ros_bridge_instance.shutdown()
-        system_health = None
-        agent_processes = None
-        print("[Main] Shutdown complete.")
+        try:
+            if agent_processes:
+                await agent_processes.close()
+        finally:
+            if watchdog_task and not watchdog_task.done():
+                watchdog_task.cancel()
+                await asyncio.gather(watchdog_task, return_exceptions=True)
+            if ros_bridge_instance:
+                ros_bridge_instance.shutdown()
+            system_health = None
+            agent_processes = None
+            tunnel_manager = None
+            print("[Main] Shutdown complete.")
 
 
 app = FastAPI(
@@ -186,6 +208,11 @@ async def get_staff():
 # ---------------------------------------------------------------------------
 # REST API: State & Visitor Session
 # ---------------------------------------------------------------------------
+
+@app.get("/api/v1/health")
+async def service_health():
+    return JSONResponse({"service": "mobile-web-voice-text-controller", "instance_id": INSTANCE_ID},
+                        headers={"Cache-Control": "no-store"})
 
 @app.get("/api/v1/state", response_model=StateBroadcast, summary="Get full system state snapshot")
 async def get_state():

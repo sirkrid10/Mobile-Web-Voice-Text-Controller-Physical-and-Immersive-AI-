@@ -33,3 +33,7 @@ temp/
 .vscode/
 .idea/
 .DS_Store
+
+# Node & Cloudflare Workers
+node_modules/
+.wrangler/

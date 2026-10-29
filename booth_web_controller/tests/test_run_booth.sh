@@ -94,6 +94,9 @@ if grep -q -- '--reload' "${SERVER_LOG}"; then exit 1; fi
 run_launcher MANAGE_AGENT_NODES=false
 grep -q 'managed=false' "${SERVER_LOG}"
 grep -q -- '--reload' "${SERVER_LOG}"
+run_launcher USE_MOCK_ROS2=true ENABLE_TUNNEL=true
+grep -q 'managed=false' "${SERVER_LOG}"
+if grep -q -- '--reload' "${SERVER_LOG}"; then echo 'tunnel opt-in must disable reload' >&2; exit 1; fi
 
 # Robot mode maps the legacy XML name and passes the dynamic profile values through.
 rm -f "${SERVER_LOG}"

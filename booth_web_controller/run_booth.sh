@@ -13,7 +13,7 @@ CONFIG_KEYS=(
     ROS_DISCOVERY_SERVER FASTRTPS_DEFAULT_PROFILES_FILE FASTDDS_DEFAULT_PROFILES_FILE
     ROS_WORKSPACE_SETUP ROBOT_SUPER_CLIENT_XML TURTLEBOT_SETUP_SCRIPT
     TURTLEBOT_FASTDDS_PROFILE TURTLEBOT_ROBOT_HOST TURTLEBOT_ROBOT_IP
-    HOST PORT USE_MOCK_ROS2 MANAGE_AGENT_NODES AGENT_WORKSPACE AGENT_CLOCK_SKEW_SEC
+    HOST PORT USE_MOCK_ROS2 MANAGE_AGENT_NODES AGENT_WORKSPACE AGENT_CLOCK_SKEW_SEC ENABLE_TUNNEL
 )
 for key in "${CONFIG_KEYS[@]}"; do
     if [[ -v "$key" ]]; then
@@ -168,7 +168,10 @@ echo "[Booth Controller] Binding server to http://${HOST}:${PORT}"
 echo "[Booth Controller] Visitor UI: http://localhost:${PORT}/"
 echo "[Booth Controller] Staff Panel: http://localhost:${PORT}/staff"
 server_args=(app.main:app --host "${HOST}" --port "${PORT}")
-if [[ "${MANAGE_AGENT_NODES,,}" != true ]]; then
+if [[ "${MANAGE_AGENT_NODES,,}" != true && "${ENABLE_TUNNEL,,}" != true ]]; then
     server_args+=(--reload)
+fi
+if [[ "${ENABLE_TUNNEL,,}" == true && "${MANAGE_AGENT_NODES,,}" != true ]]; then
+    echo "[Booth Controller] ENABLE_TUNNEL=true; disabling uvicorn reload to keep a single tunnel owner."
 fi
 exec python3 -m uvicorn "${server_args[@]}"
