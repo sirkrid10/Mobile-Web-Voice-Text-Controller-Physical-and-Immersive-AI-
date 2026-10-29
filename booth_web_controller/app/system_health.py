@@ -44,11 +44,12 @@ async def tailscale_health(server):
 
 
 class SystemHealth:
-    def __init__(self, bridge, processes, hub, *, mock=False):
+    def __init__(self, bridge, processes, hub, *, mock=False, tunnel_manager=None):
         self.bridge = bridge
         self.processes = processes
         self.hub = hub
         self.mock = mock
+        self.tunnel_manager = tunnel_manager
         self.latest = {'checked_at': None, 'mock': mock, 'ros': {}, 'tailscale': {'status': 'checking'}}
         self.task = None
 
@@ -73,7 +74,18 @@ class SystemHealth:
             await asyncio.sleep(5)
 
     def snapshot(self):
-        result = {**self.latest, 'backend_directory': str(Path(__file__).resolve().parents[2]), 'processes': self.processes.snapshot(), 'vr': self.hub.inspection()}
+        tunnel_data = self.tunnel_manager.snapshot() if self.tunnel_manager else {
+            'enabled': False, 'running': False, 'pid': None, 'tunnel_url': None,
+            'worker_static_url': None, 'target_reachable': False, 'target_probed_at': None,
+            'kv_update_accepted': False, 'kv_written_at': None, 'last_error': None,
+        }
+        result = {
+            **self.latest,
+            'backend_directory': str(Path(__file__).resolve().parents[2]),
+            'processes': self.processes.snapshot(),
+            'vr': self.hub.inspection(),
+            'tunnel': tunnel_data,
+        }
         ros = dict(result.get('ros', {}))
         ros.update(self.bridge.robot_observation())
         received_at = ros.get('robot_received_at')

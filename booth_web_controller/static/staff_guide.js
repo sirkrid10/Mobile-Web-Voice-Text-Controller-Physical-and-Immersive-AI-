@@ -40,6 +40,7 @@
       network: 'tailscale status\ntailscale ip -4' + (server ? `\ntailscale ping${server}` : ''),
       profile: `cd ${llm}\nsource ./setup_tailscale_ros.sh${server}\nros2 node list --no-daemon`,
       build: `cd ${llm}\nsource /opt/ros/jazzy/setup.bash\nsource .venv/bin/activate\ncolcon --log-base log-colcon build --build-base build-colcon --install-base install-colcon --packages-select ai_interfaces agent_pkg`
+      , 'kv-fallback': `cd ${backend}/cloudflare/robot-link\nnpx wrangler kv key put robot_url 'https://<quick-tunnel>.trycloudflare.com/' --namespace-id '<KV_NAMESPACE_ID>'`
     };
     Object.entries(commands).forEach(([name, command]) => { get(`guide-command-${name}`).textContent = command; });
   }

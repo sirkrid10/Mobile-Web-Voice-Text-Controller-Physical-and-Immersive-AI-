@@ -5,8 +5,10 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 class Element {
-  constructor(dataset = {}) { Object.assign(this, { dataset, textContent: '', disabled: false, scrollTop: 0, clientHeight: 0, scrollHeight: 0, listeners: {} }); }
+  constructor(dataset = {}) { Object.assign(this, { dataset, textContent: '', disabled: false, scrollTop: 0, clientHeight: 0, scrollHeight: 0, listeners: {}, children: [] }); }
   addEventListener(type, callback) { this.listeners[type] = callback; }
+  append(...items) { this.children.push(...items); }
+  replaceChildren(...items) { this.children = items; }
   click() { if (!this.disabled) return this.listeners.click?.(); }
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -23,7 +25,8 @@ function ui() {
   for (const mode of ['automatic', 'manual']) buttons.push(new Element({ agentMode: mode }));
   const refresh = get('staff-system-refresh'); refresh.id = 'staff-system-refresh'; buttons.push(refresh);
   let response = state(), queue = [], unauthorized = 0, subtitleChanges = 0, sequence = 0;
-  const context = { window: {}, document: { getElementById: get, querySelectorAll: () => buttons },
+  const context = { window: {}, document: { getElementById: get, createTextNode: text => ({ textContent: text }), createElement: () => new Element(), querySelectorAll: () => buttons },
+    navigator: { clipboard: { writeText: async () => {} } },
     AbortController, setTimeout, clearTimeout, Date,
     setInterval(callback) { const id = ++sequence; intervals.set(id, callback); return id; },
     clearInterval(id) { intervals.delete(id); },

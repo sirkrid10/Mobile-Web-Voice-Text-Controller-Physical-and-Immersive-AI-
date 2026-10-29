@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=abcd-20261029-1">
+  <link rel="stylesheet" href="/static/styles.css?v=static-qr-20261029-1">
 </head>
 <body class="staff-page">
   <div class="staff-container">
@@ -114,6 +114,15 @@
             <div class="staff-health-row">
               <span id="staff-system-checked">ยังไม่ได้ตรวจ</span>
               <button type="button" class="btn-staff-action" id="staff-system-refresh">อ่านสถานะล่าสุด</button>
+            </div>
+            <div class="staff-health-block">
+              <h4>Static QR / Cloudflare Tunnel</h4>
+              <p id="staff-tunnel-process">Tunnel ปิดใช้งาน</p>
+              <p id="staff-tunnel-reachable">Target: ยังไม่มีข้อมูล</p>
+              <p id="staff-tunnel-kv">KV: ยังไม่มีข้อมูล</p>
+              <p id="staff-tunnel-urls">URL กลาง: — · URL tunnel: —</p>
+              <p class="staff-action-note">KV อาจใช้เวลา 60 วินาทีหรือมากกว่าในการเผยแพร่ ค่า accepted ยืนยันเพียงว่า API รับคำขอ ไม่ยืนยันว่าทุกพื้นที่เห็นค่าใหม่</p>
+              <p class="staff-action-note" id="staff-tunnel-error"></p>
             </div>
             <div class="staff-health-block">
               <h4>Tailscale / VM</h4>
@@ -314,6 +323,7 @@
           <p id="staff-guide-feedback" role="status" aria-live="polite"></p>
           <nav class="staff-guide-links" aria-label="หัวข้อคู่มือ">
             <a href="#guide-startup">เปิดระบบ</a>
+            <a href="#guide-cloudflare">Static QR / Tunnel</a>
             <a href="#guide-problems">แก้ปัญหา</a>
             <a href="#guide-terminal">กลับไปใช้ terminal</a>
             <a href="#guide-automatic">กลับ Automatic</a>
@@ -344,6 +354,17 @@
 bash booth_web_controller/run_tailscale.sh</pre>
           </div>
           <p class="staff-action-note">คำสั่งนี้ใช้กับรุ่นที่มีตัวดูแล process และ LLM ที่ build แล้ว ไม่ต้องเปิด Intent/Subtitle ซ้ำ หากยังไม่ได้ build หลังอัปเดต ให้ดูหัวข้อคำสั่งตรวจเพิ่มเติมท้ายคู่มือ</p>
+        </section>
+
+        <section class="staff-section-card" id="guide-cloudflare" aria-labelledby="guide-cloudflare-title">
+          <h3 id="guide-cloudflare-title">Static QR และ Cloudflare Tunnel</h3>
+          <p>เปิดการทำงานอัตโนมัติโดยตั้ง <code>ENABLE_TUNNEL=true</code> ในไฟล์ <code>booth_web_controller/.env</code> พร้อมตั้ง Worker URL, API token, Account ID และ KV namespace ID จากนั้นเปิด Backend ตามปกติ ค่าเริ่มต้นคือปิด</p>
+          <p>สถานะ Process ทำงานอยู่หมายถึงโปรแกรม cloudflared ยังทำงาน ไม่ได้ยืนยันว่า Tunnel เชื่อมต่อได้ ต้องดู Target reachable แยกกัน URL กลางคัดลอกได้จากช่องสถานะ Tunnel เมื่อเปิดใช้งาน</p>
+          <p>หากไม่ใช้ระบบอัตโนมัติ ให้เปิด Quick Tunnel ใน terminal ด้วย <code>cloudflared tunnel --url http://127.0.0.1:8000</code> แล้วนำ URL ที่ได้ไปอัปเดตค่า <code>robot_url</code> ใน Worker KV ผ่าน Wrangler หรือ Dashboard โดยตรวจให้เป็น HTTPS subdomain ของ <code>trycloudflare.com</code> ก่อน</p>
+          <p>เมื่อปิด Backend ตามปกติ manager จะหยุดเฉพาะ cloudflared ที่เปิดเอง ค่า KV จะไม่ถูกลบ หากเปิด tunnel เอง ให้หยุดจาก terminal เจ้าของด้วย Ctrl+C ห้ามใช้ pkill cloudflared</p>
+          <div class="staff-guide-command"><div class="staff-command-toolbar"><h4>คำสั่ง fallback สำหรับอัปเดต KV</h4><button type="button" class="btn-staff-action" data-copy-command="guide-command-kv-fallback">คัดลอก</button></div>
+            <pre id="guide-command-kv-fallback" tabindex="0">cd cloudflare/robot-link
+npx wrangler kv key put robot_url 'https://&lt;quick-tunnel&gt;.trycloudflare.com/' --namespace-id '&lt;KV_NAMESPACE_ID&gt;'</pre></div>
         </section>
 
         <section class="staff-section-card" id="guide-problems" aria-labelledby="guide-problems-title">
@@ -453,8 +474,8 @@ colcon --log-base log-colcon build --build-base build-colcon --install-base inst
 
   </div>
 
-  <script src="/static/staff_guide.js?v=staff-20261029-1"></script>
-  <script src="/static/staff_system.js?v=staff-20261029-1"></script>
+  <script src="/static/staff_guide.js?v=static-qr-20261029-1"></script>
+  <script src="/static/staff_system.js?v=static-qr-20261029-1"></script>
   <script>
     (function() {
       const pinSection = document.getElementById('pin-section');

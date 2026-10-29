@@ -51,6 +51,34 @@
         : 'Robot: ยังไม่มีสถานะสดที่ยืนยันได้');
       set('staff-health-robot-age', `อายุข้อมูลต้นทาง: ${age == null ? '—' : `${age.toFixed(1)} วินาที`} · รับล่าสุด: ${time(ros.robot_received_at)}${age != null && age < -0.6 ? ' · นาฬิกาต้นทางเดินนำเกินช่วงที่รองรับ' : ''}`);
       set('staff-health-vr', `VR WebSocket: ${vr.connections || 0} การเชื่อมต่อ · ส่งล่าสุด: ${time(vr.last_sent_at)} · ลำดับ: ${vr.last_sent_sequence ?? '—'}`);
+      const tunnel = data.tunnel || {};
+      set('staff-tunnel-process', tunnel.enabled
+        ? `Process: ${tunnel.running ? 'cloudflared ทำงานอยู่' : 'cloudflared ไม่ทำงาน'}${tunnel.pid ? ` · PID ${tunnel.pid}` : ''}`
+        : 'Process: Tunnel ปิดใช้งาน');
+      get('staff-tunnel-process').dataset.level = tunnel.running ? 'ok' : tunnel.enabled ? 'error' : 'unknown';
+      set('staff-tunnel-reachable', `Target reachable: ${tunnel.target_reachable ? 'เข้าถึงได้' : 'ยังเข้าถึงไม่ได้'} · ตรวจล่าสุด ${time(tunnel.target_probed_at)}`);
+      set('staff-tunnel-kv', `KV update accepted: ${tunnel.kv_update_accepted ? 'รับคำขอแล้ว' : 'ยังไม่ยืนยัน'} · เขียนล่าสุด ${time(tunnel.kv_written_at)}`);
+      const staticLink = tunnel.worker_static_url || '';
+      const tunnelLink = tunnel.tunnel_url || '';
+      const safeStaticLink = /^https:\/\/[a-z0-9.-]+\.workers\.dev\/?$/i.test(staticLink) ? staticLink : '';
+      const urlLine = get('staff-tunnel-urls');
+      urlLine.replaceChildren();
+      urlLine.append(document.createTextNode('URL กลาง: '));
+      if (safeStaticLink) {
+        const link = document.createElement('a'); link.href = safeStaticLink; link.textContent = safeStaticLink; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        urlLine.append(link);
+      } else urlLine.append(document.createTextNode('—'));
+      if (safeStaticLink) {
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn-staff-action'; copy.textContent = 'คัดลอก URL กลาง';
+        copy.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(safeStaticLink); set('staff-system-feedback', 'คัดลอก URL กลางแล้ว'); }
+          catch (_) { set('staff-system-feedback', 'คัดลอกไม่ได้ กรุณาเลือก URL กลางแล้วคัดลอกเอง'); }
+        });
+        urlLine.append(document.createTextNode(' '), copy);
+      }
+      const safeTunnelLink = /^https:\/\/[a-z0-9.-]+\.trycloudflare\.com\/$/i.test(tunnelLink) ? tunnelLink : '';
+      urlLine.append(document.createElement('br'), document.createTextNode(`URL tunnel: ${safeTunnelLink || '—'}`));
+      set('staff-tunnel-error', tunnel.last_error ? `ข้อผิดพลาด: ${tunnel.last_error}` : '');
       buttons.forEach(button => {
         const action = button.dataset.nodeAction;
         const node = button.dataset.node;
