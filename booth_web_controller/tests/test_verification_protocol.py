@@ -11,6 +11,7 @@ Uses FastAPI TestClient to test:
 import io
 import time
 import asyncio
+import re
 import pytest
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
@@ -731,7 +732,10 @@ def test_html_pages_served():
     with TestClient(app) as client:
         res_index = client.get("/")
         assert res_index.status_code == 200
-        assert "TurtleBot3 Controller" in res_index.text
+        assert "<title>Robot Rescue Mission | CSTU Open House</title>" in res_index.text
+        assert 'class="visitor-page" data-theme="dark"' in res_index.text
+        assert 'id="btn-theme-toggle"' in res_index.text
+        assert 'id="view-available"' in res_index.text
         assert "เริ่มสั่งงานหุ่นยนต์" in res_index.text
         assert "แตะขอสิทธิ์ควบคุมก่อน เมื่อได้รับสิทธิ์แล้วจึงสั่งงานด้วยเสียงหรือข้อความได้" in res_index.text
         assert "กำลังเชื่อมต่อและรอสถานะล่าสุด" in res_index.text
@@ -741,6 +745,10 @@ def test_html_pages_served():
         assert res_staff.status_code == 200
         assert "Staff Override Panel" in res_staff.text
         assert "กรุณาระบุรหัส PIN ของเจ้าหน้าที่" in res_staff.text
+
+        for page in (res_index, res_staff):
+            for asset_url in re.findall(r'(?:href|src)="(/static/[^"?#]+)', page.text):
+                assert client.get(asset_url).status_code == 200, asset_url
 
 
 @pytest.mark.parametrize("mode", ["text", "voice"])

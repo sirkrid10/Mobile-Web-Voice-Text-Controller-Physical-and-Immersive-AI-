@@ -44,6 +44,10 @@ ros2 param get /robot_bridge_node valid_destinations
 
 ชื่อบนปุ่มเว็บ, ชื่อเป้าหมายใน Staff และ mock ใช้ mapping เดียวกันภายใน Backend ส่วน hint สำหรับ STT จะเสริมชื่อใหม่ให้แม้ `.env` เดิมยังเป็นข้อความ A/B/C ไม่ต้องแก้หรือแสดง API key
 
+## Visitor UI ใน release candidate
+
+หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รอบ release นี้รวม UI จาก `origin/main` กับ Static QR/TunnelManager จาก `origin/feat/static-qr-cloudflare`; ยังไม่รวม `feat/stt` และไม่มีการเปลี่ยน audio pipeline
+
 
 ## QR คงที่ด้วย Cloudflare Worker (Static QR Code)
 
