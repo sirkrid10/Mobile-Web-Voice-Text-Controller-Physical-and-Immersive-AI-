@@ -650,6 +650,31 @@
   }
 
   // --------------------------------------------------------------------------
+  // Audio Capture Constraints (Hardware DSP: Noise Suppression & Auto Gain)
+  // --------------------------------------------------------------------------
+  const AUDIO_RECORDING_CONSTRAINTS = {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 16000 }
+    }
+  };
+
+  async function acquireUserAudioStream() {
+    try {
+      return await navigator.mediaDevices.getUserMedia(AUDIO_RECORDING_CONSTRAINTS);
+    } catch (err) {
+      if (err && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
+        console.warn('[Audio] Advanced constraints rejected, falling back to basic audio', err);
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      throw err;
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Push-to-Talk Voice Recording
   // --------------------------------------------------------------------------
   async function startRecording(gesture = 'tap') {
@@ -673,7 +698,7 @@
     updateMicControls('acquiring', attempt.gesture);
     if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน…';
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await acquireUserAudioStream();
       if (attempt.cancelled || activeRecording !== attempt ||
           attempt.generation !== recordingGeneration || !canSubmitVisitorCommand()) {
         stopTracks(stream);

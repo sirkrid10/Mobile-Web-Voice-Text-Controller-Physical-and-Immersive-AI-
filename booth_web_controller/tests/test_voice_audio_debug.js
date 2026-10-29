@@ -298,3 +298,52 @@ test('permission denial and recorder construction failures leave no active mic o
   assert.equal(startTrack.stopped, true);
   assert.equal(startFailure.elements.get('mic-button').attributes.get('aria-pressed'), 'false');
 });
+
+test('recording requests noiseSuppression, echoCancellation, and autoGainControl constraints', async () => {
+  let requestedConstraints = null;
+  const track = { stopped: false, stop() { this.stopped = true; } };
+  const ui = voiceUI(false, {
+    getUserMedia: async (constraints) => {
+      requestedConstraints = constraints;
+      return { getTracks: () => [track] };
+    }
+  });
+  await ui.flush();
+  ui.sendState({});
+  const mic = ui.elements.get('mic-button');
+  mic.fire('pointerdown');
+  mic.fire('pointerup');
+  await ui.flush();
+
+  assert.ok(requestedConstraints && requestedConstraints.audio, 'getUserMedia should receive audio constraints');
+  assert.equal(requestedConstraints.audio.noiseSuppression, true);
+  assert.equal(requestedConstraints.audio.echoCancellation, true);
+  assert.equal(requestedConstraints.audio.autoGainControl, true);
+  assert.equal(requestedConstraints.audio.channelCount.ideal, 1);
+  assert.equal(requestedConstraints.audio.sampleRate.ideal, 16000);
+});
+
+test('recording falls back to basic audio if advanced audio constraints throw OverconstrainedError', async () => {
+  const calls = [];
+  const track = { stopped: false, stop() { this.stopped = true; } };
+  const ui = voiceUI(false, {
+    getUserMedia: async (constraints) => {
+      calls.push(constraints);
+      if (calls.length === 1) {
+        const error = new Error('Constraints not supported');
+        error.name = 'OverconstrainedError';
+        throw error;
+      }
+      return { getTracks: () => [track] };
+    }
+  });
+  await ui.flush();
+  ui.sendState({});
+  const mic = ui.elements.get('mic-button');
+  mic.fire('pointerdown');
+  mic.fire('pointerup');
+  await ui.flush();
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].audio, true);
+});
