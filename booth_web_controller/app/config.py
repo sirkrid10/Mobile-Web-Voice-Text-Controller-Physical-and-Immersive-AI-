@@ -61,10 +61,13 @@ class Settings(BaseSettings):
 
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (
-        "บทสนทนาสั่งงานหุ่นยนต์ TurtleBot3 ภาษาไทยผสมอังกฤษ (Code-Switching): "
-        "จุด A, จุดเอ, A, เอ, จุด B, จุดบี, B, บี, จุด C, จุดซี, C, ซี, "
-        "กลับจุดเริ่มต้น, กลับ start, จุดเริ่มต้น, start point. "
-        "Go to point A, point B, point C, return to start."
+        "บทสนทนาสั่งงานการเดินทางและการเคลื่อนที่ของหุ่นยนต์ TurtleBot3 (Thai-English Code-Switching): "
+        "เดินไป, พาไป, ไปที่, มุ่งหน้าไป, นำทางไป, ขยับไป, เคลื่อนที่ไป, เดินทางไป, ไปยัง, พาผมไป, พาฉันไป, "
+        "หยุด, หยุดรอ, รอตรงนี้, ชะลอ, เลี้ยว, กลับจุดเริ่มต้น, กลับ start, จุดเริ่มต้น, หน้าบูธ, ฐาน, "
+        "จุด A, จุดเอ, A, เอ, จุด B, จุดบี, B, บี, จุด C, จุดซี, C, ซี, บูธ A, บูธ B, บูธ C, สถานี A, สถานี B, สถานี C. "
+        "Go to, navigate to, move to, drive to, take me to, walk to, head to, guide to, proceed to, "
+        "stop, wait here, pause, halt, return to start, go back, return to base, "
+        "point A, point B, point C, station A, station B, station C, booth A, booth B, booth C, start point, home base."
     )
 
     # ROS 2 Integration Override
