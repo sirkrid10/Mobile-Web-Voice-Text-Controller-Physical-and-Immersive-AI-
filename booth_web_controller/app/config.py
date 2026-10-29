@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     STT_HIGHPASS_FREQ: int = 100
     STT_LOWPASS_FREQ: int = 7500
     STT_NORMALIZE_AUDIO: bool = True
+    STT_SAVE_DEBUG_AUDIO: bool = True
+    STT_DEBUG_AUDIO_DIR: str = "debug_audio"
 
     # STT Domain Prompt / Lexicon Hints (Bilingual Thai-English Code-Switching for Whisper)
     STT_INITIAL_PROMPT: str = (

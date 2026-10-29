@@ -105,6 +105,30 @@ class STTService:
             print(f"[STTService] Audio preprocessing encountered an error, falling back to original: {e}")
             return input_path
 
+    def _save_debug_audio(self, raw_path: str, processed_path: str, raw_suffix: str) -> None:
+        """Save copies of the raw uploaded audio and preprocessed audio for developer inspection."""
+        if not getattr(settings, "STT_SAVE_DEBUG_AUDIO", False):
+            return
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            debug_dir = getattr(settings, "STT_DEBUG_AUDIO_DIR", "debug_audio")
+            if not os.path.isabs(debug_dir):
+                debug_dir = os.path.join(base_dir, debug_dir)
+            os.makedirs(debug_dir, exist_ok=True)
+
+            # Copy raw upload
+            if raw_path and os.path.exists(raw_path):
+                raw_dest = os.path.join(debug_dir, f"latest_raw{raw_suffix}")
+                shutil.copyfile(raw_path, raw_dest)
+
+            # Copy exact audio fed to Whisper
+            if processed_path and os.path.exists(processed_path):
+                whisper_dest = os.path.join(debug_dir, "latest_whisper.wav")
+                shutil.copyfile(processed_path, whisper_dest)
+                print(f"[STTService] Debug audio saved: {whisper_dest} ({os.path.getsize(whisper_dest)} bytes)")
+        except Exception as e:
+            print(f"[STTService] Failed to save debug audio: {e}")
+
     async def transcribe_audio(self, audio_file: UploadFile) -> str:
         """Save uploaded audio (WebM/MP4/WAV) to a temporary file and transcribe with domain prompt."""
         suffix = ".webm"
@@ -136,6 +160,9 @@ class STTService:
             processed_path = await self._preprocess_audio(temp_path)
             if processed_path and processed_path != temp_path:
                 audio_to_transcribe = processed_path
+
+            # Save debug copies for developer inspection
+            self._save_debug_audio(temp_path, audio_to_transcribe, suffix)
 
             # Route to configured provider
             if self.provider == "groq":

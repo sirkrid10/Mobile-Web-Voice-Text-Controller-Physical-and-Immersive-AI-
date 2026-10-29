@@ -178,3 +178,24 @@ def test_preprocess_audio_real_ffmpeg_execution():
             os.remove(tone_path)
         if os.path.exists(tone_path + ".processed.wav"):
             os.remove(tone_path + ".processed.wav")
+
+
+def test_save_debug_audio_creates_files(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "STT_SAVE_DEBUG_AUDIO", True)
+    monkeypatch.setattr(settings, "STT_DEBUG_AUDIO_DIR", str(tmp_path))
+
+    service = STTService()
+    raw = tmp_path / "sample_raw.webm"
+    raw.write_bytes(b"fake raw audio data")
+    processed = tmp_path / "sample_proc.wav"
+    processed.write_bytes(b"fake processed audio data")
+
+    service._save_debug_audio(str(raw), str(processed), ".webm")
+
+    saved_raw = tmp_path / "latest_raw.webm"
+    saved_whisper = tmp_path / "latest_whisper.wav"
+
+    assert saved_raw.exists()
+    assert saved_raw.read_bytes() == b"fake raw audio data"
+    assert saved_whisper.exists()
+    assert saved_whisper.read_bytes() == b"fake processed audio data"
