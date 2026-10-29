@@ -658,12 +658,12 @@
   }
 
   // --------------------------------------------------------------------------
-  // Audio Capture Constraints (Hardware DSP: Noise Suppression & Auto Gain)
+  // Audio Capture Constraints (Natural Speech Optimization for Whisper ASR)
   // --------------------------------------------------------------------------
   const AUDIO_RECORDING_CONSTRAINTS = {
     audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
+      echoCancellation: false,
+      noiseSuppression: false,
       autoGainControl: true,
       channelCount: { ideal: 1 },
       sampleRate: { ideal: 16000 }

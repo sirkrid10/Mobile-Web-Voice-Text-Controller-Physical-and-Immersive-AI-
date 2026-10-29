@@ -316,8 +316,8 @@ test('recording requests noiseSuppression, echoCancellation, and autoGainControl
   await ui.flush();
 
   assert.ok(requestedConstraints && requestedConstraints.audio, 'getUserMedia should receive audio constraints');
-  assert.equal(requestedConstraints.audio.noiseSuppression, true);
-  assert.equal(requestedConstraints.audio.echoCancellation, true);
+  assert.equal(requestedConstraints.audio.noiseSuppression, false);
+  assert.equal(requestedConstraints.audio.echoCancellation, false);
   assert.equal(requestedConstraints.audio.autoGainControl, true);
   assert.equal(requestedConstraints.audio.channelCount.ideal, 1);
   assert.equal(requestedConstraints.audio.sampleRate.ideal, 16000);
