@@ -195,12 +195,17 @@ class STTService:
         try:
             client = self._get_groq_client()
             print(f"[STTService] Groq model={settings.STT_GROQ_MODEL}, language={settings.STT_LANGUAGE}")
+            prompt = settings.STT_INITIAL_PROMPT
+            # Groq Whisper API strictly requires prompt length <= 896 characters/bytes
+            if prompt and len(prompt.encode("utf-8")) > 800:
+                prompt = prompt.encode("utf-8")[:800].decode("utf-8", errors="ignore")
+
             with open(file_path, "rb") as audio:
                 transcription = await client.audio.transcriptions.create(
                     model=settings.STT_GROQ_MODEL,
                     file=audio,
                     language=settings.STT_LANGUAGE,
-                    prompt=settings.STT_INITIAL_PROMPT,
+                    prompt=prompt,
                     temperature=0.0
                 )
             result = transcription.text.strip()
