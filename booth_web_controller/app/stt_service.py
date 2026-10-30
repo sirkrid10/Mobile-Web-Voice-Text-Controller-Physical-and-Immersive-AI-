@@ -4,6 +4,7 @@ local faster-whisper on WSL 2, and graceful fallback for offline booth testing.
 """
 
 import os
+import shutil
 import tempfile
 import asyncio
 from fastapi import UploadFile
@@ -22,6 +23,12 @@ class STTService:
         self._groq_client = None
         self._openai_client = None
         self._local_model = None
+
+    def preprocessing_status(self):
+        return {
+            'enabled': settings.STT_PREPROCESS_AUDIO,
+            'ffmpeg_available': shutil.which('ffmpeg') is not None,
+        }
 
     def _get_groq_client(self):
         if not self._groq_client:
@@ -51,6 +58,7 @@ class STTService:
 
     async def transcribe_audio(self, audio_file: UploadFile) -> str:
         """Save uploaded audio (WebM/MP4/WAV) to a temporary file and transcribe with domain prompt."""
+        preprocess_enabled = settings.STT_PREPROCESS_AUDIO
         suffix = ".webm"
         if audio_file.content_type:
             if "mp4" in audio_file.content_type:
@@ -78,7 +86,7 @@ class STTService:
             try:
                 preprocessing = await preprocess_audio(
                     temp_path,
-                    enabled=settings.STT_PREPROCESS_AUDIO,
+                    enabled=preprocess_enabled,
                     highpass_freq=settings.STT_HIGHPASS_FREQ,
                     lowpass_freq=settings.STT_LOWPASS_FREQ,
                     normalize=settings.STT_NORMALIZE_AUDIO,

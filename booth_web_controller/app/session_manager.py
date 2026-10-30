@@ -43,7 +43,18 @@ class SessionManager:
         # External hooks
         self.ros_bridge: Optional[Any] = None
         self.broadcast_callback: Optional[Callable[[], None]] = None
+        self.history_callback = None
         self._lock = asyncio.Lock()
+
+    def set_history_callback(self, callback):
+        self.history_callback = callback
+
+    def _record_history(self, kind, result):
+        if self.history_callback:
+            try:
+                self.history_callback(kind, text=getattr(result, 'message', ''), **result.model_dump())
+            except Exception:
+                pass
 
     def set_ros_bridge(self, bridge: Any):
         self.ros_bridge = bridge
@@ -153,6 +164,7 @@ class SessionManager:
         if self.latest_intent and self.latest_intent.request_id == result.request_id:
             return False
         self.latest_intent = result
+        self._record_history('intent', result)
         self._trigger_broadcast()
         return True
 
@@ -179,6 +191,7 @@ class SessionManager:
         if self.active_session_id != result.session_id or self.latest_intent_dispatch is not None:
             return False
         self.latest_intent_dispatch = result
+        self._record_history('dispatch', result)
         self._trigger_broadcast()
         return True
 

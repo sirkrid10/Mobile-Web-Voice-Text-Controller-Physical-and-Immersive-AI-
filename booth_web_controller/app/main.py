@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException,
-    UploadFile, File, Depends, Form
+    UploadFile, File, Depends, Form, Query
 )
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +24,8 @@ from app.models import (
     HeartbeatResponse, DisconnectResponse,
     TextCommandRequest, CommandResponse,
     StaffConfigUpdate, StaffConfigSnapshot, StaffMockEvent,
-    StateBroadcast, SubtitleModeUpdate, SubtitleModeSnapshot, AgentModeUpdate
+    StateBroadcast, SubtitleModeUpdate, SubtitleModeSnapshot, AgentModeUpdate,
+    AudioPreprocessingUpdate
 )
 from app.session_manager import session_manager
 from app.stt_service import STTUnavailableError, stt_service
@@ -34,6 +35,7 @@ from app.vr_subtitle import VRSubtitleHub
 from app.agent_processes import AgentProcesses, ProcessControlError
 from app.system_health import SystemHealth
 from app.tunnel_manager import TunnelManager
+from app.dialogue_history import DialogueHistory
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +82,26 @@ watchdog_task: Optional[asyncio.Task] = None
 agent_processes: Optional[AgentProcesses] = None
 system_health: Optional[SystemHealth] = None
 tunnel_manager: Optional[TunnelManager] = None
+dialogue_history: Optional[DialogueHistory] = None
 INSTANCE_ID = str(uuid.uuid4())
+
+
+def receive_subtitle(text, stamp, request_id='', observation_id=''):
+    vr_subtitles.publish(text, stamp, request_id, observation_id)
+    if text.strip():
+        record_dialogue('subtitle', text=text, request_id=request_id, observation_id=observation_id)
+
+
+def record_dialogue(kind, **values):
+    if dialogue_history is not None:
+        try:
+            dialogue_history.record(kind, **values)
+        except Exception:
+            dialogue_history.error = 'history_write_failed'
+
+
+def record_web_request(request_id, session_id, text, input_mode):
+    record_dialogue('request', request_id=request_id, session_id=session_id, text=text, input_mode=input_mode)
 
 
 # ---------------------------------------------------------------------------
@@ -104,13 +125,13 @@ async def session_watchdog_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ros_bridge_instance, watchdog_task, agent_processes, system_health, tunnel_manager
+    global ros_bridge_instance, watchdog_task, agent_processes, system_health, tunnel_manager, dialogue_history
     loop = asyncio.get_running_loop()
 
     # 1. Initialize ROS 2 Bridge (Real or Mock)
     ros_bridge_instance = create_ros2_bridge(session_manager, loop)
     vr_subtitles.reset()
-    ros_bridge_instance.set_subtitle_callback(vr_subtitles.publish)
+    ros_bridge_instance.set_subtitle_callback(receive_subtitle)
     session_manager.set_ros_bridge(ros_bridge_instance)
     session_manager.set_broadcast_callback(ws_manager.broadcast_state)
 
@@ -122,6 +143,10 @@ async def lifespan(app: FastAPI):
     )
     try:
         await agent_processes.open()
+        dialogue_history = DialogueHistory(settings.DIALOGUE_HISTORY_PATH or None,
+            scope=os.path.dirname(os.path.dirname(__file__)),
+            secrets=(settings.STAFF_PIN, settings.GROQ_API_KEY, settings.OPENAI_API_KEY, settings.CLOUDFLARE_API_TOKEN))
+        session_manager.set_history_callback(record_dialogue)
         tunnel_manager = TunnelManager(
             enabled=settings.ENABLE_TUNNEL, port=settings.PORT, instance_id=INSTANCE_ID,
             worker_static_url=settings.WORKER_STATIC_URL, cf_api_token=settings.CLOUDFLARE_API_TOKEN,
@@ -151,6 +176,10 @@ async def lifespan(app: FastAPI):
                 await asyncio.gather(watchdog_task, return_exceptions=True)
             if ros_bridge_instance:
                 ros_bridge_instance.shutdown()
+            session_manager.set_history_callback(None)
+            if dialogue_history:
+                dialogue_history.close()
+            dialogue_history = None
             system_health = None
             agent_processes = None
             tunnel_manager = None
@@ -268,6 +297,7 @@ async def command_voice(
     transcript = transcript.strip()
 
     request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
+    record_web_request(request_id, registered_session_id, transcript, 'voice')
 
     # Publish to ROS 2
     if ros_bridge_instance:
@@ -304,6 +334,7 @@ async def command_text(
     # Validate claim or auto-claim
     validated_token = await session_manager.validate_or_auto_claim(x_session_id, x_session_token)
     request_id, registered_session_id = await session_manager.begin_user_request(x_session_id, validated_token)
+    record_web_request(request_id, registered_session_id, req.text, req.input_mode)
 
     # Publish to ROS 2
     if ros_bridge_instance:
@@ -407,6 +438,13 @@ async def staff_system(_: bool = Depends(verify_subtitle_staff_pin)):
     return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
 
 
+@app.get('/api/v1/staff/history')
+async def staff_dialogue_history(limit: int = Query(50, ge=1, le=2000), _: bool = Depends(verify_subtitle_staff_pin)):
+    if dialogue_history is None:
+        raise HTTPException(status_code=503, detail='Dialogue history is not running')
+    return JSONResponse(dialogue_history.snapshot(limit), headers={'Cache-Control': 'no-store'})
+
+
 @app.post('/api/v1/staff/system/mode')
 async def staff_agent_mode(req: AgentModeUpdate, _: bool = Depends(verify_subtitle_staff_pin)):
     if agent_processes is None:
@@ -415,6 +453,16 @@ async def staff_agent_mode(req: AgentModeUpdate, _: bool = Depends(verify_subtit
         await agent_processes.set_mode(req.mode)
     except ProcessControlError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
+    return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
+
+
+@app.post('/api/v1/staff/system/audio')
+async def staff_audio_preprocessing(req: AudioPreprocessingUpdate, _: bool = Depends(verify_subtitle_staff_pin)):
+    if system_health is None:
+        raise HTTPException(status_code=503, detail='System inspection is not running')
+    if req.enabled and not stt_service.preprocessing_status()['ffmpeg_available']:
+        raise HTTPException(status_code=409, detail='ไม่พบ ffmpeg ในเครื่อง Backend ให้ติดตั้งก่อนเปิดตัวกรองเสียง')
+    settings.STT_PREPROCESS_AUDIO = req.enabled
     return JSONResponse(system_health.snapshot(), headers={'Cache-Control': 'no-store'})
 
 

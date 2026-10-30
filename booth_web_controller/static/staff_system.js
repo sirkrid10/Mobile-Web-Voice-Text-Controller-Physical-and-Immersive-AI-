@@ -3,6 +3,7 @@
   window.StaffSystem = { create({ onUnauthorized, onSubtitleChange }) {
     const get = id => document.getElementById(id);
     const buttons = [...document.querySelectorAll('[data-node-action], [data-agent-mode], #staff-system-refresh')];
+    const audioButtons = [get('staff-audio-enable'), get('staff-audio-disable')];
     let pin = '', generation = 0, version = 0, busy = false, polling = false, timer = null, latest = null;
     const time = value => value ? new Date(value * 1000).toLocaleTimeString('th-TH') : 'ยังไม่มีข้อมูล';
     const yesNo = value => value === true ? 'ได้' : value === false ? 'ไม่ได้' : 'ยังยืนยันไม่ได้';
@@ -15,6 +16,11 @@
       latest = data;
       window.StaffGuide?.setPaths(data);
       const manager = data.processes, ros = data.ros || {}, tail = data.tailscale || {}, vr = data.vr || {};
+      const audio = data.audio;
+      set('staff-audio-current', audio ? `ตัวกรองเสียง: ${audio.enabled ? 'เปิด' : 'ปิด · ใช้เสียงต้นฉบับ'}` : 'ยังไม่ได้อ่านสถานะตัวกรองเสียง');
+      set('staff-audio-ready', audio ? (audio.ffmpeg_available ? 'ffmpeg พร้อมใช้งาน' : 'ไม่พบ ffmpeg · ยังเปิดตัวกรองไม่ได้') : 'Backend ยังไม่ส่งสถานะตัวกรองเสียง');
+      audioButtons[0].disabled = busy || !audio || !audio.ffmpeg_available || audio.enabled;
+      audioButtons[1].disabled = busy || !audio || !audio.enabled;
       set('staff-system-mode', `${data.mock ? 'Mock · ' : ''}${manager.mode === 'manual' ? 'Manual — เปิด node เองใน terminal' : 'Automatic — Backend ดูแล node'}`);
       set('staff-system-note', manager.problem || data.error || (manager.enabled
         ? 'Stop/Kill จะจำว่าให้ปิดไว้ ส่วน Restart ของ Subtitle จะกลับโหมดเริ่มต้น'
@@ -124,22 +130,23 @@
       } finally { if (mine === generation) polling = false; }
     }
 
-    async function operate(path, body, subtitleChanged = false) {
+    async function operate(path, body, subtitleChanged = false, audioChanged = false) {
       if (!pin || busy || !latest) return;
       busy = true;
       version += 1;
       const mine = generation;
       render(latest);
-      set('staff-system-feedback', 'กำลังดำเนินการ…');
+      const feedback = audioChanged ? 'staff-audio-feedback' : 'staff-system-feedback';
+      set(feedback, 'กำลังดำเนินการ…');
       try {
         const data = await request(path, body);
         if (data) {
           render(data);
-          set('staff-system-feedback', 'ดำเนินการแล้ว ตรวจสถานะ process และ ROS ด้านล่าง');
+          set(feedback, audioChanged ? 'เปลี่ยนตัวกรองแล้ว มีผลกับเสียงที่ส่งครั้งถัดไป' : 'ดำเนินการแล้ว ตรวจสถานะ process และ ROS ด้านล่าง');
           if (subtitleChanged) onSubtitleChange();
         }
       } catch (error) {
-        if (mine === generation) set('staff-system-feedback', `ดำเนินการไม่สำเร็จ: ${error.message}`);
+        if (mine === generation) set(feedback, `ดำเนินการไม่สำเร็จ: ${error.message}`);
       } finally {
         if (mine === generation) {
           busy = false;
@@ -155,10 +162,19 @@
         '/api/v1/staff/system/mode', { mode: button.dataset.agentMode }, true));
     });
     get('staff-system-refresh').addEventListener('click', refresh);
+    audioButtons.forEach((button, index) => {
+      button.disabled = true;
+      button.addEventListener('click', () => operate('/api/v1/staff/system/audio', { enabled: index === 0 }, false, true));
+    });
     buttons.forEach(button => { button.disabled = button.id !== 'staff-system-refresh'; });
     return {
       start(value) { this.stop(); pin = value; refresh(); timer = setInterval(refresh, 5000); },
-      stop() { pin = ''; generation += 1; version += 1; busy = false; polling = false; latest = null; if (timer) clearInterval(timer); timer = null; }
+      stop() {
+        pin = ''; generation += 1; version += 1; busy = false; polling = false; latest = null;
+        audioButtons.forEach(button => { button.disabled = true; });
+        set('staff-audio-current', 'ยังไม่ได้อ่านสถานะ'); set('staff-audio-ready', ''); set('staff-audio-feedback', '');
+        if (timer) clearInterval(timer); timer = null;
+      }
     };
   } };
 })();

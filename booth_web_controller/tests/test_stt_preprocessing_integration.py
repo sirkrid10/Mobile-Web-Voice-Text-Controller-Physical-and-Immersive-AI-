@@ -22,6 +22,31 @@ class FakeUpload:
         return self.data
 
 
+def test_staff_toggle_does_not_change_upload_already_in_progress(monkeypatch):
+    monkeypatch.setattr(settings, 'STT_PREPROCESS_AUDIO', False)
+    service = stt_module.STTService()
+    service.provider = 'groq'
+    captured = []
+
+    class Upload(FakeUpload):
+        async def read(self):
+            settings.STT_PREPROCESS_AUDIO = True
+            return self.data
+
+    async def preprocess(_path, **kwargs):
+        captured.append(kwargs['enabled'])
+        return PreprocessingResult(None, 'disabled')
+
+    async def provider(_path):
+        return 'ทดสอบ'
+
+    monkeypatch.setattr(stt_module, 'preprocess_audio', preprocess)
+    monkeypatch.setattr(service, '_transcribe_groq', provider)
+    assert asyncio.run(service.transcribe_audio(Upload(b'first'))) == 'ทดสอบ'
+    assert asyncio.run(service.transcribe_audio(FakeUpload(b'next'))) == 'ทดสอบ'
+    assert captured == [False, True]
+
+
 def test_disabled_preprocessing_sends_original_upload_and_cleans_it(monkeypatch):
     monkeypatch.setattr(settings, "STT_PREPROCESS_AUDIO", False)
     service = stt_module.STTService()

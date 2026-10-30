@@ -16,7 +16,8 @@ function state(mode = 'automatic') {
   const node = { status: 'running', pid: 123, external_pids: [], started_at: 100, restart_count: 0, exit_code: null, last_error: '', logs: [] };
   return { checked_at: 100, mock: false, processes: { enabled: true, mode, problem: '', nodes: {
     intent: { ...node }, subtitle: { ...node, pid: 124 }
-  } }, ros: { intent: 'responding', subtitle: 'timeout', robot_fresh: false }, tailscale: { status: 'unknown' }, vr: { connections: 0 } };
+  } }, ros: { intent: 'responding', subtitle: 'timeout', robot_fresh: false }, tailscale: { status: 'unknown' }, vr: { connections: 0 },
+  audio: { enabled: false, ffmpeg_available: true } };
 }
 function ui() {
   const elements = new Map(), buttons = [], calls = [], intervals = new Map();
@@ -54,6 +55,42 @@ test('system inspection waits for PIN and keeps process alive distinct from ROS 
   assert.match(view.get('staff-subtitle-rpc').textContent, /ไม่ตอบภายในเวลา/);
   assert.match(view.get('staff-health-vr').textContent, /0 การเชื่อมต่อ/);
   assert.match(view.get('staff-health-robot').textContent, /ยังไม่มีสถานะสด/);
+  view.panel.stop();
+});
+
+test('audio controls work in Mock without enabling ROS process management', async () => {
+  const view = ui(), mock = state();
+  mock.mock = true; mock.processes.enabled = false;
+  view.setState(mock);
+  assert.equal(view.get('staff-audio-enable').disabled, true);
+  view.panel.start('pin'); await settle();
+  assert.equal(view.get('staff-audio-enable').disabled, false);
+  assert.equal(view.get('staff-audio-disable').disabled, true);
+  assert.match(view.get('staff-audio-ready').textContent, /พร้อมใช้งาน/);
+  mock.audio.enabled = true; view.setState(mock);
+  view.get('staff-audio-enable').click(); view.get('staff-audio-enable').click();
+  await settle();
+  const posts = view.calls.filter(c => c.options.method === 'POST');
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].url, '/api/v1/staff/system/audio');
+  assert.deepEqual(JSON.parse(posts[0].options.body), { enabled: true });
+  assert.match(view.get('staff-audio-current').textContent, /เปิด/);
+  view.panel.stop();
+  assert.equal(view.get('staff-audio-disable').disabled, true);
+});
+
+test('missing ffmpeg prevents enabling and a failed write keeps the confirmed mode', async () => {
+  const view = ui(), data = state();
+  data.audio.ffmpeg_available = false; view.setState(data);
+  view.panel.start('pin'); await settle();
+  assert.equal(view.get('staff-audio-enable').disabled, true);
+  data.audio.ffmpeg_available = true; view.setState(data);
+  await [...view.intervals.values()][0]();
+  view.queue({ ok: false, status: 409, json: async () => ({ detail: 'ไม่พบ ffmpeg' }) });
+  view.get('staff-audio-enable').click(); await settle();
+  assert.match(view.get('staff-audio-feedback').textContent, /ไม่พบ ffmpeg/);
+  assert.match(view.get('staff-audio-current').textContent, /ปิด/);
+  assert.equal(view.get('staff-audio-enable').disabled, false);
   view.panel.stop();
 });
 

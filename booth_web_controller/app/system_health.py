@@ -5,6 +5,7 @@ import json
 import os
 import time
 from pathlib import Path
+from app.stt_service import stt_service
 
 
 async def run_probe(*argv, timeout=3):
@@ -85,6 +86,7 @@ class SystemHealth:
             'processes': self.processes.snapshot(),
             'vr': self.hub.inspection(),
             'tunnel': tunnel_data,
+            'audio': stt_service.preprocessing_status(),
         }
         ros = dict(result.get('ros', {}))
         ros.update(self.bridge.robot_observation())

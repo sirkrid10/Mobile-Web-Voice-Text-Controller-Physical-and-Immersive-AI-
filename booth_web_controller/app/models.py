@@ -122,6 +122,11 @@ class AgentModeUpdate(BaseModel):
     mode: Literal['automatic', 'manual']
 
 
+class AudioPreprocessingUpdate(BaseModel):
+    model_config = {'extra': 'forbid'}
+    enabled: bool = Field(strict=True)
+
+
 # ---------------------------------------------------------------------------
 # Robot & System State
 # ---------------------------------------------------------------------------

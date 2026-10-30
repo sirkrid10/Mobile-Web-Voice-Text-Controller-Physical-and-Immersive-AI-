@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # Staff Security
     STAFF_PIN: str = "1234"
+    DIALOGUE_HISTORY_PATH: str = ''
     MANAGE_AGENT_NODES: bool = False
     AGENT_WORKSPACE: str = str(Path(__file__).resolve().parents[3] / 'turtlebot-llm')
     AGENT_CLOCK_SKEW_SEC: float = Field(0.6, ge=0, le=0.6, allow_inf_nan=False)

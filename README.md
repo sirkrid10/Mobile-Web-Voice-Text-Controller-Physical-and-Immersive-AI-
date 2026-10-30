@@ -17,6 +17,12 @@ Mobile Web Application controller designed for exhibition booth visitors to inte
 
 ---
 
+## รุ่นปล่อยใช้งาน 30 ตุลาคม 2026
+
+รวม Visitor UI, Static QR, Staff ควบคุมตัวกรองเสียง และประวัติ Request/Intent/Action/Subtitle ไว้ใน main คำสั่ง Tailscale และ ROS/VR contracts เดิมไม่เปลี่ยน ตัวกรองเสียงเปิด/ปิดผ่าน Staff ได้และกลับค่าจาก `.env` เมื่อ restart; ต้องมี Linux ffmpeg เมื่อเปิดใช้งาน ใช้คู่กับ turtlebot-llm รุ่น Friendly ล่าสุด โดยเลือก Friendly ใหม่หลัง restart Subtitle
+
+ตรวจซอฟต์แวร์ด้วย Mock และ ffmpeg จริงแล้ว รอบนี้ไม่ได้ทดสอบการเดินของหุ่นหรือแว่น VR จริง การ push Git ไม่ restart Backend/ROS nodes และไม่เขียนทับ private `.env`
+
 ## จุดหมาย ABCD และชื่อบนป้าย (29 ตุลาคม 2026)
 
 | ID | ชื่อบนป้าย | ภาษาอังกฤษ | ตำแหน่งตาม handoff |
@@ -44,9 +50,9 @@ ros2 param get /robot_bridge_node valid_destinations
 
 ชื่อบนปุ่มเว็บ, ชื่อเป้าหมายใน Staff และ mock ใช้ mapping เดียวกันภายใน Backend ส่วน hint สำหรับ STT จะเสริมชื่อใหม่ให้แม้ `.env` เดิมยังเป็นข้อความ A/B/C ไม่ต้องแก้หรือแสดง API key
 
-## Visitor UI ใน release candidate
+## Visitor UI ในรุ่นปล่อยใช้งาน
 
-หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รอบ release นี้รวม UI จาก `origin/main`, Static QR/TunnelManager และ backend audio preprocessing แบบเลือกเปิดได้ ไม่ได้ merge `feat/stt` ทั้ง branch จึงคง frontend ไมค์, prompt, session และ ROS contract เดิม
+หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รุ่นนี้รวม UI จาก `origin/main`, Static QR/TunnelManager และ backend audio preprocessing แบบเลือกเปิดได้ ไม่ได้ merge `feat/stt` ทั้ง branch จึงคง frontend ไมค์, prompt, session และ ROS contract เดิม
 
 คำสั่งเปิดใช้งานยังเหมือนเดิม จาก workspace หลัก:
 
@@ -59,6 +65,13 @@ bash booth_web_controller/run_tailscale.sh
 ค่าเริ่มต้น `STT_PREPROCESS_AUDIO=false` ส่งเสียงต้นฉบับเหมือนชุดเดิมและไม่ต้องติดตั้ง ffmpeg เพื่อรันระบบปกติ ดูวิธีเปิดทดสอบและย้อนปิดในหัวข้อ Optional STT audio preprocessing ด้านล่าง
 หลังสลับ branch หรืออัปเดตโค้ด ให้ปิด Backend เดิมด้วย Ctrl+C แล้วเปิดคำสั่งเดิมใหม่เมื่อหุ่นไม่มีงานนำทางค้าง ห้ามเปิด Backend ซ้อน การสลับ Git ไม่ restart process ที่กำลังรันอยู่
 
+
+## ประวัติคำสั่งและ Subtitle
+
+หน้า Staff มี **ประวัติคำสั่ง / Intent / Subtitle** หลังยืนยัน PIN แสดงคำสั่งผ่านเว็บ ผล Intent, หลักฐาน dispatch และซับที่ Backend รับ พร้อมเวลาและ request ID เริ่มเก็บเมื่อเปิด Backend รุ่นที่มีฟีเจอร์นี้ ไม่สามารถกู้ข้อความก่อนหน้านั้นที่ไม่เคยบันทึกไว้
+
+เก็บสูงสุด 2,000 เหตุการณ์ใน SQLite ส่วนตัวที่ `~/.local/state/turtlebot-dialogue/<workspace-hash>/history.sqlite3` นอก Git และอ่านต่อได้หลัง restart หน้า Staff แสดงล่าสุด 50 เหตุการณ์ ส่วน API ที่ต้องใช้ PIN คือ `GET /api/v1/staff/history?limit=2000` ข้อมูลนี้ไม่รวมไฟล์เสียง, session token หรือ API keys และยังไม่ระบุว่าซับมาจากโมเดลหลัก โมเดลสำรอง หรือ fallback
+ถ้าเปิดจาก worktree อื่นจะมีประวัติแยกกัน ตั้ง `DIALOGUE_HISTORY_PATH` ใน private config เฉพาะเมื่อต้องการกำหนดตำแหน่งไฟล์เอง
 
 ## QR คงที่ด้วย Cloudflare Worker (Static QR Code)
 
@@ -475,6 +488,17 @@ nano .env
 | `USE_MOCK_ROS2` | `false` | Explicit standalone simulation; false uses ROS 2 |
 
 ### Optional STT audio preprocessing
+
+สลับเปิด/ปิดได้จากหน้า **Staff → ตัวกรองเสียงก่อนถอดคำพูด** หลังยืนยัน PIN โดยไม่ต้อง restart Backend ปุ่มมีผลกับ upload ครั้งถัดไป และไม่เปลี่ยนงานที่กำลังประมวลผล เมื่อ restart Backend จะกลับค่าจาก `.env` การตั้งผ่าน Staff ไม่เขียนทับ private config
+ถ้าไม่พบ Linux ffmpeg หน้า Staff จะไม่ให้เปิดตัวกรอง แต่ยังปิดกลับไปใช้เสียงต้นฉบับได้ สวิตช์นี้ไม่เปลี่ยน Mock/Robot mode
+
+สำหรับทดสอบกับ Mock แยกจาก Backend จริง ให้ใช้พอร์ตว่างและปิด tunnel อัตโนมัติ เพื่อไม่เขียน production KV:
+
+```bash
+USE_MOCK_ROS2=true ENABLE_TUNNEL=false PORT=18003 bash booth_web_controller/run_booth.sh
+```
+
+เปิด `http://localhost:18003/staff` สำหรับควบคุม ส่วนการอัดเสียงจากมือถือที่เข้าผ่าน IP ต้องใช้ HTTPS จึงควรเปิด Quick Tunnel แยกชี้พอร์ตทดสอบ แล้วใช้ URL ของ tunnel ทดสอบโดยตรง ไม่เปลี่ยน URL กลาง production
 
 The release default sends the original microphone upload to the configured STT provider. Preprocessing is opt-in and stays off until the same authorized real recordings have been compared with the flag off and on. When enabled, Linux `ffmpeg` applies the configured high-pass and low-pass filters and writes mono, 16 kHz, signed 16-bit PCM WAV. Normalization is a separate option. These filters do not separate the visitor from other nearby speakers.
 
