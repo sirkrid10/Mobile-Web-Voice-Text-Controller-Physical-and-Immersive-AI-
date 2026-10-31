@@ -1,7 +1,34 @@
 # Mobile Web Voice & Text Controller
+
+## เครือข่ายล่าสุดที่ใช้วันงาน: LAN (30 ตุลาคม 2026)
+
+ฝั่ง Robot เปลี่ยนจาก Tailscale มาใช้ Discovery Server `172.16.15.12:11811`, domain 30 ให้ใช้ LAN profile ให้ตรงกันทุก process การ source ใน Terminal ใหม่ไม่เปลี่ยน environment ของ Backend/Intent/Subtitle ที่เปิดค้างไว้ ต้องหยุดชุดเดิมเมื่อไม่มีงานค้างแล้วเปิดใหม่
+
+เมื่อให้ Backend ดูแล Intent/Subtitle อัตโนมัติ เปิดเพียง Backend ไม่เปิด node ซ้อน:
+
+```bash
+cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
+unset TURTLEBOT_SETUP_SCRIPT TURTLEBOT_FASTDDS_PROFILE ROBOT_SUPER_CLIENT_XML
+MANAGE_AGENT_NODES=true bash booth_web_controller/run_robot.sh 172.16.15.12
+```
+
+ค่าข้างต้นไม่เขียนทับ `.env` หาก IP หน้างานเปลี่ยนให้ใช้ IP ใหม่ สคริปต์ Tailscale ด้านล่างยังเก็บไว้เป็นทางเลือก แต่ใช้เมื่อฝั่ง Robot กลับมาเปิด Tailscale profile เดียวกันเท่านั้น เลือก Friendly ใหม่หลัง restart Subtitle
+
+ตรวจแบบไม่ส่ง Goal จาก Terminal แยก:
+
+```bash
+cd ~/ros2_ws/turtlebot-llm
+unset TURTLEBOT_FASTDDS_PROFILE ROBOT_SUPER_CLIENT_XML
+export TURTLEBOT_ROBOT_IP=172.16.15.12
+source ./setup_demo_auto_ip.sh robot
+python3 tools/robot_vm_link_probe.py --samples 10 --timeout 5 --warmup-sec 2
+```
+
+ผล probe ผ่านไม่แทนการยืนยันหุ่นเดินจริง ต้องเห็น heartbeat ใหม่, timestamp อยู่ในขอบเขต และหุ่นพร้อมด้วย
+
 ### Physical and Immersive AI (TurtleBot3 + ROS 2 Nav2 + LLM + VR Robot-Mind View)
 
-การเชื่อมหุ่นจริงปัจจุบันใช้ **Tailscale** คำสั่ง intent, subtitle และ Backend อยู่ด้านบนของเอกสารนี้ คำสั่ง LAN เป็นทางเลือกสำหรับเครือข่ายภายใน
+โปรไฟล์ล่าสุดที่ใช้หน้างานคือ **LAN** ตามคำสั่งด้านบน ส่วน Tailscale เป็นทางเลือกเมื่อฝั่ง Robot เปิด Discovery Server บน Tailscale ตรงกัน
 
 ชุดวันงานใช้ `main` หรือ tag `release-2026-10-28` ให้ตรงกันใน repo LLM, Backend และ Unity
 ดู [รายการ release และลำดับเปิดวันงาน](https://github.com/Lilieay/turtlebot-llm/blob/main/docs/releases/2026-10-28.md)
@@ -54,7 +81,7 @@ ros2 param get /robot_bridge_node valid_destinations
 
 หน้า Visitor ใช้รูปแบบ Robot Rescue Mission สำหรับมือถือและจอใหญ่ มีธีมมืด/สว่างที่จำค่าหลัง reload, ขั้นตอนขอ session ก่อนสั่งงาน และหน้าสถานะคิว/ภารกิจ หน้า Staff แยกต่างหากและยังใช้ PIN เดิม รุ่นนี้รวม UI จาก `origin/main`, Static QR/TunnelManager และ backend audio preprocessing แบบเลือกเปิดได้ ไม่ได้ merge `feat/stt` ทั้ง branch จึงคง frontend ไมค์, prompt, session และ ROS contract เดิม
 
-คำสั่งเปิดใช้งานยังเหมือนเดิม จาก workspace หลัก:
+ทางเลือกเปิดผ่าน Tailscale เมื่อฝั่ง Robot ใช้ Tailscale เช่นกัน จาก workspace หลัก:
 
 ```bash
 cd ~/ros2_ws/Mobile-Web-Voice-Text-Controller-Physical-and-Immersive-AI-
