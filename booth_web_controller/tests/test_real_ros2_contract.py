@@ -37,7 +37,7 @@ qos_profile = QoSProfile(
 def ensure_ros_initialized(monkeypatch):
     """Ensure rclpy is initialized for all contract tests."""
     fresh_session = SessionManager()
-    monkeypatch.setattr('app.main.session_manager', fresh_session)
+    monkeypatch.setattr('app.runtime.session_manager', fresh_session)
     monkeypatch.setitem(globals(), 'session_manager', fresh_session)
     if not rclpy.ok():
         rclpy.init()
@@ -214,7 +214,7 @@ def test_real_ros2_subtitle_reception_and_ttl_clearing():
     executor.add_node(mock_node)
 
     with TestClient(app) as client:
-        from app.main import ros_bridge_instance
+        from app.runtime import ros_bridge_instance
 
         def set_current_source_stamp(message):
             message.stamp = ros_bridge_instance.node.get_clock().now().to_msg()

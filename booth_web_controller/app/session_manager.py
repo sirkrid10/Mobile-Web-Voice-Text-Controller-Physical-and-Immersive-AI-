@@ -1,5 +1,5 @@
 """Exclusive Session Manager & Smart Watchdog State Machine.
-Manages single-device session locking, smart 60s inactivity timer with navigation pause,
+Manages single-device session locking, configurable inactivity timing with navigation pause,
 and automatic return to Start Booth upon session termination.
 """
 
@@ -7,7 +7,9 @@ import time
 import secrets
 import asyncio
 from typing import Optional, Dict, Any, Callable
-from fastapi import HTTPException
+from app.session_state import SessionError, SessionIdentity, RobotDisplay, RequestHistory
+from app.auto_return import AutoReturn
+from app.bridge_base import BaseROS2Bridge
 
 from app.config import settings
 from app.models import DirectActionOutcome, IntentDispatchOutcome, IntentOutcome, StateBroadcast
@@ -15,9 +17,10 @@ from app.models import DirectActionOutcome, IntentDispatchOutcome, IntentOutcome
 
 class SessionManager:
     def __init__(self):
-        self.active_session_id: Optional[str] = None
-        self.active_session_token: Optional[str] = None
-        self.last_activity_ts: float = 0.0
+        self.identity = SessionIdentity()
+        self.display = RobotDisplay(current_goal=settings.START_BOOTH_ID)
+        self.requests = RequestHistory()
+        self.auto_return = AutoReturn()
 
         # Timing configurations
         self.inactivity_timeout_sec: int = settings.INACTIVITY_TIMEOUT_SEC
@@ -25,26 +28,12 @@ class SessionManager:
         self.auto_return_enabled: bool = settings.AUTO_RETURN_ENABLED
         self.auto_return_delay_sec: int = settings.AUTO_RETURN_DELAY_SEC
 
-        # Auto-return background task
-        self.auto_return_task: Optional[asyncio.Task] = None
-
-        # Robot & Brain Live State
-        self.robot_state: str = "IDLE"  # IDLE, NAVIGATING, REPLANNING, REACHED, STOPPED, FAILED
-        self.current_goal: Optional[str] = settings.START_BOOTH_ID
-        self.heard_text: str = ""
-        self.llm_explanation: str = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
-        self.obstacle_detected: bool = False
-        self.robot_pose: Dict[str, float] = {"x": 0.0, "y": 0.0}
-        self.latest_request_identity: Optional[tuple[str, str]] = None
-        self.latest_intent: Optional[IntentOutcome] = None
-        self.latest_intent_dispatch: Optional[IntentDispatchOutcome] = None
-        self.latest_action: Optional[DirectActionOutcome] = None
-
         # External hooks
-        self.ros_bridge: Optional[Any] = None
+        self.ros_bridge: Optional[BaseROS2Bridge] = None
         self.broadcast_callback: Optional[Callable[[], None]] = None
         self.history_callback = None
         self._lock = asyncio.Lock()
+
 
     def set_history_callback(self, callback):
         self.history_callback = callback
@@ -56,7 +45,7 @@ class SessionManager:
             except Exception:
                 pass
 
-    def set_ros_bridge(self, bridge: Any):
+    def set_ros_bridge(self, bridge: BaseROS2Bridge | None):
         self.ros_bridge = bridge
 
     def set_broadcast_callback(self, cb: Callable[[], None]):
@@ -77,40 +66,38 @@ class SessionManager:
     async def claim(self, session_id: str) -> Dict[str, Any]:
         async with self._lock:
             # Case A: System is currently free
-            if self.active_session_id is None:
-                self.active_session_id = session_id
-                self.active_session_token = secrets.token_hex(16)
-                self.last_activity_ts = time.time()
-                self.latest_request_identity = None
-                self.latest_intent = None
-                self.latest_intent_dispatch = None
+            if self.identity.active_session_id is None:
+                self.identity.active_session_id = session_id
+                self.identity.active_session_token = secrets.token_hex(16)
+                self.identity.last_activity_ts = time.time()
+                self.requests.latest_request_identity = None
+                self.requests.latest_intent = None
+                self.requests.latest_intent_dispatch = None
 
                 # Cancel any pending auto-return task since a new visitor arrived
-                if self.auto_return_task and not self.auto_return_task.done():
-                    self.auto_return_task.cancel()
-                    self.auto_return_task = None
+                if self.auto_return.cancel_pending():
                     print(f"[SessionManager] Cancelled auto-return task. New session claimed by {session_id}")
 
                 self._trigger_broadcast()
                 return {
                     "status": "claimed",
                     "session_id": session_id,
-                    "session_token": self.active_session_token,
+                    "session_token": self.identity.active_session_token,
                     "inactivity_remaining_sec": self.inactivity_timeout_sec
                 }
 
             # Case B: The same visitor re-claiming / refreshing their session
-            if self.active_session_id == session_id:
-                self.last_activity_ts = time.time()
+            if self.identity.active_session_id == session_id:
+                self.identity.last_activity_ts = time.time()
                 return {
                     "status": "claimed",
                     "session_id": session_id,
-                    "session_token": self.active_session_token,
+                    "session_token": self.identity.active_session_token,
                     "inactivity_remaining_sec": self.get_remaining_sec()
                 }
 
             # Case C: Locked by another visitor
-            raise HTTPException(
+            raise SessionError(
                 status_code=409,
                 detail="Session locked by another visitor. Please wait for current session to finish."
             )
@@ -121,76 +108,74 @@ class SessionManager:
     async def validate_or_auto_claim(self, session_id: str, session_token: Optional[str]) -> str:
         async with self._lock:
             # Auto-claim if available
-            if self.active_session_id is None:
-                self.active_session_id = session_id
-                self.active_session_token = secrets.token_hex(16)
-                self.last_activity_ts = time.time()
-                self.latest_request_identity = None
-                self.latest_intent = None
-                self.latest_intent_dispatch = None
-                if self.auto_return_task and not self.auto_return_task.done():
-                    self.auto_return_task.cancel()
-                    self.auto_return_task = None
+            if self.identity.active_session_id is None:
+                self.identity.active_session_id = session_id
+                self.identity.active_session_token = secrets.token_hex(16)
+                self.identity.last_activity_ts = time.time()
+                self.requests.latest_request_identity = None
+                self.requests.latest_intent = None
+                self.requests.latest_intent_dispatch = None
+                self.auto_return.cancel_pending()
                 self._trigger_broadcast()
-                return self.active_session_token
+                return self.identity.active_session_token
 
             # Existing claim verification
-            if self.active_session_id == session_id:
-                if session_token and session_token == self.active_session_token:
-                    self.last_activity_ts = time.time()
-                    return self.active_session_token
-                raise HTTPException(status_code=403, detail="Invalid session token for active controller.")
+            if self.identity.active_session_id == session_id:
+                if session_token and session_token == self.identity.active_session_token:
+                    self.identity.last_activity_ts = time.time()
+                    return self.identity.active_session_token
+                raise SessionError(status_code=403, detail="Invalid session token for active controller.")
 
-            raise HTTPException(status_code=403, detail="Robot is currently controlled by another visitor.")
+            raise SessionError(status_code=403, detail="Robot is currently controlled by another visitor.")
 
     async def begin_user_request(self, session_id: str, expected_token: str) -> tuple[str, str]:
         """Register a command before publishing so immediate ROS results can correlate."""
         async with self._lock:
-            if self.active_session_id != session_id or self.active_session_token != expected_token:
-                raise HTTPException(status_code=403, detail="Session ownership changed before command submission.")
+            if self.identity.active_session_id != session_id or self.identity.active_session_token != expected_token:
+                raise SessionError(status_code=403, detail="Session ownership changed before command submission.")
             identity = (f"req-{secrets.token_hex(8)}", session_id)
-            self.latest_request_identity = identity
-            self.latest_intent = None
-            self.latest_intent_dispatch = None
+            self.requests.latest_request_identity = identity
+            self.requests.latest_intent = None
+            self.requests.latest_intent_dispatch = None
             self._trigger_broadcast()
             return identity
 
     def record_intent_result(self, result: IntentOutcome) -> bool:
         """Accept one result only for the current visitor request."""
-        if self.latest_request_identity != (result.request_id, result.session_id):
+        if self.requests.latest_request_identity != (result.request_id, result.session_id):
             return False
-        if self.active_session_id != result.session_id:
+        if self.identity.active_session_id != result.session_id:
             return False
-        if self.latest_intent and self.latest_intent.request_id == result.request_id:
+        if self.requests.latest_intent and self.requests.latest_intent.request_id == result.request_id:
             return False
-        self.latest_intent = result
+        self.requests.latest_intent = result
         self._record_history('intent', result)
         self._trigger_broadcast()
         return True
 
     def record_action_outcome(self, result: DirectActionOutcome) -> bool:
         """Update the snapshot only for the newest backend-owned Action."""
-        if self.latest_action and self.latest_action.request_id != result.request_id:
+        if self.requests.latest_action and self.requests.latest_action.request_id != result.request_id:
             if result.outcome != "sending":
                 return False
         terminal = {"unavailable", "rejected", "succeeded", "aborted", "canceled", "failed", "transport_error"}
         if (
-            self.latest_action
-            and self.latest_action.request_id == result.request_id
-            and self.latest_action.outcome in terminal
+            self.requests.latest_action
+            and self.requests.latest_action.request_id == result.request_id
+            and self.requests.latest_action.outcome in terminal
         ):
             return False
-        self.latest_action = result
+        self.requests.latest_action = result
         self._trigger_broadcast()
         return True
 
     def record_intent_dispatch(self, result: IntentDispatchOutcome) -> bool:
         """Correlate sender evidence even when it arrives before IntentResult."""
-        if self.latest_request_identity != (result.request_id, result.session_id):
+        if self.requests.latest_request_identity != (result.request_id, result.session_id):
             return False
-        if self.active_session_id != result.session_id or self.latest_intent_dispatch is not None:
+        if self.identity.active_session_id != result.session_id or self.requests.latest_intent_dispatch is not None:
             return False
-        self.latest_intent_dispatch = result
+        self.requests.latest_intent_dispatch = result
         self._record_history('dispatch', result)
         self._trigger_broadcast()
         return True
@@ -200,10 +185,10 @@ class SessionManager:
     # -----------------------------------------------------------------------
     async def heartbeat(self, session_token: str) -> Dict[str, Any]:
         async with self._lock:
-            if not self.active_session_token or session_token != self.active_session_token:
-                raise HTTPException(status_code=403, detail="Invalid or expired session token.")
+            if not self.identity.active_session_token or session_token != self.identity.active_session_token:
+                raise SessionError(status_code=403, detail="Invalid or expired session token.")
 
-            self.last_activity_ts = time.time()
+            self.identity.last_activity_ts = time.time()
             return {
                 "status": "extended",
                 "inactivity_remaining_sec": self.inactivity_timeout_sec
@@ -214,24 +199,24 @@ class SessionManager:
     # -----------------------------------------------------------------------
     async def watchdog_tick(self) -> StateBroadcast:
         async with self._lock:
-            is_navigating = self.robot_state in ("NAVIGATING", "REPLANNING")
+            is_navigating = self.display.robot_state in ("NAVIGATING", "REPLANNING")
 
-            if self.active_session_id is not None:
+            if self.identity.active_session_id is not None:
                 if is_navigating:
                     # Smart Timer Pause: keep timer reset while robot is traveling!
-                    self.last_activity_ts = time.time()
+                    self.identity.last_activity_ts = time.time()
                     remaining = self.inactivity_timeout_sec
                     show_warning = False
                     timer_paused = True
                 else:
                     # Stationary countdown: robot is IDLE, REACHED, STOPPED, or FAILED
                     timer_paused = False
-                    elapsed = int(time.time() - self.last_activity_ts)
+                    elapsed = int(time.time() - self.identity.last_activity_ts)
                     remaining = max(0, self.inactivity_timeout_sec - elapsed)
                     show_warning = (0 < remaining <= self.warning_threshold_sec)
 
                     if remaining == 0:
-                        print(f"[SessionManager] Inactivity timeout reached for session {self.active_session_id}")
+                        print(f"[SessionManager] Inactivity timeout reached for session {self.identity.active_session_id}")
                         asyncio.create_task(self.release_session(reason="inactivity_timeout"))
             else:
                 remaining = self.inactivity_timeout_sec
@@ -241,11 +226,11 @@ class SessionManager:
             return self._build_state_broadcast(remaining, timer_paused, show_warning)
 
     def get_remaining_sec(self) -> int:
-        if not self.active_session_id:
+        if not self.identity.active_session_id:
             return self.inactivity_timeout_sec
-        if self.robot_state in ("NAVIGATING", "REPLANNING"):
+        if self.display.robot_state in ("NAVIGATING", "REPLANNING"):
             return self.inactivity_timeout_sec
-        elapsed = int(time.time() - self.last_activity_ts)
+        elapsed = int(time.time() - self.identity.last_activity_ts)
         return max(0, self.inactivity_timeout_sec - elapsed)
 
     # -----------------------------------------------------------------------
@@ -253,59 +238,28 @@ class SessionManager:
     # -----------------------------------------------------------------------
     async def release_session(self, reason: str = "user_disconnect") -> bool:
         async with self._lock:
-            if self.active_session_id is None:
+            if self.identity.active_session_id is None:
                 return False
 
-            released_session = self.active_session_id
-            self.active_session_id = None
-            self.active_session_token = None
-            self.latest_request_identity = None
-            self.latest_intent = None
-            self.latest_intent_dispatch = None
+            released_session = self.identity.active_session_id
+            self.identity.active_session_id = None
+            self.identity.active_session_token = None
+            self.requests.latest_request_identity = None
+            self.requests.latest_intent = None
+            self.requests.latest_intent_dispatch = None
             print(f"[SessionManager] Released session {released_session} (reason: {reason})")
 
             # Check Auto-Return criteria
-            should_auto_return = (
-                self.auto_return_enabled and
-                reason in ("user_disconnect", "inactivity_timeout") and
-                self.current_goal != settings.START_BOOTH_ID
+            should_auto_return = self.auto_return.eligible(
+                self.auto_return_enabled, reason, self.display.current_goal,
             )
 
             if should_auto_return:
-                if self.auto_return_task and not self.auto_return_task.done():
-                    self.auto_return_task.cancel()
-                self.auto_return_task = asyncio.create_task(self._delayed_auto_return())
+                self.auto_return.schedule(self)
                 print(f"[SessionManager] Scheduled Auto-Return in {self.auto_return_delay_sec}s")
 
             self._trigger_broadcast()
             return should_auto_return
-
-    async def _delayed_auto_return(self):
-        try:
-            print(f"[SessionManager] Auto-return waiting {self.auto_return_delay_sec}s grace period...")
-            await asyncio.sleep(self.auto_return_delay_sec)
-
-            async with self._lock:
-                if self.active_session_id is not None:
-                    print("[SessionManager] Auto-return aborted: new session was claimed.")
-                    return
-
-                print("[SessionManager] Executing Auto-Return to START_BOOTH...")
-                self.current_goal = settings.START_BOOTH_ID
-                self.heard_text = "กลับจุดเริ่มต้น (Auto-Return)"
-                self.llm_explanation = "หมดเวลากิจกรรม กำลังนำหุ่นยนต์เดินกลับจุดเริ่มต้นหน้าร้าน"
-
-                if self.ros_bridge:
-                    self.ros_bridge.publish_high_level_action(
-                        action="GO_TO",
-                        target=settings.START_BOOTH_ID,
-                        explanation="Auto-returning to Start Booth after session ended",
-                        source="auto_return"
-                    )
-
-            self._trigger_broadcast()
-        except asyncio.CancelledError:
-            print("[SessionManager] Delayed auto-return task was cancelled.")
 
     # -----------------------------------------------------------------------
     # Staff Controls & Overrides
@@ -315,17 +269,17 @@ class SessionManager:
 
     async def emergency_stop(self):
         async with self._lock:
-            self.robot_state = "STOPPED"
-            self.llm_explanation = "🚨 สตาฟกดหยุดฉุกเฉิน (Emergency Stop)"
+            self.display.robot_state = "STOPPED"
+            self.display.llm_explanation = "🚨 สตาฟกดหยุดฉุกเฉิน (Emergency Stop)"
             if self.ros_bridge:
                 self.ros_bridge.publish_emergency_stop()
         self._trigger_broadcast()
 
     async def return_to_start_now(self):
         async with self._lock:
-            self.current_goal = settings.START_BOOTH_ID
-            self.heard_text = "คำสั่งสตาฟ: กลับจุดเริ่มต้นทันที"
-            self.llm_explanation = "สตาฟสั่งให้หุ่นยนต์กลับจุดเริ่มต้นหน้าร้านทันที"
+            self.display.current_goal = settings.START_BOOTH_ID
+            self.display.heard_text = "คำสั่งสตาฟ: กลับจุดเริ่มต้นทันที"
+            self.display.llm_explanation = "สตาฟสั่งให้หุ่นยนต์กลับจุดเริ่มต้นหน้าร้านทันที"
             if self.ros_bridge:
                 self.ros_bridge.publish_high_level_action(
                     action="GO_TO",
@@ -353,53 +307,53 @@ class SessionManager:
     def update_from_ros_state(self, state: str, goal: Optional[str] = None,
                               obstacle_detected: bool = False,
                               pose: Optional[Dict[str, float]] = None):
-        self.robot_state = state
+        self.display.robot_state = state
         if goal:
-            self.current_goal = goal
-        self.obstacle_detected = obstacle_detected
+            self.display.current_goal = goal
+        self.display.obstacle_detected = obstacle_detected
         if pose:
-            self.robot_pose = pose
+            self.display.robot_pose = pose
         self._trigger_broadcast()
 
     def update_from_llm_mind(self, heard_text: str, target: Optional[str] = None,
                              explanation: Optional[str] = None):
         if heard_text:
-            self.heard_text = heard_text
+            self.display.heard_text = heard_text
         if target:
-            self.current_goal = target
+            self.display.current_goal = target
         if explanation:
-            self.llm_explanation = explanation
+            self.display.llm_explanation = explanation
         self._trigger_broadcast()
 
     # -----------------------------------------------------------------------
     # State Snapshot Serialization
     # -----------------------------------------------------------------------
     def get_state_broadcast(self) -> StateBroadcast:
-        is_navigating = self.robot_state in ("NAVIGATING", "REPLANNING")
+        is_navigating = self.display.robot_state in ("NAVIGATING", "REPLANNING")
         remaining = self.get_remaining_sec()
-        show_warning = (self.active_session_id is not None and not is_navigating and 0 < remaining <= self.warning_threshold_sec)
+        show_warning = (self.identity.active_session_id is not None and not is_navigating and 0 < remaining <= self.warning_threshold_sec)
         return self._build_state_broadcast(remaining, is_navigating, show_warning)
 
     def _build_state_broadcast(self, remaining: int, timer_paused: bool, show_warning: bool) -> StateBroadcast:
         return StateBroadcast(
-            robot_state=self.robot_state,
-            heard_text=self.heard_text,
-            current_goal=self.current_goal,
-            llm_reason=self.llm_explanation,
-            is_busy=(self.robot_state in ("NAVIGATING", "REPLANNING")),
-            lock_status="AVAILABLE" if self.active_session_id is None else "LOCKED",
-            active_session_id=self.active_session_id,
+            robot_state=self.display.robot_state,
+            heard_text=self.display.heard_text,
+            current_goal=self.display.current_goal,
+            llm_reason=self.display.llm_explanation,
+            is_busy=(self.display.robot_state in ("NAVIGATING", "REPLANNING")),
+            lock_status="AVAILABLE" if self.identity.active_session_id is None else "LOCKED",
+            active_session_id=self.identity.active_session_id,
             inactivity_remaining_sec=remaining,
             timer_paused_for_navigation=timer_paused,
             show_timeout_warning=show_warning,
             auto_return_enabled=self.auto_return_enabled,
             auto_return_delay_sec=self.auto_return_delay_sec,
-            obstacle_detected=self.obstacle_detected,
+            obstacle_detected=self.display.obstacle_detected,
             locations=settings.LOCATIONS,
-            latest_intent=self.latest_intent,
-            latest_request_id=self.latest_request_identity[0] if self.latest_request_identity else None,
-            latest_intent_dispatch=self.latest_intent_dispatch,
-            latest_action=self.latest_action
+            latest_intent=self.requests.latest_intent,
+            latest_request_id=self.requests.latest_request_identity[0] if self.requests.latest_request_identity else None,
+            latest_intent_dispatch=self.requests.latest_intent_dispatch,
+            latest_action=self.requests.latest_action
         )
 
 

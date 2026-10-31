@@ -7,6 +7,10 @@ Uses FastAPI TestClient to test:
 5. Staff PIN Authentication & Emergency Stop
 6. Voice Audio Command Processing (with fallback)
 """
+from app.session_state import RobotDisplay, SessionError
+from app import runtime
+from app.routes import commands, sessions
+from fastapi import HTTPException
 
 import io
 import time
@@ -28,19 +32,19 @@ def reset_session_state():
     session_manager.set_broadcast_callback(None)
     """Reset session manager state before each test."""
     asyncio.run(session_manager.release_session(reason="test_reset"))
-    session_manager.robot_state = "IDLE"
-    session_manager.current_goal = settings.START_BOOTH_ID
-    session_manager.heard_text = ""
-    session_manager.llm_explanation = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
-    session_manager.obstacle_detected = False
-    session_manager.latest_request_identity = None
-    session_manager.latest_intent = None
-    session_manager.latest_action = None
+    session_manager.display.robot_state = "IDLE"
+    session_manager.display.current_goal = settings.START_BOOTH_ID
+    session_manager.display.heard_text = ""
+    session_manager.display.llm_explanation = "พร้อมรับคำสั่งจากผู้เข้าชมบูธ"
+    session_manager.display.obstacle_detected = False
+    session_manager.requests.latest_request_identity = None
+    session_manager.requests.latest_intent = None
+    session_manager.requests.latest_action = None
     session_manager.auto_return_enabled = True
     session_manager.auto_return_delay_sec = 1  # 1s for fast testing
     session_manager.inactivity_timeout_sec = 60
-    if session_manager.auto_return_task and not session_manager.auto_return_task.done():
-        session_manager.auto_return_task.cancel()
+    if session_manager.auto_return.task and not session_manager.auto_return.task.done():
+        session_manager.auto_return.task.cancel()
     # The TestClient lifespan runs on a different event loop than asyncio.run above.
     session_manager._lock = asyncio.Lock()
     yield
@@ -112,7 +116,7 @@ def test_intent_result_requires_current_request_and_session():
 
     asyncio.run(session_manager.claim("intent-owner"))
     request_id, session_id = asyncio.run(session_manager.begin_user_request(
-        "intent-owner", session_manager.active_session_token
+        "intent-owner", session_manager.identity.active_session_token
     ))
     result = IntentOutcome(
         request_id=request_id,
@@ -129,7 +133,7 @@ def test_intent_result_requires_current_request_and_session():
 
     state = session_manager.get_state_broadcast()
     assert state.latest_intent.message == "Which booth?"
-    session_manager.latest_request_identity = ("new-request", session_id)
+    session_manager.requests.latest_request_identity = ("new-request", session_id)
     assert not session_manager.record_intent_result(result)
 
 
@@ -148,8 +152,8 @@ def test_action_snapshot_keeps_newest_goal_and_terminal_state():
     assert not session_manager.record_action_outcome(first.model_copy(update={"outcome": "succeeded"}))
     assert session_manager.record_action_outcome(second.model_copy(update={"outcome": "succeeded"}))
     assert not session_manager.record_action_outcome(second.model_copy(update={"outcome": "accepted"}))
-    assert session_manager.latest_action.request_id == "action-2"
-    assert session_manager.latest_action.outcome == "succeeded"
+    assert session_manager.requests.latest_action.request_id == "action-2"
+    assert session_manager.requests.latest_action.outcome == "succeeded"
 
 
 def test_quick_chip_command_keeps_original_flow_and_correlates_result():
@@ -166,7 +170,7 @@ def test_quick_chip_command_keeps_original_flow_and_correlates_result():
     assert payload["session_id"] == "chip-visitor"
     state = session_manager.get_state_broadcast()
     assert state.heard_text == "หยุดรอตรงนี้ก่อน"
-    assert session_manager.latest_request_identity == (payload["request_id"], "chip-visitor")
+    assert session_manager.requests.latest_request_identity == (payload["request_id"], "chip-visitor")
 
 
 def test_locations_use_named_abcd_and_start_chip_remains_a_request():
@@ -182,7 +186,7 @@ def test_locations_use_named_abcd_and_start_chip_remains_a_request():
     ("ไปจุด A", "A"), ("พาไปจุด บี", "B"), ("ไปจุด C", "C"), ("กลับ start", "D")
 ])
 def test_mock_visitor_requests_map_to_a_b_c_and_start_alias(text, destination):
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
     target, status, _ = MockROS2Bridge._mock_intent(text)
     assert status == "NAVIGATE"
     assert target == destination
@@ -192,7 +196,7 @@ def test_mock_visitor_requests_map_to_a_b_c_and_start_alias(text, destination):
     ("ไปที่บูธ", "CLARIFY"), ("ไปจุด A แล้วจุด B", "CLARIFY"), ("ส่งคำขอรอ", "UNSUPPORTED")
 ])
 def test_mock_does_not_invent_destination_for_ambiguous_or_unsupported_text(text, status):
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
     _, actual_status, _ = MockROS2Bridge._mock_intent(text)
     assert actual_status == status
 
@@ -306,7 +310,7 @@ def test_real_bridge_publish_failure_does_not_update_heard_text():
 
 
 def test_mock_busy_result_preserves_simulation_and_emits_subtitle(monkeypatch):
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
 
     loop = asyncio.new_event_loop()
     bridge = MockROS2Bridge(session_manager, loop)
@@ -331,15 +335,15 @@ def test_mock_busy_result_preserves_simulation_and_emits_subtitle(monkeypatch):
 
 
 def test_mock_subtitle_uses_remaining_source_ttl_and_discards_owner_loop_expiry():
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
 
     class SubtitleState:
-        heard_text = ""
-        llm_explanation = ""
+        def __init__(self):
+            self.display = RobotDisplay(llm_explanation="")
 
         def update_from_llm_mind(self, heard_text, explanation, target=None):
-            self.heard_text = heard_text
-            self.llm_explanation = explanation
+            self.display.heard_text = heard_text
+            self.display.llm_explanation = explanation
 
         def _trigger_broadcast(self):
             pass
@@ -350,30 +354,30 @@ def test_mock_subtitle_uses_remaining_source_ttl_and_discards_owner_loop_expiry(
         bridge = MockROS2Bridge(state, asyncio.get_running_loop(), clock=lambda: now[0])
         bridge.handle_mock_subtitle("เหลือครึ่งวินาที", ttl_sec=3, stamp_sec=100)
         await asyncio.sleep(0)
-        assert state.llm_explanation == "เหลือครึ่งวินาที"
+        assert state.display.llm_explanation == "เหลือครึ่งวินาที"
         now[0] = 103
         await asyncio.sleep(0.6)
-        assert state.llm_explanation == ""
+        assert state.display.llm_explanation == ""
 
         now[0] = 202.5
         bridge.handle_mock_subtitle("หมดอายุระหว่างรอ loop", ttl_sec=0.5, stamp_sec=202)
         now[0] = 203
         await asyncio.sleep(0)
-        assert state.llm_explanation == ""
+        assert state.display.llm_explanation == ""
         bridge.shutdown()
 
     asyncio.run(run())
 
 
 def test_mock_subtitle_clear_stale_messages_and_old_timers_cannot_clear_new_text():
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
 
     class SubtitleState:
-        heard_text = ""
-        llm_explanation = "initial"
+        def __init__(self):
+            self.display = RobotDisplay(llm_explanation="initial")
 
         def update_from_llm_mind(self, heard_text, explanation, target=None):
-            self.llm_explanation = explanation
+            self.display.llm_explanation = explanation
 
         def _trigger_broadcast(self):
             pass
@@ -388,29 +392,29 @@ def test_mock_subtitle_clear_stale_messages_and_old_timers_cannot_clear_new_text
         await asyncio.sleep(0)
         bridge.handle_mock_subtitle("ย้อนเวลา", ttl_sec=5, stamp_sec=99)
         await asyncio.sleep(0.15)
-        assert state.llm_explanation == "ข้อความใหม่"
+        assert state.display.llm_explanation == "ข้อความใหม่"
 
         now[0] = 101
         bridge.handle_mock_subtitle("", ttl_sec=0, stamp_sec=101)
         await asyncio.sleep(0)
-        assert state.llm_explanation == ""
+        assert state.display.llm_explanation == ""
         bridge.handle_mock_subtitle("อนาคต", ttl_sec=3, stamp_sec=102)
         await asyncio.sleep(0)
-        assert state.llm_explanation == ""
+        assert state.display.llm_explanation == ""
         bridge.shutdown()
 
     asyncio.run(run())
 
 
 def test_expired_subtitle_does_not_clear_fresh_subtitle_or_replace_its_timer():
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
 
     class SubtitleState:
-        heard_text = ""
-        llm_explanation = ""
+        def __init__(self):
+            self.display = RobotDisplay(llm_explanation="")
 
         def update_from_llm_mind(self, heard_text, explanation, target=None):
-            self.llm_explanation = explanation
+            self.display.llm_explanation = explanation
 
         def _trigger_broadcast(self):
             pass
@@ -427,7 +431,7 @@ def test_expired_subtitle_does_not_clear_fresh_subtitle_or_replace_its_timer():
         bridge.handle_mock_subtitle("มาช้าและหมดอายุ", ttl_sec=0.5, stamp_sec=101)
         await asyncio.sleep(0)
 
-        assert state.llm_explanation == "ยังสด"
+        assert state.display.llm_explanation == "ยังสด"
         assert bridge._subtitle_timer is original_timer
         assert not original_timer.cancelled()
         bridge.shutdown()
@@ -436,32 +440,32 @@ def test_expired_subtitle_does_not_clear_fresh_subtitle_or_replace_its_timer():
 
 
 def test_staff_return_home_replaces_active_mock_visitor_navigation():
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
 
     async def run():
         bridge = MockROS2Bridge(session_manager, asyncio.get_running_loop())
         session_manager.set_ros_bridge(bridge)
-        session_manager.latest_action = None
+        session_manager.requests.latest_action = None
         session_manager.update_from_ros_state(state="IDLE", goal="A")
         bridge._start_navigation_simulation("B")
         visitor_task = bridge._sim_task
         await asyncio.sleep(0)
 
         await session_manager.return_to_start_now()
-        staff_action_id = session_manager.latest_action.request_id
+        staff_action_id = session_manager.requests.latest_action.request_id
         staff_task = bridge._sim_task
 
         assert staff_task is not visitor_task
-        assert session_manager.current_goal == "D"
-        assert session_manager.latest_action.destination_id == "D"
-        assert session_manager.latest_action.source == "staff_override"
-        assert session_manager.latest_action.outcome == "accepted"
+        assert session_manager.display.current_goal == "D"
+        assert session_manager.requests.latest_action.destination_id == "D"
+        assert session_manager.requests.latest_action.source == "staff_override"
+        assert session_manager.requests.latest_action.outcome == "accepted"
 
         await asyncio.wrap_future(staff_task)
-        assert session_manager.current_goal == "D"
-        assert session_manager.latest_action.request_id == staff_action_id
-        assert session_manager.latest_action.outcome == "succeeded"
-        assert session_manager.robot_state == "REACHED"
+        assert session_manager.display.current_goal == "D"
+        assert session_manager.requests.latest_action.request_id == staff_action_id
+        assert session_manager.requests.latest_action.outcome == "succeeded"
+        assert session_manager.display.robot_state == "REACHED"
         bridge.shutdown()
         session_manager.set_ros_bridge(None)
 
@@ -483,13 +487,13 @@ def test_staff_return_home_replaces_active_mock_visitor_navigation():
     ("new_phase", False, 0, "UNKNOWN"),
 ])
 def test_navigation_phase_maps_only_to_confirmed_web_state(phase, ready, error, expected):
-    from app.ros2_bridge import map_navigation_state
+    from app.ros_node import map_navigation_state
     assert map_navigation_state(phase, ready, error) == expected
 
 
 def test_web_state_schema_accepts_unknown_and_not_ready():
     for state in ("UNKNOWN", "NOT_READY"):
-        session_manager.robot_state = state
+        session_manager.display.robot_state = state
         assert session_manager.get_state_broadcast().robot_state == state
 
 
@@ -499,7 +503,7 @@ def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatc
         await session_manager.claim("replacement-owner")
         return "ไปจุด A"
 
-    monkeypatch.setattr("app.main.stt_service.transcribe_audio", transcribe_and_change_owner)
+    monkeypatch.setattr("app.runtime.stt_service.transcribe_audio", transcribe_and_change_owner)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/command/voice",
@@ -508,8 +512,8 @@ def test_voice_request_rechecks_session_ownership_after_transcription(monkeypatc
         )
 
     assert response.status_code == 403
-    assert session_manager.active_session_id == "replacement-owner"
-    assert session_manager.latest_request_identity is None
+    assert session_manager.identity.active_session_id == "replacement-owner"
+    assert session_manager.requests.latest_request_identity is None
 
 
 @pytest.mark.parametrize("provider", ["groq", "openai", "faster_whisper"])
@@ -579,8 +583,8 @@ def test_voice_failures_do_not_register_or_publish_requests(monkeypatch, transcr
     bridge = Mock()
     bridge.inspect_connections = AsyncMock(return_value={})
     bridge.robot_observation.return_value = {}
-    monkeypatch.setattr(main_module, "create_ros2_bridge", lambda *_args: bridge)
-    monkeypatch.setattr(main_module.stt_service, "transcribe_audio", transcribe)
+    monkeypatch.setattr(runtime, 'create_ros2_bridge', lambda *_args: bridge)
+    monkeypatch.setattr(runtime.stt_service, "transcribe_audio", transcribe)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/command/voice",
@@ -590,36 +594,36 @@ def test_voice_failures_do_not_register_or_publish_requests(monkeypatch, transcr
 
     assert response.status_code == status
     assert "private provider detail" not in response.text
-    assert session_manager.latest_request_identity is None
+    assert session_manager.requests.latest_request_identity is None
     bridge.publish_user_transcript.assert_not_called()
 
 
 def test_smart_navigation_timer_pause():
     """Protocol 3: Watchdog pauses countdown during NAVIGATING/REPLANNING."""
     asyncio.run(session_manager.claim("dev-timer-test"))
-    session_manager.robot_state = "IDLE"
+    session_manager.display.robot_state = "IDLE"
 
     # Tick 1: IDLE countdown
-    session_manager.last_activity_ts = time.time() - 10
+    session_manager.identity.last_activity_ts = time.time() - 10
     state_idle = asyncio.run(session_manager.watchdog_tick())
     assert state_idle.timer_paused_for_navigation is False
     assert state_idle.inactivity_remaining_sec == 50
 
     # Set state to NAVIGATING -> timer should pause and remain at 60s
-    session_manager.robot_state = "NAVIGATING"
+    session_manager.display.robot_state = "NAVIGATING"
     state_nav = asyncio.run(session_manager.watchdog_tick())
     assert state_nav.timer_paused_for_navigation is True
     assert state_nav.inactivity_remaining_sec == 60
 
     # Set state to REPLANNING -> still paused
-    session_manager.robot_state = "REPLANNING"
+    session_manager.display.robot_state = "REPLANNING"
     state_replan = asyncio.run(session_manager.watchdog_tick())
     assert state_replan.timer_paused_for_navigation is True
     assert state_replan.inactivity_remaining_sec == 60
 
     # Reached destination -> countdown resumes
-    session_manager.robot_state = "REACHED"
-    session_manager.last_activity_ts = time.time() - 5
+    session_manager.display.robot_state = "REACHED"
+    session_manager.identity.last_activity_ts = time.time() - 5
     state_reached = asyncio.run(session_manager.watchdog_tick())
     assert state_reached.timer_paused_for_navigation is False
     assert state_reached.inactivity_remaining_sec == 55
@@ -633,8 +637,8 @@ def test_auto_return_on_disconnect():
         token = claim_res.json()["session_token"]
 
         # Navigate away from start
-        session_manager.current_goal = "B"
-        session_manager.robot_state = "REACHED"
+        session_manager.display.current_goal = "B"
+        session_manager.display.robot_state = "REACHED"
         session_manager.auto_return_delay_sec = 1  # 1s for testing
 
         # Disconnect
@@ -644,19 +648,19 @@ def test_auto_return_on_disconnect():
         )
         assert disc_res.status_code == 200
         assert disc_res.json()["auto_return_scheduled"] is True
-        assert session_manager.active_session_id is None
+        assert session_manager.identity.active_session_id is None
 
         # Wait for delayed auto-return task to trigger
         time.sleep(1.3)
-        assert session_manager.current_goal == settings.START_BOOTH_ID == "D"
+        assert session_manager.display.current_goal == settings.START_BOOTH_ID == "D"
 
 
 def test_disconnect_at_d_does_not_schedule_redundant_return():
     with TestClient(app) as client:
         claim = client.post("/api/v1/session/claim", json={"session_id": "at-d"})
         token = claim.json()["session_token"]
-        session_manager.current_goal = "D"
-        session_manager.robot_state = "REACHED"
+        session_manager.display.current_goal = "D"
+        session_manager.display.robot_state = "REACHED"
         response = client.post(
             "/api/v1/session/disconnect", headers={"X-Session-Token": token}
         )
@@ -705,7 +709,7 @@ def test_staff_pin_security_and_emergency_stop():
         )
         assert res_ok.status_code == 200
         assert res_ok.json()["status"] == "stopped"
-        assert session_manager.robot_state == "STOPPED"
+        assert session_manager.display.robot_state == "STOPPED"
 
 
 def test_voice_upload_endpoint(monkeypatch):
@@ -713,7 +717,7 @@ def test_voice_upload_endpoint(monkeypatch):
     async def transcribe(_audio):
         return "ไปจุด C"
 
-    monkeypatch.setattr("app.main.stt_service.transcribe_audio", transcribe)
+    monkeypatch.setattr("app.runtime.stt_service.transcribe_audio", transcribe)
     with TestClient(app) as client:
         dummy_audio = io.BytesIO(b"RIFF....WAVEfmt ....data....")
         res = client.post(
@@ -760,29 +764,29 @@ def test_command_returns_token_for_disconnect_without_weakening_session_auth(mon
 
     async def run():
         session_manager.auto_return_enabled = False
-        monkeypatch.setattr(backend, "ros_bridge_instance", Mock())
-        monkeypatch.setattr(backend.stt_service, "transcribe_audio", AsyncMock(return_value="ไปจุด B"))
+        monkeypatch.setattr(runtime, 'ros_bridge_instance', Mock())
+        monkeypatch.setattr(runtime.stt_service, "transcribe_audio", AsyncMock(return_value="ไปจุด B"))
         if mode == "text":
-            result = await backend.command_text(
+            result = await commands.command_text(
                 TextCommandRequest(text="ไปจุด B"),
                 x_session_id="autoclaim-user", x_session_token=None,
             )
         else:
-            result = await backend.command_voice(
+            result = await commands.command_voice(
                 object(), x_session_id="autoclaim-user", x_session_token=None,
             )
         response = CommandResponse(**result)
-        assert response.session_token == session_manager.active_session_token
+        assert response.session_token == session_manager.identity.active_session_token
         assert response.request_id and response.session_id == "autoclaim-user"
-        with pytest.raises(backend.HTTPException) as denied:
+        with pytest.raises(SessionError) as denied:
             await session_manager.validate_or_auto_claim("autoclaim-user", None)
         assert denied.value.status_code == 403
-        with pytest.raises(backend.HTTPException) as denied:
-            await backend.disconnect_session(x_session_token=None)
+        with pytest.raises(HTTPException) as denied:
+            await sessions.disconnect_session(x_session_token=None)
         assert denied.value.status_code == 403
-        await backend.heartbeat_session(x_session_token=response.session_token)
-        result = await backend.disconnect_session(x_session_token=response.session_token)
+        await sessions.heartbeat_session(x_session_token=response.session_token)
+        result = await sessions.disconnect_session(x_session_token=response.session_token)
         assert result["status"] == "disconnected"
-        assert session_manager.active_session_id is None
+        assert session_manager.identity.active_session_id is None
 
     asyncio.run(run())

@@ -8,7 +8,9 @@ from typing import List, Dict, Any
 from pathlib import Path
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from app.destinations import DESTINATION_IDS, STATION_SPEECH_HINT, visitor_locations
+from app.destinations import (
+    DESTINATION_IDS, STATION_SPEECH_HINT, START_DESTINATION_ID, speech_hint, visitor_locations,
+)
 
 
 class Settings(BaseSettings):
@@ -42,7 +44,7 @@ class Settings(BaseSettings):
     WARNING_THRESHOLD_SEC: int = 15
     AUTO_RETURN_ENABLED: bool = True
     AUTO_RETURN_DELAY_SEC: int = 5
-    START_BOOTH_ID: str = "D"
+    START_BOOTH_ID: str = START_DESTINATION_ID
     DIRECT_ACTION_VALIDITY_SEC: float = 30.0
 
     @field_validator("START_BOOTH_ID")
@@ -89,13 +91,21 @@ class Settings(BaseSettings):
 
     @field_validator('STT_INITIAL_PROMPT')
     @classmethod
-    def include_station_names(cls, value: str) -> str:
+    def include_station_names(cls, value: str, info) -> str:
         # Existing .env hints must not hide newly added stations/names.
-        return value if STATION_SPEECH_HINT in value else value + ' ' + STATION_SPEECH_HINT
+        hint = speech_hint(info.data.get('START_BOOTH_ID', START_DESTINATION_ID))
+        value = value.replace(STATION_SPEECH_HINT, hint)
+        return value if hint in value else value + ' ' + hint
 
 
     # ROS 2 Integration Override
     USE_MOCK_ROS2: bool = False
+
+    @model_validator(mode="after")
+    def derive_default_locations(self):
+        if 'LOCATIONS' not in self.model_fields_set:
+            self.LOCATIONS = visitor_locations(self.START_BOOTH_ID)
+        return self
 
     # Predefined Booth Locations for Quick Chips (Matching LLM destination_id)
     LOCATIONS: List[Dict[str, Any]] = Field(default_factory=visitor_locations)

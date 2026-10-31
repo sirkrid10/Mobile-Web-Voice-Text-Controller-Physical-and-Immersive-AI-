@@ -31,13 +31,6 @@
   let currentSubmission = null;
   let submissionFeedback = '';
 
-  // Audio Recording State
-  let isRecording = false;
-  let isAcquiringMicrophone = false;
-  let isUploadingMicrophone = false;
-  let recordingGeneration = 0;
-  let activeRecording = null;
-
   // DOM Elements - Visitor UI
   const viewAvailable = document.getElementById('view-available');
   const viewActive = document.getElementById('view-active');
@@ -53,42 +46,7 @@
   // --------------------------------------------------------------------------
   // Theme Toggle (Dark / Light Mode)
   // --------------------------------------------------------------------------
-  function applyTheme(theme) {
-    const bodyEl = typeof document !== 'undefined' ? document.body : null;
-    const rootEl = typeof document !== 'undefined' ? document.documentElement : null;
-    if (bodyEl && bodyEl.setAttribute) {
-      if (theme === 'dark') {
-        bodyEl.setAttribute('data-theme', 'dark');
-        if (rootEl && rootEl.style) rootEl.style.colorScheme = 'dark';
-      } else if (bodyEl.removeAttribute) {
-        bodyEl.removeAttribute('data-theme');
-        if (rootEl && rootEl.style) rootEl.style.colorScheme = 'only light';
-      }
-    }
-  }
-
-  function initTheme() {
-    try {
-      const savedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null;
-      // Start in the cyberpunk theme; keep the visitor's saved preference.
-      const initialTheme = savedTheme || 'dark';
-      applyTheme(initialTheme);
-    } catch (e) {}
-
-    if (btnThemeToggle) {
-      btnThemeToggle.addEventListener('click', () => {
-        const bodyEl = typeof document !== 'undefined' ? document.body : null;
-        const isDark = bodyEl && bodyEl.getAttribute && bodyEl.getAttribute('data-theme') === 'dark';
-        const newTheme = isDark ? 'light' : 'dark';
-        applyTheme(newTheme);
-        try {
-          if (typeof localStorage !== 'undefined') localStorage.setItem('theme', newTheme);
-        } catch (e) {}
-      });
-    }
-  }
-
-  initTheme();
+  initVisitorTheme(btnThemeToggle);
   const btnExtend = document.getElementById('btn-extend-time');
   const warningBanner = document.getElementById('warning-banner');
 
@@ -124,70 +82,21 @@
   let connectionStatus = 'connecting';
 
   // --------------------------------------------------------------------------
-  // Audio MIME Support Detection (iOS Safari & Android Chrome)
+  // Microphone Controller
   // --------------------------------------------------------------------------
-  function getSupportedMimeType() {
-    const candidates = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg'
-    ];
-    for (const mime of candidates) {
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(mime)) {
-        return mime;
-      }
-    }
-    return '';
-  }
+  const recording = createVisitorRecording({
+    canSubmitVisitorCommand, setSessionFeedback, audioDebugEnabled, audioDebugPlayer,
+    transcriptPreview, updateMicControls, showRecordedAudio, sendVoiceCommand
+  });
 
   // --------------------------------------------------------------------------
   // WebSocket Status Client
   // --------------------------------------------------------------------------
-  let ws = null;
-  let wsReconnectTimer = null;
   let receivedWebSocketState = false;
-
-  function initWebSocket() {
-    let socketReceivedSnapshot = false;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/status`;
-
-    ws = new WebSocket(wsUrl);
-
-    ws.onopen = function () {
-      console.log('[WebSocket] Connected to /ws/status');
-      if (!socketReceivedSnapshot) setConnectionStatus('connecting');
-      if (wsReconnectTimer) {
-        clearTimeout(wsReconnectTimer);
-        wsReconnectTimer = null;
-      }
-    };
-
-    ws.onmessage = function (event) {
-      try {
-        const state = JSON.parse(event.data);
-        if (!isValidStateSnapshot(state)) return;
-        socketReceivedSnapshot = true;
-        receivedWebSocketState = true;
-        renderState(state);
-        setConnectionStatus('connected');
-      } catch (e) {
-        console.error('[WebSocket] Error parsing state JSON:', e);
-      }
-    };
-
-    ws.onclose = function () {
-      console.warn('[WebSocket] Closed. Attempting reconnect in 2s...');
-      setConnectionStatus('disconnected');
-      wsReconnectTimer = setTimeout(initWebSocket, 2000);
-    };
-
-    ws.onerror = function (err) {
-      console.error('[WebSocket] Error:', err);
-      ws.close();
-    };
-  }
+  const statusSocket = createVisitorSocket({
+    isValidStateSnapshot, renderState, setConnectionStatus,
+    onSnapshot: () => { receivedWebSocketState = true; }
+  });
 
   function isValidStateSnapshot(state) {
     return Boolean(state && typeof state === 'object' &&
@@ -228,8 +137,8 @@
       }
     }
     if (micButton) {
-      micButton.disabled = isUploadingMicrophone ||
-        (unavailable && !isRecording && !isAcquiringMicrophone);
+      micButton.disabled = recording.isUploadingMicrophone ||
+        (unavailable && !recording.isRecording && !recording.isAcquiringMicrophone);
     }
   }
 
@@ -440,7 +349,7 @@
   }
 
   function resetSubmissionState() {
-    cancelRecording();
+    recording.cancelRecording();
     clearAudioDebug();
     submissionGeneration += 1;
     pendingSubmission = null;
@@ -652,152 +561,6 @@
   // --------------------------------------------------------------------------
   // Push-to-Talk Voice Recording
   // --------------------------------------------------------------------------
-  async function startRecording(gesture = 'tap') {
-    if (activeRecording) return;
-    if (!canSubmitVisitorCommand()) {
-      setSessionFeedback('ยังบันทึกเสียงไม่ได้ กรุณารอสถานะและสิทธิ์ควบคุมที่ยืนยันแล้ว');
-      return;
-    }
-    if (audioDebugEnabled) audioDebugPlayer.pause?.();
-    const attempt = {
-      generation: ++recordingGeneration,
-      chunks: [],
-      stream: null,
-      recorder: null,
-      cancelled: false,
-      mimeType: '',
-      gesture
-    };
-    activeRecording = attempt;
-    isAcquiringMicrophone = true;
-    updateMicControls('acquiring', attempt.gesture);
-    if (transcriptPreview) transcriptPreview.textContent = 'กำลังรอสิทธิ์ใช้ไมโครโฟน…';
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (attempt.cancelled || activeRecording !== attempt ||
-          attempt.generation !== recordingGeneration || !canSubmitVisitorCommand()) {
-        stopTracks(stream);
-        if (activeRecording === attempt) {
-          activeRecording = null;
-          isAcquiringMicrophone = false;
-          updateMicControls('idle');
-        }
-        return;
-      }
-      attempt.stream = stream;
-
-      const mimeType = getSupportedMimeType();
-      attempt.mimeType = mimeType || 'audio/webm';
-      const options = mimeType ? { mimeType } : {};
-      const recorder = new MediaRecorder(stream, options);
-      attempt.recorder = recorder;
-
-      recorder.ondataavailable = function (e) {
-        if (!attempt.cancelled && e.data && e.data.size > 0) {
-          attempt.chunks.push(e.data);
-        }
-      };
-
-      recorder.onstop = async function () {
-        stopAttemptTracks(attempt);
-        if (attempt.cancelled || activeRecording !== attempt) return;
-        if (!canSubmitVisitorCommand()) {
-          activeRecording = null;
-          isUploadingMicrophone = false;
-          updateMicControls('idle');
-          const message = 'ข้อมูลหรือสิทธิ์ควบคุมยังไม่ยืนยัน จึงไม่ได้ส่งเสียง';
-          if (transcriptPreview) transcriptPreview.textContent = message;
-          setSessionFeedback(message);
-          return;
-        }
-        const audioBlob = new Blob(attempt.chunks, { type: attempt.mimeType });
-        showRecordedAudio(audioBlob);
-        console.log(`[MediaRecorder] Audio recorded: ${audioBlob.size} bytes (${attempt.mimeType})`);
-        activeRecording = null;
-        isRecording = false;
-        isAcquiringMicrophone = false;
-        isUploadingMicrophone = true;
-        updateMicControls('uploading');
-        try {
-          await sendVoiceCommand(audioBlob);
-        } finally {
-          isUploadingMicrophone = false;
-          updateMicControls('idle');
-        }
-      };
-
-      recorder.start();
-      isAcquiringMicrophone = false;
-      isRecording = true;
-      updateMicControls('recording', attempt.gesture);
-      if (transcriptPreview) transcriptPreview.textContent = 'กำลังฟัง…';
-    } catch (err) {
-      console.error('[Audio] Recording start failed:', err);
-      attempt.cancelled = true;
-      if (attempt.recorder && attempt.recorder.state !== 'inactive') {
-        try { attempt.recorder.stop(); } catch (stopError) { console.error('[Audio] Cleanup stop failed:', stopError); }
-      }
-      stopAttemptTracks(attempt);
-      if (activeRecording === attempt) {
-        activeRecording = null;
-        isAcquiringMicrophone = false;
-        isRecording = false;
-        updateMicControls('idle');
-        const message = 'เปิดไมโครโฟนไม่สำเร็จ กรุณาอนุญาตสิทธิ์หรือใช้ช่องพิมพ์ข้อความ';
-        if (transcriptPreview) transcriptPreview.textContent = message;
-        setSessionFeedback(message);
-      }
-    }
-  }
-
-  function stopRecording() {
-    const attempt = activeRecording;
-    if (!attempt) return;
-    if (isAcquiringMicrophone) {
-      cancelRecording('ยกเลิกการบันทึกก่อนเปิดไมโครโฟน');
-      return;
-    }
-    if (!isRecording || !attempt.recorder) return;
-    isRecording = false;
-    isUploadingMicrophone = true;
-    updateMicControls('uploading');
-    try {
-      attempt.recorder.stop();
-    } catch (e) {
-      console.error('[Audio] Stop error:', e);
-      cancelRecording('หยุดการบันทึกไม่สำเร็จ');
-    }
-  }
-
-  function cancelRecording(message = '') {
-    const attempt = activeRecording;
-    if (!attempt) return;
-    attempt.cancelled = true;
-    recordingGeneration += 1;
-    activeRecording = null;
-    isRecording = false;
-    isAcquiringMicrophone = false;
-    isUploadingMicrophone = false;
-    if (attempt.recorder && attempt.recorder.state !== 'inactive') {
-      try { attempt.recorder.stop(); } catch (e) { console.error('[Audio] Cancel error:', e); }
-    }
-    stopAttemptTracks(attempt);
-    updateMicControls('idle');
-    if (message && transcriptPreview) transcriptPreview.textContent = message;
-    if (message) setSessionFeedback(message);
-  }
-
-  function stopTracks(stream) {
-    if (!stream) return;
-    stream.getTracks().forEach(track => track.stop());
-  }
-
-  function stopAttemptTracks(attempt) {
-    if (attempt.streamReleased) return;
-    attempt.streamReleased = true;
-    stopTracks(attempt.stream);
-  }
-
   function updateMicControls(mode, gesture = 'tap') {
     const labels = {
       idle: { visible: 'แตะเพื่อพูด', accessible: 'เริ่มบันทึกเสียง' },
@@ -926,8 +689,8 @@
     let isHoldMode = false;
 
     function toggleRecording() {
-      if (activeRecording) stopRecording();
-      else startRecording();
+      if (recording.active) recording.stopRecording();
+      else recording.startRecording();
     }
 
     micButton.addEventListener('pointerdown', (e) => {
@@ -938,7 +701,7 @@
       }
       pressTimer = setTimeout(() => {
         isHoldMode = true;
-        startRecording('hold');
+        recording.startRecording('hold');
       }, 250);
     });
 
@@ -949,7 +712,7 @@
         pressTimer = null;
       }
       if (isHoldMode) {
-        stopRecording();
+        recording.stopRecording();
         isHoldMode = false;
       } else {
         toggleRecording();
@@ -959,7 +722,7 @@
     micButton.addEventListener('pointercancel', () => {
       if (pressTimer) clearTimeout(pressTimer);
       pressTimer = null;
-      cancelRecording('การบันทึกเสียงถูกยกเลิก');
+      recording.cancelRecording('การบันทึกเสียงถูกยกเลิก');
       isHoldMode = false;
     });
 
@@ -978,7 +741,7 @@
     });
   }
 
-  initWebSocket();
+  statusSocket.connect();
   fetch('/api/v1/state')
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

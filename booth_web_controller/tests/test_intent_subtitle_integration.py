@@ -1,4 +1,7 @@
 """Cross-process-contract checks with local ROS nodes and fake inference."""
+from app import runtime
+from app.routes import commands
+from fastapi import HTTPException
 
 import asyncio
 import json
@@ -96,18 +99,18 @@ async def _run_integration(monkeypatch):
     previous_mock_setting = settings.USE_MOCK_ROS2
     settings.USE_MOCK_ROS2 = False
     session_manager._lock = asyncio.Lock()
-    session_manager.active_session_id = None
-    session_manager.active_session_token = None
-    session_manager.latest_request_identity = None
-    session_manager.latest_intent = None
-    session_manager.latest_action = None
-    session_manager.robot_state = "UNKNOWN"
-    session_manager.current_goal = settings.START_BOOTH_ID
-    session_manager.heard_text = ""
-    session_manager.llm_explanation = ""
+    session_manager.identity.active_session_id = None
+    session_manager.identity.active_session_token = None
+    session_manager.requests.latest_request_identity = None
+    session_manager.requests.latest_intent = None
+    session_manager.requests.latest_action = None
+    session_manager.display.robot_state = "UNKNOWN"
+    session_manager.display.current_goal = settings.START_BOOTH_ID
+    session_manager.display.heard_text = ""
+    session_manager.display.llm_explanation = ""
     session_manager.auto_return_enabled = True
     session_manager.auto_return_delay_sec = 1
-    session_manager.auto_return_task = None
+    session_manager.auto_return.task = None
     session_manager.set_broadcast_callback(None)
 
     loop = asyncio.get_running_loop()
@@ -120,16 +123,16 @@ async def _run_integration(monkeypatch):
         hub.publish(text, stamp, request_id, observation_id)
 
     bridge.set_subtitle_callback(record_caption)
-    backend.ros_bridge_instance = bridge
+    runtime.ros_bridge_instance = bridge
     session_manager.set_ros_bridge(bridge)
     executor_thread.start()
 
     async def submit_text(text, destination, input_mode="chip"):
         model.navigate_to(destination)
-        response = await backend.command_text(
+        response = await commands.command_text(
             TextCommandRequest(text=text, input_mode=input_mode),
             x_session_id="integration-visitor",
-            x_session_token=session_manager.active_session_token,
+            x_session_token=session_manager.identity.active_session_token,
         )
         request_id = response["request_id"]
         await wait_for(
@@ -142,14 +145,14 @@ async def _run_integration(monkeypatch):
             description=f"UserRequest {request_id}",
         )
         await wait_for(
-            lambda: session_manager.latest_intent is not None
-            and session_manager.latest_intent.request_id == request_id,
+            lambda: session_manager.requests.latest_intent is not None
+            and session_manager.requests.latest_intent.request_id == request_id,
             description=f"IntentResult {request_id}",
         )
         return response
 
     try:
-        await wait_for(lambda: session_manager.robot_state == "IDLE", description="Robot READY readiness")
+        await wait_for(lambda: session_manager.display.robot_state == "IDLE", description="Robot READY readiness")
         await wait_for(
             lambda: bridge._intent_health_client.services_are_ready()
             and bridge._subtitle_health_client.services_are_ready(),
@@ -169,13 +172,13 @@ async def _run_integration(monkeypatch):
             ("ไปจุด B อีกครั้ง", "B", "text"),
         ):
             response = await submit_text(text, destination, input_mode)
-            outcome = session_manager.latest_intent
+            outcome = session_manager.requests.latest_intent
             assert outcome.status == "NAVIGATE"
             assert outcome.destination_id == destination
             assert outcome.session_id == response["session_id"]
             assert outcome.request_id == response["request_id"]
             await wait_for(
-                lambda: session_manager.latest_intent_dispatch is not None,
+                lambda: session_manager.requests.latest_intent_dispatch is not None,
                 description="sender-side Action dispatch evidence",
             )
             snapshot = session_manager.get_state_broadcast()
@@ -185,8 +188,8 @@ async def _run_integration(monkeypatch):
             assert snapshot.latest_intent_dispatch.destination_id == destination
             assert snapshot.latest_intent_dispatch.status == "sent"
             await wait_for(
-                lambda: session_manager.current_goal == destination
-                and session_manager.robot_state == "REACHED",
+                lambda: session_manager.display.current_goal == destination
+                and session_manager.display.robot_state == "REACHED",
                 description=f"Robot arrival at {destination}",
             )
             zone = next(station['name'] for station in STATIONS if station['id'] == destination)
@@ -210,17 +213,17 @@ async def _run_integration(monkeypatch):
         # Auto-return uses the same A/B/C/D Action contract, targeting D.
         assert await session_manager.release_session(reason="user_disconnect")
         await wait_for(
-            lambda: session_manager.latest_action is not None
-            and session_manager.latest_action.source == "auto_return"
-            and session_manager.latest_action.destination_id == "D",
+            lambda: session_manager.requests.latest_action is not None
+            and session_manager.requests.latest_action.source == "auto_return"
+            and session_manager.requests.latest_action.destination_id == "D",
             description="auto-return direct D Action",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "D" and session_manager.robot_state == "REACHED",
+            lambda: session_manager.display.current_goal == "D" and session_manager.display.robot_state == "REACHED",
             description="auto-return ARRIVED at D",
         )
         await wait_for(
-            lambda: session_manager.latest_action.outcome == "succeeded",
+            lambda: session_manager.requests.latest_action.outcome == "succeeded",
             description="auto-return terminal Action result",
         )
         await wait_for(
@@ -232,15 +235,15 @@ async def _run_integration(monkeypatch):
         token = claim["session_token"]
 
         # Provider failure and empty audio leave the last registered request untouched.
-        prior_identity = session_manager.latest_request_identity
+        prior_identity = session_manager.requests.latest_request_identity
         request_count = len(observer.requests)
 
         async def provider_error(_audio):
             raise STTUnavailableError("private provider detail")
 
-        monkeypatch.setattr(backend.stt_service, "transcribe_audio", provider_error)
-        with pytest.raises(backend.HTTPException) as failed:
-            await backend.command_voice(
+        monkeypatch.setattr(runtime.stt_service, "transcribe_audio", provider_error)
+        with pytest.raises(HTTPException) as failed:
+            await commands.command_voice(
                 _FakeUpload(), x_session_id="integration-visitor", x_session_token=token,
             )
         assert failed.value.status_code == 503
@@ -249,19 +252,19 @@ async def _run_integration(monkeypatch):
         async def empty_audio(_audio):
             return "  \n"
 
-        monkeypatch.setattr(backend.stt_service, "transcribe_audio", empty_audio)
-        with pytest.raises(backend.HTTPException) as empty:
-            await backend.command_voice(
+        monkeypatch.setattr(runtime.stt_service, "transcribe_audio", empty_audio)
+        with pytest.raises(HTTPException) as empty:
+            await commands.command_voice(
                 _FakeUpload(), x_session_id="integration-visitor", x_session_token=token,
             )
         assert empty.value.status_code == 422
-        assert session_manager.latest_request_identity == prior_identity
+        assert session_manager.requests.latest_request_identity == prior_identity
         await asyncio.sleep(0.15)
         assert len(observer.requests) == request_count
 
         # Hold inference, make the Robot busy with a staff Action, then release it.
         model.hold_next = True
-        response = await backend.command_text(
+        response = await commands.command_text(
             TextCommandRequest(text="hold-model then go C", input_mode="text"),
             x_session_id="integration-visitor",
             x_session_token=token,
@@ -269,42 +272,42 @@ async def _run_integration(monkeypatch):
         visitor_request_id = response["request_id"]
         await wait_for(lambda: model.entered.is_set(), description="fake model entering held inference")
         await session_manager.return_to_start_now()
-        staff_action_id = session_manager.latest_action.request_id
-        assert session_manager.latest_action.source == "staff_override"
-        assert session_manager.latest_action.destination_id == "D"
+        staff_action_id = session_manager.requests.latest_action.request_id
+        assert session_manager.requests.latest_action.source == "staff_override"
+        assert session_manager.requests.latest_action.destination_id == "D"
         await wait_for(
-            lambda: session_manager.robot_state == "NAVIGATING",
+            lambda: session_manager.display.robot_state == "NAVIGATING",
             description="staff Return Home Robot motion",
         )
         model.release.set()
 
         await wait_for(
-            lambda: session_manager.latest_intent is not None
-            and session_manager.latest_intent.request_id == visitor_request_id,
+            lambda: session_manager.requests.latest_intent is not None
+            and session_manager.requests.latest_intent.request_id == visitor_request_id,
             description="busy result for held request",
         )
-        busy = session_manager.latest_intent
+        busy = session_manager.requests.latest_intent
         assert busy.status == "FAILED"
         assert busy.error_code == "robot_busy"
         assert busy.request_id == visitor_request_id
         assert busy.request_id != staff_action_id
         assert busy.session_id == "integration-visitor"
-        assert session_manager.latest_action.request_id == staff_action_id
-        assert session_manager.latest_action.destination_id == "D"
+        assert session_manager.requests.latest_action.request_id == staff_action_id
+        assert session_manager.requests.latest_action.destination_id == "D"
         assert visitor_request_id not in {
             state.request_id for state in observer.navigation
         }
         await wait_for(
-            lambda: "หุ่นยังไม่ว่าง" in session_manager.llm_explanation,
+            lambda: "หุ่นยังไม่ว่าง" in session_manager.display.llm_explanation,
             description="busy Subtitle through SubtitleNode to thought",
         )
         await wait_for(
-            lambda: "หุ่นยังไม่ว่าง" not in session_manager.llm_explanation,
+            lambda: "หุ่นยังไม่ว่าง" not in session_manager.display.llm_explanation,
             timeout=2,
             description="busy subtitle expires without replaying consumed navigation",
         )
         await wait_for(
-            lambda: session_manager.current_goal == "D" and session_manager.robot_state == "REACHED",
+            lambda: session_manager.display.current_goal == "D" and session_manager.display.robot_state == "REACHED",
             description="staff return ARRIVED at D",
         )
         await wait_for(
@@ -316,9 +319,9 @@ async def _run_integration(monkeypatch):
         async def fake_voice(_audio):
             return "ช่วยพาไปจุด C"
 
-        monkeypatch.setattr(backend.stt_service, "transcribe_audio", fake_voice)
+        monkeypatch.setattr(runtime.stt_service, "transcribe_audio", fake_voice)
         model.navigate_to("C")
-        voice_response = await backend.command_voice(
+        voice_response = await commands.command_voice(
             _FakeUpload(), x_session_id="integration-visitor", x_session_token=token,
         )
         await wait_for(
@@ -326,27 +329,27 @@ async def _run_integration(monkeypatch):
             description="voice UserRequest publication",
         )
         await wait_for(
-            lambda: session_manager.latest_intent is not None
-            and session_manager.latest_intent.request_id == voice_response["request_id"],
+            lambda: session_manager.requests.latest_intent is not None
+            and session_manager.requests.latest_intent.request_id == voice_response["request_id"],
             description="voice IntentResult",
         )
-        voice_result = session_manager.latest_intent
+        voice_result = session_manager.requests.latest_intent
         assert voice_result.status == "NAVIGATE"
         assert voice_result.destination_id == "C"
         assert voice_result.session_id == voice_response["session_id"]
-        assert session_manager.latest_action.request_id == staff_action_id
-        assert session_manager.latest_action.source == "staff_override"
+        assert session_manager.requests.latest_action.request_id == staff_action_id
+        assert session_manager.requests.latest_action.source == "staff_override"
         await wait_for(
-            lambda: session_manager.current_goal == "C" and session_manager.robot_state == "REACHED",
+            lambda: session_manager.display.current_goal == "C" and session_manager.display.robot_state == "REACHED",
             description="voice navigation arrival at C",
         )
     finally:
         model.release.set()
         settings.USE_MOCK_ROS2 = previous_mock_setting
         session_manager.auto_return_enabled = False
-        if session_manager.auto_return_task and not session_manager.auto_return_task.done():
-            session_manager.auto_return_task.cancel()
-        if session_manager.active_session_id is not None:
+        if session_manager.auto_return.task and not session_manager.auto_return.task.done():
+            session_manager.auto_return.task.cancel()
+        if session_manager.identity.active_session_id is not None:
             await session_manager.release_session(reason="staff_force_release")
         external_executor.shutdown(timeout_sec=1)
         executor_thread.join(timeout=1)
@@ -357,18 +360,18 @@ async def _run_integration(monkeypatch):
         robot.destroy_node()
         intent.destroy_node()
         bridge.shutdown()
-        backend.ros_bridge_instance = None
+        runtime.ros_bridge_instance = None
         session_manager.set_ros_bridge(None)
         session_manager._lock = asyncio.Lock()
-        session_manager.active_session_id = None
-        session_manager.active_session_token = None
-        session_manager.latest_request_identity = None
-        session_manager.latest_intent = None
-        session_manager.latest_action = None
-        session_manager.robot_state = "IDLE"
-        session_manager.current_goal = settings.START_BOOTH_ID
-        session_manager.heard_text = ""
-        session_manager.llm_explanation = ""
+        session_manager.identity.active_session_id = None
+        session_manager.identity.active_session_token = None
+        session_manager.requests.latest_request_identity = None
+        session_manager.requests.latest_intent = None
+        session_manager.requests.latest_action = None
+        session_manager.display.robot_state = "IDLE"
+        session_manager.display.current_goal = settings.START_BOOTH_ID
+        session_manager.display.heard_text = ""
+        session_manager.display.llm_explanation = ""
 
 
 class _FakeUpload:

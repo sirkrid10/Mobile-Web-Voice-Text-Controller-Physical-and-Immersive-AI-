@@ -2,7 +2,7 @@
 import pytest
 from app.config import Settings
 from app.destinations import STATIONS, DESTINATION_IDS
-from app.ros2_bridge import MockROS2Bridge
+from app.mock_ros2_bridge import MockROS2Bridge
 
 
 @pytest.mark.parametrize('text,expected', [
@@ -48,3 +48,32 @@ def test_station_names_follow_the_four_photographed_signs():
     assert [(station['id'], station['name']) for station in STATIONS] == [
         ('A', 'โซนกู้ภัย'), ('B', 'โซนการแพทย์'), ('C', 'โซนส่งเสบียง'), ('D', 'ศูนย์บัญชาการ'),
     ]
+
+
+def test_configured_start_updates_default_chip_and_speech_hint():
+    config = Settings(START_BOOTH_ID='B', _env_file=None)
+    start = next(location for location in config.LOCATIONS if location['id'] == 'start')
+    assert 'จุด B' in start['label']
+    assert 'โซนการแพทย์' in start['label']
+    assert 'มุมบนซ้าย' in start['description']
+    assert 'return to start คือจุด B' in config.STT_INITIAL_PROMPT
+    assert 'return to start คือจุด D' not in config.STT_INITIAL_PROMPT
+
+
+def test_explicit_location_configuration_is_preserved():
+    locations = [{'id': 'B', 'label': 'Custom point', 'prompt': 'ไปจุด B'}]
+    config = Settings(START_BOOTH_ID='B', LOCATIONS=locations, _env_file=None)
+    assert config.LOCATIONS == locations
+
+
+def test_custom_speech_prompt_keeps_context_and_adds_current_station_catalog():
+    config = Settings(START_BOOTH_ID='C', STT_INITIAL_PROMPT='Visitor context', _env_file=None)
+    assert config.STT_INITIAL_PROMPT.startswith('Visitor context')
+    assert all(station['name'] in config.STT_INITIAL_PROMPT for station in STATIONS)
+    assert 'return to start คือจุด C' in config.STT_INITIAL_PROMPT
+
+
+def test_mock_return_uses_the_configured_start(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, 'START_BOOTH_ID', 'B')
+    assert MockROS2Bridge._mock_intent('return to start') == ('B', 'NAVIGATE', '')

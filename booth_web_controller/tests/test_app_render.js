@@ -127,8 +127,12 @@ function createUI(overrides = {}) {
     Object.entries(overrides).filter(([key]) => key !== 'initialStateFetch')
   ));
 
-  const script = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.js'), 'utf8');
-  vm.runInNewContext(script, context, { filename: 'static/app.js' });
+  const visitorHtml = fs.readFileSync(path.join(__dirname, '..', 'static', 'index.html'), 'utf8');
+  const visitorScripts = [...visitorHtml.matchAll(/<script src="\/static\/([^"?]+)(?:\?[^"]*)?"><\/script>/g)];
+  for (const [, name] of visitorScripts) {
+    const script = fs.readFileSync(path.join(__dirname, '..', 'static', name), 'utf8');
+    vm.runInNewContext(script, context, { filename: `static/${name}` });
+  }
 
   function sendState(state, socket = sockets.at(-1)) {
     socket.onmessage({ data: JSON.stringify({ ...initialState, ...state }) });

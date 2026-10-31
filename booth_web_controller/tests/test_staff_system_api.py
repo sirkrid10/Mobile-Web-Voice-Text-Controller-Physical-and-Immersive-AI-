@@ -1,4 +1,5 @@
 """PIN-protected controls drive actual disposable processes, without ROS or Robot."""
+from app import runtime
 import asyncio
 import sys
 
@@ -19,8 +20,8 @@ def test_system_endpoints_auth_whitelist_and_lifecycle(tmp_path, monkeypatch):
                 for name in ('intent', 'subtitle')}
     monkeypatch.setattr(settings, 'USE_MOCK_ROS2', True)
     monkeypatch.setattr(settings, 'ENABLE_TUNNEL', False)
-    monkeypatch.setattr(main, 'session_manager', SessionManager())
-    monkeypatch.setattr(main, 'AgentProcesses', lambda *a, **kw: AgentProcesses(root, enabled=True, commands=commands))
+    monkeypatch.setattr(runtime, 'session_manager', SessionManager())
+    monkeypatch.setattr(runtime, 'AgentProcesses', lambda *a, **kw: AgentProcesses(root, enabled=True, commands=commands))
     headers = {'X-Staff-Pin': settings.STAFF_PIN}
     with TestClient(main.app) as client:
         health = client.get('/api/v1/health')
@@ -54,4 +55,4 @@ def test_system_endpoints_auth_whitelist_and_lifecycle(tmp_path, monkeypatch):
         assert response.json()['processes']['mode'] == 'manual'
         assert client.post('/api/v1/staff/system/nodes/intent/start', headers=headers, json={}).status_code == 409
         assert client.post('/api/v1/staff/system/mode', headers=headers, json={'mode': 'automatic'}).status_code == 200
-    assert main.agent_processes is None
+    assert runtime.agent_processes is None

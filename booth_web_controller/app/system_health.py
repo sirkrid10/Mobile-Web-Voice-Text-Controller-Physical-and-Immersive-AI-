@@ -8,6 +8,10 @@ from pathlib import Path
 from app.stt_service import stt_service
 
 
+ROBOT_STATE_FRESHNESS_SEC = 3.0
+ROBOT_CLOCK_SKEW_SEC = 0.6
+
+
 async def run_probe(*argv, timeout=3):
     process = None
     try:
@@ -95,7 +99,8 @@ class SystemHealth:
         now = time.time()
         ros['robot_receive_age_sec'] = max(0, now - received_at) if received_at else None
         ros['robot_source_age_sec'] = now - source_at if source_at else None
-        ros['robot_fresh'] = bool(received_at and source_at and now - received_at <= 3 and -0.6 <= now - source_at <= 3)
+        ros['robot_fresh'] = bool(received_at and source_at and now - received_at <= ROBOT_STATE_FRESHNESS_SEC
+                                  and -ROBOT_CLOCK_SKEW_SEC <= now - source_at <= ROBOT_STATE_FRESHNESS_SEC)
         result['ros'] = ros
         return result
 

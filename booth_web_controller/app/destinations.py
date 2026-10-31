@@ -11,23 +11,35 @@ STATIONS = (
      'aliases': ('ศูนย์บัญชาการ', 'บัญชาการ', 'command center', 'mission control'), 'corner': 'มุมล่างขวา'},
 )
 DESTINATION_IDS = tuple(station['id'] for station in STATIONS)
-STATION_SPEECH_HINT = (
-    'จุด A จุดเอ โซนกู้ภัย RESCUE ZONE SEARCH & RESCUE; '
-    'จุด B จุดบี โซนการแพทย์ MEDICAL ZONE MEDICAL AID; '
-    'จุด C จุดซี โซนส่งเสบียง SUPPLY ZONE SUPPLY DROP-OFF; '
-    'จุด D จุดดี ศูนย์บัญชาการ COMMAND CENTER MISSION CONTROL; '
-    'กลับจุดเริ่มต้น return to start คือจุด D'
-)
+START_DESTINATION_ID = 'D'
+SPOKEN_IDS = {'A': 'เอ', 'B': 'บี', 'C': 'ซี', 'D': 'ดี'}
 
 
-def visitor_locations():
+def station_for(identifier):
+    return next(station for station in STATIONS if station['id'] == identifier)
+
+
+def speech_hint(start_id=START_DESTINATION_ID):
+    stations = '; '.join(
+        f"จุด {station['id']} จุด{SPOKEN_IDS[station['id']]} {station['name']} "
+        f"{station['english'].replace(' / ', ' ')}"
+        for station in STATIONS
+    )
+    return stations + f'; กลับจุดเริ่มต้น return to start คือจุด {start_id}'
+
+
+STATION_SPEECH_HINT = speech_hint()
+
+
+def visitor_locations(start_id=START_DESTINATION_ID):
+    start = station_for(start_id)
     return [{
         'id': station['id'], 'label': f"📍 จุด {station['id']} · {station['name']}",
         'prompt': f"ไป{station['name']}",
         'description': f"{station['english']} · {station['corner']}", 'icon': 'map-pin',
     } for station in STATIONS] + [
-        {'id': 'start', 'label': '🏠 กลับจุดเริ่มต้น (จุด D · ศูนย์บัญชาการ)',
-         'prompt': 'กลับจุดเริ่มต้น', 'description': 'กลับ D ศูนย์บัญชาการ มุมล่างขวา', 'icon': 'home'},
+        {'id': 'start', 'label': f"🏠 กลับจุดเริ่มต้น (จุด {start_id} · {start['name']})",
+         'prompt': 'กลับจุดเริ่มต้น', 'description': f"กลับ {start_id} {start['name']} {start['corner']}", 'icon': 'home'},
         {'id': 'wait', 'label': '⏸️ ส่งคำขอรอ (ยังไม่รองรับ)', 'prompt': 'หยุดรอตรงนี้ก่อน',
          'description': 'ส่งคำขอรอผ่านระบบแปลคำสั่ง (ยังไม่รองรับ)', 'icon': 'pause'},
     ]

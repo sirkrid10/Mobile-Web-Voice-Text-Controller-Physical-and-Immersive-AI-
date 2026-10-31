@@ -1,4 +1,5 @@
 """Staff-only mode control: HTTP authorization, ROS errors, and real ROS service calls."""
+from app import runtime
 
 import asyncio
 from concurrent.futures import Future
@@ -22,7 +23,7 @@ def anyio_backend():
 async def api(monkeypatch):
     bridge = SimpleNamespace(read_subtitle_mode=AsyncMock(return_value='standard'),
                              set_subtitle_mode=AsyncMock(return_value='friendly'))
-    monkeypatch.setattr(backend, 'ros_bridge_instance', bridge)
+    monkeypatch.setattr(runtime, 'ros_bridge_instance', bridge)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=backend.app), base_url='http://test') as client:
         yield client, bridge, {'X-Staff-Pin': settings.STAFF_PIN}
 
@@ -68,12 +69,12 @@ async def test_transport_failure_is_not_reported_as_success(api, status):
 @pytest.mark.anyio
 async def test_missing_bridge_is_unavailable(api, monkeypatch):
     client, bridge, headers = api
-    monkeypatch.setattr(backend, 'ros_bridge_instance', None)
+    monkeypatch.setattr(runtime, 'ros_bridge_instance', None)
     assert (await client.get('/api/v1/staff/subtitle-mode', headers=headers)).status_code == 503
 
 
 def test_standalone_mock_does_not_fake_subtitle_mode():
-    from app.ros2_bridge import MockROS2Bridge
+    from app.mock_ros2_bridge import MockROS2Bridge
     async def run():
         bridge = MockROS2Bridge(SimpleNamespace(), asyncio.get_running_loop())
         with pytest.raises(SubtitleModeError) as exc:
@@ -165,9 +166,9 @@ def test_real_ros_parameter_roundtrip_from_authenticated_http(monkeypatch):
         def close(self):
             pass
     async def run():
-        monkeypatch.setattr(backend, 'session_manager', SessionManager())
-        bridge = RealROS2Bridge(backend.session_manager, asyncio.get_running_loop())
-        monkeypatch.setattr(backend, 'ros_bridge_instance', bridge)
+        monkeypatch.setattr(runtime, 'session_manager', SessionManager())
+        bridge = RealROS2Bridge(runtime.session_manager, asyncio.get_running_loop())
+        monkeypatch.setattr(runtime, 'ros_bridge_instance', bridge)
         subtitle = SubtitleNode(subtitle_model=OfflineModel())
         executor = SingleThreadedExecutor()
         executor.add_node(subtitle)
@@ -192,7 +193,7 @@ def test_real_ros_parameter_roundtrip_from_authenticated_http(monkeypatch):
                     changed = await client.post('/api/v1/staff/subtitle-mode', headers=headers, json={'mode': mode})
                     assert changed.status_code == 200 and changed.json()['mode'] == mode
                     assert subtitle.get_parameter('subtitle_mode').value == mode
-                assert backend.session_manager.latest_action is None
+                assert runtime.session_manager.requests.latest_action is None
         finally:
             heartbeat.cancel()
             try:

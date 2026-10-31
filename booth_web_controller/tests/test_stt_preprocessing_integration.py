@@ -1,9 +1,11 @@
+from app import runtime
+from app.routes import commands
+from app.session_state import SessionError
 import asyncio
 from pathlib import Path
 import tempfile
 
 import pytest
-from fastapi import HTTPException
 
 from app import main, stt_service as stt_module
 from app.audio_preprocessing import PreprocessingResult
@@ -258,17 +260,17 @@ def test_voice_request_losing_session_during_stt_never_publishes(monkeypatch):
         bridge = FakeBridge()
         started = asyncio.Event()
         resume = asyncio.Event()
-        monkeypatch.setattr(main, "session_manager", manager)
-        monkeypatch.setattr(main, "ros_bridge_instance", bridge)
+        monkeypatch.setattr(runtime, 'session_manager', manager)
+        monkeypatch.setattr(runtime, 'ros_bridge_instance', bridge)
 
         async def slow_transcription(_audio):
             started.set()
             await resume.wait()
             return "ไปจุด A"
 
-        monkeypatch.setattr(main.stt_service, "transcribe_audio", slow_transcription)
+        monkeypatch.setattr(runtime.stt_service, "transcribe_audio", slow_transcription)
         claim = await manager.claim("visitor-session")
-        request = asyncio.create_task(main.command_voice(
+        request = asyncio.create_task(commands.command_voice(
             FakeUpload(b"audio"),
             x_session_token=claim["session_token"],
             x_session_id="visitor-session",
@@ -276,7 +278,7 @@ def test_voice_request_losing_session_during_stt_never_publishes(monkeypatch):
         await started.wait()
         await manager.release_session(reason="user_disconnect")
         resume.set()
-        with pytest.raises(HTTPException) as error:
+        with pytest.raises(SessionError) as error:
             await request
         assert error.value.status_code == 403
         assert bridge.published == []

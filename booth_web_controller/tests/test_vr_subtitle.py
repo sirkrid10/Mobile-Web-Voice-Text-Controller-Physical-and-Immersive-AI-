@@ -1,4 +1,5 @@
 """Versioned VR WebSocket contract, isolated from real API keys and robot goals."""
+from app import runtime
 
 import asyncio
 import json
@@ -7,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import main as backend
-from app.ros2_bridge import MockROS2Bridge
+from app.mock_ros2_bridge import MockROS2Bridge
 from app.vr_subtitle import MAX_PACKET_BYTES, VRSubtitleHub
 
 
@@ -38,7 +39,7 @@ class ASGISocket:
 def test_endpoint_schema_updates_clear_handling_and_reconnect(monkeypatch):
     async def run():
         hub = VRSubtitleHub()
-        monkeypatch.setattr(backend, 'vr_subtitles', hub)
+        monkeypatch.setattr(runtime, 'vr_subtitles', hub)
         first = await ASGISocket().connect()
         initial = await first.read()
         assert initial['type'] == 'subtitle' and initial['version'] == 1
@@ -65,9 +66,9 @@ def test_endpoint_schema_updates_clear_handling_and_reconnect(monkeypatch):
 def test_bridge_forwards_only_accepted_nonempty_subtitles():
     async def run():
         hub = VRSubtitleHub()
-        session = SimpleNamespace(heard_text='', llm_explanation='', _trigger_broadcast=lambda: None)
+        session = SimpleNamespace(display=SimpleNamespace(heard_text='', llm_explanation=''), _trigger_broadcast=lambda: None)
         def update(**kwargs):
-            session.llm_explanation = kwargs['explanation']
+            session.display.llm_explanation = kwargs['explanation']
         session.update_from_llm_mind = update
         bridge = MockROS2Bridge(session, asyncio.get_running_loop(), clock=lambda: 1000)
         bridge.set_subtitle_callback(hub.publish)
@@ -81,7 +82,7 @@ def test_bridge_forwards_only_accepted_nonempty_subtitles():
             bridge._accept_subtitle(998, 1001, 'out of order')
             bridge._accept_subtitle(1000, 1000, '')
             assert hub.sequence == 1
-            assert session.llm_explanation == ''  # Existing web-state TTL is unchanged.
+            assert session.display.llm_explanation == ''  # Existing web-state TTL is unchanged.
             assert json.loads(hub.latest)['text'] == 'พร้อมแล้วครับ'
         finally:
             bridge.shutdown()
@@ -175,7 +176,7 @@ def test_real_ros_subtitle_reaches_vr_websocket(monkeypatch):
     import threading
     async def run():
         hub = VRSubtitleHub()
-        monkeypatch.setattr(backend, 'vr_subtitles', hub)
+        monkeypatch.setattr(runtime, 'vr_subtitles', hub)
         bridge = RealROS2Bridge(SessionManager(), asyncio.get_running_loop())
         bridge.set_subtitle_callback(hub.publish)
         publisher_node = Node('vr_subtitle_test_publisher')

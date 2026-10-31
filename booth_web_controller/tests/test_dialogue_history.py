@@ -1,3 +1,5 @@
+from app import runtime
+from app.routes import commands
 import asyncio
 import json
 from types import SimpleNamespace
@@ -41,7 +43,7 @@ def test_history_unavailable_does_not_raise_on_record_or_read(tmp_path):
 
 def test_history_api_requires_pin_and_bounds_limit(tmp_path, monkeypatch):
     history = DialogueHistory(tmp_path / 'history.sqlite3')
-    monkeypatch.setattr(main, 'dialogue_history', history)
+    monkeypatch.setattr(runtime, 'dialogue_history', history)
     history.record('subtitle', text='<script>unsafe</script>', request_id='review-1')
     client = TestClient(main.app)
     assert client.get('/api/v1/staff/history').status_code == 401
@@ -58,29 +60,29 @@ def test_request_intent_and_subtitle_correlate_even_without_vr_client(tmp_path, 
     history = DialogueHistory(tmp_path / 'history.sqlite3')
     manager = SessionManager()
     manager.auto_return_enabled = False
-    manager.set_history_callback(main.record_dialogue)
-    monkeypatch.setattr(main, 'dialogue_history', history)
-    monkeypatch.setattr(main, 'session_manager', manager)
-    monkeypatch.setattr(main, 'vr_subtitles', VRSubtitleHub())
+    manager.set_history_callback(runtime.record_dialogue)
+    monkeypatch.setattr(runtime, 'dialogue_history', history)
+    monkeypatch.setattr(runtime, 'session_manager', manager)
+    monkeypatch.setattr(runtime, 'vr_subtitles', VRSubtitleHub())
 
     class Bridge:
         def publish_user_transcript(self, **values):
             outcome = IntentOutcome(request_id=values['request_id'], session_id=values['session_id'],
                 stamp={'sec': 1, 'nanosec': 0}, status='UNSUPPORTED', message='ไม่ใช่คำสั่งเดินทาง')
             assert manager.record_intent_result(outcome)
-            main.receive_subtitle('ผมชาร์จแบตแทนกินข้าวครับ', 1, values['request_id'])
+            runtime.receive_subtitle('ผมชาร์จแบตแทนกินข้าวครับ', 1, values['request_id'])
 
-    monkeypatch.setattr(main, 'ros_bridge_instance', Bridge())
+    monkeypatch.setattr(runtime, 'ros_bridge_instance', Bridge())
     async def run():
         claim = await manager.claim('review-session')
-        await main.command_text(TextCommandRequest(text='นายกินข้าวหรือยัง'),
+        await commands.command_text(TextCommandRequest(text='นายกินข้าวหรือยัง'),
             x_session_token=claim['session_token'], x_session_id='review-session')
     asyncio.run(run())
     events = history.snapshot()['events']
     assert [event['kind'] for event in events] == ['request', 'intent', 'subtitle']
     assert len({event['request_id'] for event in events}) == 1
     before = len(events)
-    main.receive_subtitle('', 2)
+    runtime.receive_subtitle('', 2)
     assert len(history.snapshot()['events']) == before
     history.close()
 
@@ -89,9 +91,9 @@ def test_logging_failure_does_not_prevent_command_or_vr_delivery(monkeypatch):
     def fail(*args, **kwargs):
         raise OSError('fake disk error')
     broken = SimpleNamespace(record=fail, error=None)
-    monkeypatch.setattr(main, 'dialogue_history', broken)
-    monkeypatch.setattr(main, 'vr_subtitles', VRSubtitleHub())
-    main.record_web_request('req', 'session', 'hello', 'text')
-    main.receive_subtitle('ทดสอบ', 1, 'req')
+    monkeypatch.setattr(runtime, 'dialogue_history', broken)
+    monkeypatch.setattr(runtime, 'vr_subtitles', VRSubtitleHub())
+    runtime.record_web_request('req', 'session', 'hello', 'text')
+    runtime.receive_subtitle('ทดสอบ', 1, 'req')
     assert broken.error == 'history_write_failed'
-    assert json.loads(main.vr_subtitles.latest)['text'] == 'ทดสอบ'
+    assert json.loads(runtime.vr_subtitles.latest)['text'] == 'ทดสอบ'

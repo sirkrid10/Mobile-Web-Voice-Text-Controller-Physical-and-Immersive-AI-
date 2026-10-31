@@ -1,3 +1,5 @@
+from app import runtime
+from app.routes import sessions
 import asyncio
 import json
 import signal
@@ -268,17 +270,17 @@ def test_tunnel_start_failure_does_not_block_backend_health(monkeypatch):
         await asyncio.Event().wait()
 
     async def run():
-        monkeypatch.setattr(main, "create_ros2_bridge", lambda *args: FakeBridge())
-        monkeypatch.setattr(main, "session_manager", SessionManager())
-        monkeypatch.setattr(main, "AgentProcesses", FakeProcesses)
-        monkeypatch.setattr(main, "SystemHealth", FakeHealth)
-        monkeypatch.setattr(main, "TunnelManager", BrokenTunnelManager)
-        monkeypatch.setattr(main, "session_watchdog_loop", idle_watchdog)
-        monkeypatch.setattr(main.settings, "ENABLE_TUNNEL", True)
-        async with main.lifespan(main.app):
-            response = await main.service_health()
+        monkeypatch.setattr(runtime, 'create_ros2_bridge', lambda *args: FakeBridge())
+        monkeypatch.setattr(runtime, 'session_manager', SessionManager())
+        monkeypatch.setattr(runtime, 'AgentProcesses', FakeProcesses)
+        monkeypatch.setattr(runtime, 'SystemHealth', FakeHealth)
+        monkeypatch.setattr(runtime, 'TunnelManager', BrokenTunnelManager)
+        monkeypatch.setattr(runtime, 'session_watchdog_loop', idle_watchdog)
+        monkeypatch.setattr(runtime.settings, "ENABLE_TUNNEL", True)
+        async with runtime.lifespan(main.app):
+            response = await sessions.service_health()
             assert response.status_code == 200
             assert response.body
-            assert main.tunnel_manager.last_error == "Tunnel manager failed to start (RuntimeError)"
+            assert runtime.tunnel_manager.last_error == "Tunnel manager failed to start (RuntimeError)"
 
     asyncio.run(run())
